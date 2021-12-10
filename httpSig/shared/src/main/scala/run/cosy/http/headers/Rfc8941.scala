@@ -13,6 +13,8 @@ import scala.util.{Failure, Success, Try}
 
 object Rfc8941 {
 
+	type NumberOutOfBoundsException = run.cosy.http.headers.NumberOutOfBoundsException
+
 	//
 	//types used by RFC8941
 	//
@@ -310,7 +312,7 @@ object Rfc8941 {
 				def canon: String = o match
 					case l: IList => l.items.map(i=>i.canon).mkString("("," ",")")+l.params.canon
 					case pi: PItem[?] => pi.item.canon + pi.params.canon
-		
+
 		given sfDictSer(using
 			Serialise[Item], Serialise[Param], Serialise[Params],
 			Serialise[PItem[Item]], Serialise[IList]

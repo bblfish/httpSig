@@ -18,7 +18,7 @@ package run.cosy.http.headers
 
 import cats.data.NonEmptyList
 import cats.parse.Parser.{char, charIn}
-import cats.parse.Rfc5234._
+import cats.parse.Rfc5234.*
 import cats.parse.{Parser, Parser0}
 
 /** Common rules defined in RFC7230
@@ -57,6 +57,7 @@ object Rfc7230 {
 
 	private def surroundedBy[A](a: Parser0[A], b: Parser[Any]): Parser[A] =
 		b *> a <* b
+
 	private def between[A](a: Parser[Any], b: Parser0[A], c: Parser[Any]): Parser[A] =
 		a *> b <* c
 

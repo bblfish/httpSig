@@ -1,12 +1,12 @@
 package run.cosy.http.headers
 
+import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.parse.Parser.{Expectation, Fail}
-import cats.data.NonEmptyList
 import run.cosy.http.headers.Rfc8941
-import Rfc8941.Parser.{dictMember, sfBinary, sfBoolean, sfDecimal, sfDictionary, sfInteger, sfList, sfNumber, sfString, sfToken}
-import Rfc8941._
-import Rfc8941.SyntaxHelper._
+import run.cosy.http.headers.Rfc8941.*
+import run.cosy.http.headers.Rfc8941.Parser.*
+import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 
 import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}
@@ -16,12 +16,15 @@ class Rfc8941_Test extends munit.FunSuite {
 	val cafebabe = ArraySeq[Byte](113, -89, -34, 109, -90, -34)
 	val cafedead = ArraySeq[Byte](113, -89, -34, 117, -26, -99)
 
-	def R[T](value: T,remaining: String=""): Right[Parser.Error,(String, T)] = Right(remaining,value)
-	def RA[T](value: T,remaining: String=""): Right[Parser.Error,T] = Right(value)
-	def parseFail[T](result: Either[Parser.Error,(String, T)], msg: String="")(implicit loc: munit.Location): Unit =
-		assert(result.isLeft,result)
-	def parseFailAll[T](result: Either[Parser.Error,T], msg: String="")(implicit loc: munit.Location): Unit =
-		assert(result.isLeft,result)
+	def R[T](value: T, remaining: String = ""): Right[Parser.Error, (String, T)] = Right(remaining, value)
+
+	def RA[T](value: T, remaining: String = ""): Right[Parser.Error, T] = Right(value)
+
+	def parseFail[T](result: Either[Parser.Error, (String, T)], msg: String = "")(implicit loc: munit.Location): Unit =
+		assert(result.isLeft, result)
+
+	def parseFailAll[T](result: Either[Parser.Error, T], msg: String = "")(implicit loc: munit.Location): Unit =
+		assert(result.isLeft, result)
 
 	import Rfc8941.Parser.*
 	//
@@ -36,11 +39,11 @@ class Rfc8941_Test extends munit.FunSuite {
 	}
 
 	test("test sfInteger syntax") {
-		assertEquals(SfInt("42").long,42L)
-		assertEquals(SfInt("-42").long,-42L)
-		assertEquals(SfInt(42L).long,42L)
-		intercept[Rfc8941.NumberOutOfBoundsException]{
-			SfInt(("999"*5)+"0")
+		assertEquals(SfInt("42").long, 42L)
+		assertEquals(SfInt("-42").long, -42L)
+		assertEquals(SfInt(42L).long, 42L)
+		intercept[Rfc8941.NumberOutOfBoundsException] {
+			SfInt(("999" * 5) + "0")
 		}
 	}
 
@@ -53,9 +56,9 @@ class Rfc8941_Test extends munit.FunSuite {
 	}
 
 	test("test sfDecimal syntax") {
-		assertEquals(SfDec("42.0").double,42.0)
-		assertEquals(SfDec("-42.01").double,-42.01)
-		assertEquals(SfDec("-42.011").double,-42.011)
+		assertEquals(SfDec("42.0").double, 42.0)
+		assertEquals(SfDec("-42.01").double, -42.01)
+		assertEquals(SfDec("-42.011").double, -42.011)
 		assertEquals(SfDec("-42.015").double, -42.015)
 		assertEquals(SfDec(42.0015).double, 42.002)
 		intercept[Rfc8941.NumberOutOfBoundsException] {
@@ -65,10 +68,10 @@ class Rfc8941_Test extends munit.FunSuite {
 			SfDec("999OO0")
 		}
 		intercept[NumberFormatException] {
-			SfDec(("999"*4)+"0")
+			SfDec(("999" * 4) + "0")
 		}
-		intercept[NumberFormatException]{
-			SfDec(("999"*6)+"0")
+		intercept[NumberFormatException] {
+			SfDec(("999" * 6) + "0")
 		}
 	}
 
@@ -93,14 +96,14 @@ class Rfc8941_Test extends munit.FunSuite {
 	}
 
 	test("test sfString syntax") {
-		assertEquals(SfString("hello"),sf"hello")
-		assertEquals(SfString("""hello\"""),sf"""hello\""")
-		assertEquals(SfString(s"molae=${22+20}"),sf"molae=42")
+		assertEquals(SfString("hello"), sf"hello")
+		assertEquals(SfString("""hello\"""), sf"""hello\""")
+		assertEquals(SfString(s"molae=${22 + 20}"), sf"molae=42")
 		intercept[IllegalArgumentException] {
 			SfString("être")
 		}
 		intercept[IllegalArgumentException] {
-			SfString("	hi")   //no tabs
+			SfString("	hi") //no tabs
 		}
 	}
 
@@ -116,9 +119,9 @@ class Rfc8941_Test extends munit.FunSuite {
 	}
 
 	test("test sfToken syntax") {
-//		intercept[IllegalArgumentException] {
-//			Token("NoUpperCase")
-//		}
+		//		intercept[IllegalArgumentException] {
+		//			Token("NoUpperCase")
+		//		}
 	}
 
 	test("test sfToken") {
@@ -135,13 +138,14 @@ class Rfc8941_Test extends munit.FunSuite {
 
 	test("test sfBinary") {
 		assertEquals(sfBinary.parse(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==:"), R(ArraySeq.unsafeWrapArray(Base64.getDecoder.decode("cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg=="))))
-		assertEquals(sfBinary.parseAll(":cafebabe:"),RA(cafebabe))
-		assertEquals(sfBinary.parseAll(":cafedead:"),RA(cafedead))
+		assertEquals(sfBinary.parseAll(":cafebabe:"), RA(cafebabe))
+		assertEquals(sfBinary.parseAll(":cafedead:"), RA(cafedead))
 		parseFailAll(sfBinary.parseAll(" :cafedead:"), "can't start with space")
 		parseFailAll(sfBinary.parseAll(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg"), "must finish with colon")
 		parseFailAll(sfBinary.parseAll(":cHJldGVuZCB0aGlz#IGlzIGJpbmFyeSBjb250ZW50Lg:"), "no hash in the middle")
 	}
-	import Rfc8941.{PItem => PI, Token, SfDec => Dec, SfInt}
+
+	import Rfc8941.{SfInt, Token, PItem as PI, SfDec as Dec}
 
 	//
 	// test Lists
@@ -182,16 +186,16 @@ class Rfc8941_Test extends munit.FunSuite {
 			sfList.parseAll(
 				"""1234.750;  n=4;f=3 , 42;magic="h2g2", foo123/456;lang=en ,
 				  |   ?0;sleep=?1, "No/No", :cafebabe:;enc=unicode""".stripMargin.filter(_ != '\n').toString),
-			RA(List(PI(SfDec("1234.750"),ListMap(Token("n")->SfInt("4"),Token("f")->SfInt("3"))),
-				PI(SfInt("42"),ListMap(Token("magic")->sf"h2g2")),
-				PI(Token("foo123/456"),ListMap(Token("lang")->Token("en"))),
-				PI(false,ListMap(Token("sleep")->true)),
+			RA(List(PI(SfDec("1234.750"), ListMap(Token("n") -> SfInt("4"), Token("f") -> SfInt("3"))),
+				PI(SfInt("42"), ListMap(Token("magic") -> sf"h2g2")),
+				PI(Token("foo123/456"), ListMap(Token("lang") -> Token("en"))),
+				PI(false, ListMap(Token("sleep") -> true)),
 				PI(sf"No/No"),
-				PI(cafebabe,ListMap(Token("enc") -> Token("unicode")))))
+				PI(cafebabe, ListMap(Token("enc") -> Token("unicode")))))
 		)
 	}
 
-	import Rfc8941.{IList=>IL,DictMember}
+	import Rfc8941.{DictMember, IList as IL}
 
 	//
 	//Inner Lists
@@ -224,8 +228,8 @@ class Rfc8941_Test extends munit.FunSuite {
 		assertEquals(
 			sfList.parse("""("foo"; a=1;b=2);lvl=5, ("bar" "baz");lvl=1"""),
 			R(List(
-				IL(List(PI(sf"foo",ListMap(Token("a")->SfInt("1"),Token("b")->SfInt("2")))),ListMap(Token("lvl")->SfInt("5"))),
-				IL(List(PI(sf"bar"),PI(sf"baz")),ListMap(Token("lvl")->SfInt("1")))
+				IL(List(PI(sf"foo", ListMap(Token("a") -> SfInt("1"), Token("b") -> SfInt("2")))), ListMap(Token("lvl") -> SfInt("5"))),
+				IL(List(PI(sf"bar"), PI(sf"baz")), ListMap(Token("lvl") -> SfInt("1")))
 			))
 		)
 	}
@@ -235,11 +239,11 @@ class Rfc8941_Test extends munit.FunSuite {
 	test("dict-member") {
 		assertEquals(
 			dictMember.parse("""en="Applepie""""),
-			R(DictMember(Token("en"),PI(sf"Applepie")))
+			R(DictMember(Token("en"), PI(sf"Applepie")))
 		)
 	}
 
-	test("sfDictionary"){
+	test("sfDictionary") {
 		assertEquals(
 			sfDictionary.parse("""en="Applepie", da=:cafebabe:"""),
 			R(ListMap(
@@ -251,15 +255,15 @@ class Rfc8941_Test extends munit.FunSuite {
 			R(SfDict(
 				Token("a") -> PI(false),
 				Token("b") -> PI(true)(),
-				Token("c") -> PI(true)(Token("foo") ->Token("bar"))
+				Token("c") -> PI(true)(Token("foo") -> Token("bar"))
 			)))
 		assertEquals(
 			sfDictionary.parse("""a=(1 2), b=3, c=4;aa=bb, d=(5 6);valid"""),
 			R(SfDict(
-				Token("a") -> IL(PI(SfInt("1")),PI(SfInt("2")))(),
+				Token("a") -> IL(PI(SfInt("1")), PI(SfInt("2")))(),
 				Token("b") -> PI(SfInt("3"))(),
-				Token("c") -> PI(SfInt("4"))(Token("aa")->Token("bb")),
-				Token("d") -> IL(PI(SfInt("5")),PI(SfInt("6")))(Token("valid")->true)
+				Token("c") -> PI(SfInt("4"))(Token("aa") -> Token("bb")),
+				Token("d") -> IL(PI(SfInt("5")), PI(SfInt("6")))(Token("valid") -> true)
 			)))
 	}
 
@@ -270,10 +274,11 @@ class Rfc8941_Test extends munit.FunSuite {
 		import scala.language.implicitConversions
 
 
-		val `ex§4.1` = """sig1=("@request-target" "host" "date"   "cache-control" \
-						|      "x-empty-header" "x-example"); keyid="test-key-a"; \
-						|       alg="rsa-pss-sha512"; created=1402170695; expires=1402170995\
-						|""".rfc8792single
+		val `ex§4.1` =
+			"""sig1=("@request-target" "host" "date"   "cache-control" \
+			  |      "x-empty-header" "x-example"); keyid="test-key-a"; \
+			  |       alg="rsa-pss-sha512"; created=1402170695; expires=1402170995\
+			  |""".rfc8792single
 
 		assertEquals(
 			sfDictionary.parseAll(`ex§4.1`),
@@ -282,29 +287,29 @@ class Rfc8941_Test extends munit.FunSuite {
 					sf"@request-target", sf"host", sf"date", sf"cache-control",
 					sf"x-empty-header", sf"x-example"
 				)(
-					Token("keyid")-> sf"test-key-a",
-					Token("alg")-> sf"rsa-pss-sha512",
-					Token("created")-> SfInt("1402170695"),
-					Token("expires")-> SfInt("1402170995")
+					Token("keyid") -> sf"test-key-a",
+					Token("alg") -> sf"rsa-pss-sha512",
+					Token("created") -> SfInt("1402170695"),
+					Token("expires") -> SfInt("1402170995")
 				)
 			))
 		)
 
 		val `ex§4.2`: String =
-		"""sig1=:K2qGT5srn2OGbOIDzQ6kYT+ruaycnDAAUpKv+ePFfD0RAxn/1BUe\
-		|     Zx/Kdrq32DrfakQ6bPsvB9aqZqognNT6be4olHROIkeV879RrsrObury8L9SCEibe\
-		|     oHyqU/yCjphSmEdd7WD+zrchK57quskKwRefy2iEC5S2uAH0EPyOZKWlvbKmKu5q4\
-		|     CaB8X/I5/+HLZLGvDiezqi6/7p2Gngf5hwZ0lSdy39vyNMaaAT0tKo6nuVw0S1MVg\
-		|     1Q7MpWYZs0soHjttq0uLIA3DIbQfLiIvK6/l0BdWTU7+2uQj7lBkQAsFZHoA96ZZg\
-		|     FquQrXRlmYOh+Hx5D9fJkXcXe5tmAg==:""".rfc8792single
+			"""sig1=:K2qGT5srn2OGbOIDzQ6kYT+ruaycnDAAUpKv+ePFfD0RAxn/1BUe\
+			  |     Zx/Kdrq32DrfakQ6bPsvB9aqZqognNT6be4olHROIkeV879RrsrObury8L9SCEibe\
+			  |     oHyqU/yCjphSmEdd7WD+zrchK57quskKwRefy2iEC5S2uAH0EPyOZKWlvbKmKu5q4\
+			  |     CaB8X/I5/+HLZLGvDiezqi6/7p2Gngf5hwZ0lSdy39vyNMaaAT0tKo6nuVw0S1MVg\
+			  |     1Q7MpWYZs0soHjttq0uLIA3DIbQfLiIvK6/l0BdWTU7+2uQj7lBkQAsFZHoA96ZZg\
+			  |     FquQrXRlmYOh+Hx5D9fJkXcXe5tmAg==:""".rfc8792single
 
-		val `ex§4.2value`: ArraySeq[Byte]    =
-		"""K2qGT5srn2OGbOIDzQ6kYT+ruaycnDAAUpKv+ePFfD0RAxn/1BUe\
-		|  Zx/Kdrq32DrfakQ6bPsvB9aqZqognNT6be4olHROIkeV879RrsrObury8L9SCEibe\
-		|  oHyqU/yCjphSmEdd7WD+zrchK57quskKwRefy2iEC5S2uAH0EPyOZKWlvbKmKu5q4\
-		|  CaB8X/I5/+HLZLGvDiezqi6/7p2Gngf5hwZ0lSdy39vyNMaaAT0tKo6nuVw0S1MVg\
-		|  1Q7MpWYZs0soHjttq0uLIA3DIbQfLiIvK6/l0BdWTU7+2uQj7lBkQAsFZHoA96ZZg\
-		|  FquQrXRlmYOh+Hx5D9fJkXcXe5tmAg==""".rfc8792single.base64Decode
+		val `ex§4.2value`: ArraySeq[Byte] =
+			"""K2qGT5srn2OGbOIDzQ6kYT+ruaycnDAAUpKv+ePFfD0RAxn/1BUe\
+			  |  Zx/Kdrq32DrfakQ6bPsvB9aqZqognNT6be4olHROIkeV879RrsrObury8L9SCEibe\
+			  |  oHyqU/yCjphSmEdd7WD+zrchK57quskKwRefy2iEC5S2uAH0EPyOZKWlvbKmKu5q4\
+			  |  CaB8X/I5/+HLZLGvDiezqi6/7p2Gngf5hwZ0lSdy39vyNMaaAT0tKo6nuVw0S1MVg\
+			  |  1Q7MpWYZs0soHjttq0uLIA3DIbQfLiIvK6/l0BdWTU7+2uQj7lBkQAsFZHoA96ZZg\
+			  |  FquQrXRlmYOh+Hx5D9fJkXcXe5tmAg==""".rfc8792single.base64Decode
 
 		assertEquals(
 			sfDictionary.parse(`ex§4.2`),
@@ -312,41 +317,43 @@ class Rfc8941_Test extends munit.FunSuite {
 		)
 	}
 
-	import Rfc8941.Serialise.{given,*}
+	import Rfc8941.Serialise.{*, given}
+
 	test("serialisation of Items") {
 		assertEquals(true.canon, "?1")
 		assertEquals(false.canon, "?0")
 		assertEquals(Token("*ab/d").canon, "*ab/d")
 		assertEquals(SfInt("234").canon, "234")
 		assertEquals(sf"hello".canon, """"hello"""")
-		assertEquals(SfDec("1024.48").canon,"1024.48")
-		assertEquals(cafebabe.canon,":cafebabe:")
-		assertEquals(cafedead.canon,":cafedead:")
+		assertEquals(SfDec("1024.48").canon, "1024.48")
+		assertEquals(cafebabe.canon, ":cafebabe:")
+		assertEquals(cafedead.canon, ":cafedead:")
 	}
-	import Rfc8941.{Token=>Tk}
+	import Rfc8941.Token as Tk
+
 	test("serialisation of Parameterized Items") {
-		assertEquals(Param("fun",true).canon,";fun")
-		assertEquals(Params(Tk("fun")->true).canon,";fun")
+		assertEquals(Param("fun", true).canon, ";fun")
+		assertEquals(Params(Tk("fun") -> true).canon, ";fun")
 		assertEquals(
-			Params(Tk("foo")->true, Tk("bar")->SfInt("42")).canon,
+			Params(Tk("foo") -> true, Tk("bar") -> SfInt("42")).canon,
 			";foo;bar=42")
 		assertEquals(
-			Params(Tk("foo")->true, Tk("bar")->SfInt("42"),Tk("baz")->sf"hello").canon,
+			Params(Tk("foo") -> true, Tk("bar") -> SfInt("42"), Tk("baz") -> sf"hello").canon,
 			""";foo;bar=42;baz="hello"""")
 		assertEquals(
-			Params(Tk("keyid")->cafebabe).canon,
+			Params(Tk("keyid") -> cafebabe).canon,
 			";keyid=:cafebabe:"
 		)
 		assertEquals(
-			PItem(Tk("*foo"))(Tk("age")->SfInt("33")).canon,
+			PItem(Tk("*foo"))(Tk("age") -> SfInt("33")).canon,
 			"*foo;age=33"
 		)
 		assertEquals(
-			PItem(SfDec("99.999"))(Tk("discount")-> SfDec("0.2")).canon,
+			PItem(SfDec("99.999"))(Tk("discount") -> SfDec("0.2")).canon,
 			"99.999;discount=0.2"
 		)
 		assertEquals(
-			PItem(cafebabe)(Tk("enc")-> sf"utf8").canon,
+			PItem(cafebabe)(Tk("enc") -> sf"utf8").canon,
 			""":cafebabe:;enc="utf8""""
 		)
 	}
@@ -358,14 +365,14 @@ class Rfc8941_Test extends munit.FunSuite {
 		// but whitespaces between attributes have been removed as per
 		// issue: https://github.com/httpwg/http-extensions/issues/1456
 		assertEquals(
-			IList(sf"@request-target", sf"host", sf"date",sf"cache-control",sf"x-empty-header", sf"x-example",
-				PItem(sf"x-dictionary")(Param("key",Tk("b"))),
-				PItem(sf"x-dictionary")(Param("key",Tk("a"))),
-				PItem(sf"x-list")(Param("prefix",SfInt("3"))))(
-				Param("keyid",sf"test-key-a"),
-				Param("alg",sf"rsa-pss-sha512"),
-				Param("created",SfInt("1402170695")),
-				Param("expires",SfInt("1402170995")),
+			IList(sf"@request-target", sf"host", sf"date", sf"cache-control", sf"x-empty-header", sf"x-example",
+				PItem(sf"x-dictionary")(Param("key", Tk("b"))),
+				PItem(sf"x-dictionary")(Param("key", Tk("a"))),
+				PItem(sf"x-list")(Param("prefix", SfInt("3"))))(
+				Param("keyid", sf"test-key-a"),
+				Param("alg", sf"rsa-pss-sha512"),
+				Param("created", SfInt("1402170695")),
+				Param("expires", SfInt("1402170995")),
 			).canon,
 			"""("@request-target" "host" "date" "cache-control" \
 			  |   "x-empty-header" "x-example" "x-dictionary";key=b \
@@ -377,24 +384,25 @@ class Rfc8941_Test extends munit.FunSuite {
 	test("serialisation of sfDict") {
 		import scala.language.implicitConversions
 		assertEquals(
-			SfDict(Token("key")->PItem(true)(Param("encoding",Token("utf8")))).canon,
+			SfDict(Token("key") -> PItem(true)(Param("encoding", Token("utf8")))).canon,
 			"key;encoding=utf8"
 		)
-		val `ex§4.1` = """sig1=("@request-target" "host" "date" "cache-control" \
-							  |      "x-empty-header" "x-example");keyid="test-key-a";\
-							  |       alg="rsa-pss-sha512";created=1402170695;expires=1402170995\
-							  |""".rfc8792single
+		val `ex§4.1` =
+			"""sig1=("@request-target" "host" "date" "cache-control" \
+			  |      "x-empty-header" "x-example");keyid="test-key-a";\
+			  |       alg="rsa-pss-sha512";created=1402170695;expires=1402170995\
+			  |""".rfc8792single
 
 		assertEquals(
 			SfDict(
 				Token("sig1") -> IL(
-					sf"@request-target",sf"host",sf"date",sf"cache-control",
+					sf"@request-target", sf"host", sf"date", sf"cache-control",
 					sf"x-empty-header", sf"x-example"
 				)(
-					Token("keyid")-> sf"test-key-a",
-					Token("alg")-> sf"rsa-pss-sha512",
-					Token("created")->SfInt("1402170695"),
-					Token("expires")->SfInt("1402170995")
+					Token("keyid") -> sf"test-key-a",
+					Token("alg") -> sf"rsa-pss-sha512",
+					Token("created") -> SfInt("1402170695"),
+					Token("expires") -> SfInt("1402170995")
 				)
 			).canon,
 			`ex§4.1`

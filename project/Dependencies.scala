@@ -28,6 +28,17 @@ object Dependencies {
 		lazy val parse =  Def.setting("org.typelevel" %%% "cats-parse" % "0.3.6")
 	}
 
+	object akka {
+		val CoreVersion = "2.6.17"
+		val HttpVersion = "10.2.7"
+		def apply(id: String, version: String) =
+			Def.setting("com.typesafe.akka" %% id % version cross CrossVersion.for3Use2_13)
+
+		lazy val typed =	akka("akka-actor-typed", CoreVersion)
+		lazy val stream = akka("akka-stream", CoreVersion)
+		lazy val http = akka("akka-http", HttpVersion)
+	}
+
 	val scalajsDom = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
 	val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
 

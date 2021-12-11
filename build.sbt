@@ -56,12 +56,8 @@ lazy val httpSig = crossProject(JVMPlatform,JSPlatform)
 			cats.parse.value
 		),
 		libraryDependencies ++= Seq(
-			munit.value % Test,
-			cats.munitEffect.value % Test,
-			http4s.server.value % Test,
-			http4s.client.value % Test,
-			http4s.theDsl.value % Test
-		),
+			munit.value % Test
+		)
 //		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
 		// Test / requireJsDomEnv := true,
 		// scalaJSUseMainModuleInitializer := true,
@@ -73,9 +69,40 @@ lazy val httpSig = crossProject(JVMPlatform,JSPlatform)
 
 		// https://github.com/rdfjs/N3.js/
 		// do I also need to run `npm install n3` ?
-		Compile / npmDependencies += NPM.n3,
-		Test / npmDependencies += NPM.n3,
+//		Compile / npmDependencies += NPM.n3,
+//		Test / npmDependencies += NPM.n3,
 	)
 
 lazy val httpSigJVM = httpSig.jvm
 lazy val httpSigJS =  httpSig.js
+
+// we only use Java akka here (doing akka-js would be a whole project by itself)
+lazy val akkaSig = project
+	.in(file("akka"))
+	.settings(commonSettings:_*)
+	.settings(
+		name := "HttpSigAkka",
+		description := "Http Sig parsing lib for Akka headers",
+		// scalacOptions := scala3jsOptions,
+		libraryDependencies ++= Seq(
+			akka.http.value, akka.stream.value, akka.typed.value
+		),
+		libraryDependencies ++= Seq(
+			munit.value % Test,
+			cats.munitEffect.value % Test
+		)
+		//		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
+		// Test / requireJsDomEnv := true,
+		// scalaJSUseMainModuleInitializer := true,
+		// scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)), // configure Scala.js to emit a JavaScript module instead of a top-level script
+		// ESModule cannot be used because we are using ScalaJSBundlerPlugin
+		// scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+
+		//		fastOptJS / webpackConfigFile := Some(baseDirectory.value / "webpack.config.dev.js"),
+
+		// https://github.com/rdfjs/N3.js/
+		// do I also need to run `npm install n3` ?
+//		Compile / npmDependencies += NPM.n3,
+//		Test / npmDependencies += NPM.n3
+	).dependsOn(httpSig.jvm)
+

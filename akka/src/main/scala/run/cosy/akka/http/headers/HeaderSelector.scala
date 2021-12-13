@@ -1,8 +1,8 @@
-package run.cosy.http.headers
+package run.cosy.akka.http.headers
+
+import run.cosy.http.headers.*
 
 import scala.util.{Failure, Try}
-import run.cosy.http.headers.{SigInput,InvalidSigException}
-import run.cosy.http.headers.Rfc8941
 
 /**
  * Header info specifying properties of a header for Signing Http Messages,
@@ -66,7 +66,7 @@ object `@signature-params` {
 case class SelectorOps[HM](selectorFor: Map[Rfc8941.SfString,HeaderSelector[HM]] ):
 
 	import Rfc8941.Serialise.given
-	import SelectorOps.{prefix,key}
+	import SelectorOps.{key, prefix}
 
 	/** add new selectors to this one */
 	def append(selectors: HeaderSelector[HM]*): SelectorOps[HM] =

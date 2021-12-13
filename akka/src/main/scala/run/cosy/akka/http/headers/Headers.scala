@@ -1,14 +1,15 @@
-package run.cosy.http
+package run.cosy.akka.http.headers
 
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{CustomHeader, ModeledCustomHeader, ModeledCustomHeaderCompanion, RawHeader}
+import run.cosy.akka.http.headers.{BetterCustomHeader,BetterCustomHeaderCompanion}
 
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.Charset
 import java.util.Locale
-import scala.util.{Failure, Success, Try}
 import scala.io.Codec
 import scala.language.{existentials, implicitConversions}
+import scala.util.{Failure, Success, Try}
 
 object Encoding {
 	val utf8 = Charset.forName("UTF-8")

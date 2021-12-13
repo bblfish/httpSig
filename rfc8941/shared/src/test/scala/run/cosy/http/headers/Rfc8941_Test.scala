@@ -267,7 +267,7 @@ class Rfc8941_Test extends munit.FunSuite {
 			)))
 	}
 
-	import run.cosy.test.utils.StringUtils.*
+	import run.cosy.http.utils.StringUtils.*
 	//examples are taken from https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03
 	test("sfDictionary with Signing Http Messages headers") {
 		//here we start playing with making the syntax easier to work with by using implicit conversions

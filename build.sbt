@@ -41,15 +41,15 @@ val scala3jsOptions =  Seq(
 )
 
 
-lazy val httpSig = crossProject(JVMPlatform,JSPlatform)
+lazy val rfc8941 = crossProject(JVMPlatform,JSPlatform)
 	.crossType(CrossType.Full)
-	.in(file("httpSig"))
+	.in(file("rfc8941"))
 	.settings(commonSettings:_*)
 	.enablePlugins(ScalaJSPlugin)
 	.enablePlugins(ScalaJSBundlerPlugin)
 	.settings(
-		name := "HttpSig",
-		description := "Http Sig parsing library",
+		name := "rfc8941",
+		description := "RFC8941 (Structured Field Values) parser",
 		// scalacOptions := scala3jsOptions,
 		libraryDependencies ++= Seq(
 			http4s.client.value,
@@ -73,16 +73,13 @@ lazy val httpSig = crossProject(JVMPlatform,JSPlatform)
 //		Test / npmDependencies += NPM.n3,
 	)
 
-lazy val httpSigJVM = httpSig.jvm
-lazy val httpSigJS =  httpSig.js
-
 // we only use Java akka here (doing akka-js would be a whole project by itself)
 lazy val akkaSig = project
 	.in(file("akka"))
 	.settings(commonSettings:_*)
 	.settings(
-		name := "HttpSigAkka",
-		description := "Http Sig parsing lib for Akka headers",
+		name := "SigningHttpMessagesAkka",
+		description := "Signing HTTP Messages parser for Akka headers",
 		// scalacOptions := scala3jsOptions,
 		libraryDependencies ++= Seq(
 			akka.http.value, akka.stream.value, akka.typed.value
@@ -104,5 +101,5 @@ lazy val akkaSig = project
 		// do I also need to run `npm install n3` ?
 //		Compile / npmDependencies += NPM.n3,
 //		Test / npmDependencies += NPM.n3
-	).dependsOn(httpSig.jvm)
+	).dependsOn(rfc8941.jvm)
 

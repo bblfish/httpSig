@@ -1,21 +1,20 @@
-package run.cosy.http.headers
+package run.cosy.akka.http.headers
 
-import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import _root_.akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
+import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import cats.parse.Parser
-import run.cosy.http.headers.{HTTPHeaderParseException, UnableToCreateSigHeaderException}
-import run.cosy.http.{BetterCustomHeader, BetterCustomHeaderCompanion}
+import run.cosy.akka.http.headers.Encoding.UnicodeString
+
+import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
+
+import run.cosy.http.headers.*
+import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, Params, SfDict, SfInt, SfList, SfString, Token}
 
 import java.security.{PrivateKey, PublicKey, Signature}
 import java.time.Instant
+import scala.collection.immutable
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
-import run.cosy.http.headers.Rfc8941
-import Rfc8941.{IList, Item, PItem, Parameterized, Params, SfDict, SfInt, SfList, SfString, Token}
-import run.cosy.http.{BetterCustomHeader,BetterCustomHeaderCompanion}
-import run.cosy.http.Encoding.UnicodeString
-
-import scala.collection.immutable
 
 
 /**
@@ -90,7 +89,7 @@ object SigInputs:
  */
 final case class SigInput private(val il: IList) extends AnyVal {
 	import Rfc8941.Serialise.given
-	import SigInput.{createdTk,expiresTk,keyidTk,algTk, nonceTk}
+	import SigInput.*
 	//todo: verify that collecting only SfStrings is ok
 	def headers: Seq[String] = il.items.collect{ case PItem(SfString(str),_) => str}
 	def headerItems: Seq[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])

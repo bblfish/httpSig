@@ -142,8 +142,9 @@ object SigInput {
 	 * a keyid attribute.
 	 * */
 	def valid[H](il: IList)(using o: SelectorOps[H]): Boolean =
-		def headersOk = il.items.forall {
-				case p: PItem[?] if p.item.isInstanceOf[SfString] => o.valid(p)
+		def headersOk = il.items.forall { pit =>
+			pit.item match
+				case str : SfString => o.valid(pit.asInstanceOf[PItem[SfString]]) // todo: remove asInstanceOf?
 				case _ => false
 			}
 		def paramsOk = il.params.forall {

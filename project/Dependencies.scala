@@ -39,6 +39,27 @@ object Dependencies {
 		lazy val http = akka("akka-http", HttpVersion)
 	}
 
+	object java {
+		/**
+		 * Apache 2 License
+		 *
+		 * @see https://connect2id.com/products/nimbus-jose-jwt/examples/jwk-conversion
+		 */
+		val nimbusDS = "com.nimbusds" % "nimbus-jose-jwt" % "9.15.2"
+		/**
+		 * BouncyCastle (for parsing PEM encoded objects at present in test)
+		 * MIT style License
+		 *
+		 * @see https://www.bouncycastle.org/latest_releases.html
+		 * @see https://repo1.maven.org/maven2/org/bouncycastle/bcprov-jdk15to18/
+		 */
+		val bouncy = Seq(
+			//"org.bouncycastle" % "bcprov-jdk15to18" % bouncyVersion,
+			//"org.bouncycastle" % "bctls-jdk15to18" % bouncyVersion,
+			"org.bouncycastle" % "bcpkix-jdk15to18" %  "1.69" % Test
+		)
+	}
+
 	val scalajsDom = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
 	val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
 

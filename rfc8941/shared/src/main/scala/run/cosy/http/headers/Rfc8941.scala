@@ -78,8 +78,8 @@ object Rfc8941 {
 			val sb = new StringBuilder
 			sb.append('"')
 			for (c <- asciiStr) {
-				if (c == '\\') sb.append(bs).append(bs)
-				else if (c == '"') sb.append(bs).append('"')
+				if c == '\\' then sb.append(bs).append(bs)
+				else if c == '"' then sb.append(bs).append('"')
 				else sb.append(c)
 			}
 			sb.append('"')
@@ -151,10 +151,10 @@ object Rfc8941 {
 		def apply[T <: Item](item: T)(params: Param*): PItem[T] = new PItem(item, ListMap(params *))
 
 	/** Inner List */
-	final case class IList(items: List[PItem[_]], params: Params) extends Parameterized
+	final case class IList(items: List[PItem[?]], params: Params) extends Parameterized
 
 	object IList:
-		def apply(items: PItem[_]*)(params: Param*): IList = new IList(items.toList, ListMap(params *))
+		def apply(items: PItem[?]*)(params: Param*): IList = new IList(items.toList, ListMap(params *))
 
 	implicit def token2PI[T <: Item]: Conversion[T, PItem[T]] = (i: T) => PItem[T](i)
 
@@ -168,10 +168,9 @@ object Rfc8941 {
 				val strings = sc.parts.iterator
 				val expressions = args.iterator
 				var buf = new StringBuilder(strings.next())
-				while (strings.hasNext) {
+				while strings.hasNext do
 					buf.append(expressions.next())
 					buf.append(strings.next())
-				}
 				SfString(buf.toString())
 			}
 
@@ -222,7 +221,7 @@ object Rfc8941 {
 			.map { (c, lc) => Token.unsafeParsed((c :: lc).mkString) }
 		val base64: P[Char] = (R5234.alpha | R5234.digit | P.charIn('+', '/', '='))
 		val sfBinary: P[ArraySeq[Byte]] = (`:` *> base64.rep0 <* `:`).map { chars =>
-			ArraySeq.unsafeWrapArray(Base64.getDecoder.decode(chars.mkString))
+			ArraySeq.unsafeWrapArray(Base64.getDecoder.nn.decode(chars.mkString).nn)
 		}
 		val bareItem: P[Item] = P.oneOf(sfNumber :: sfString :: sfToken :: sfBinary :: sfBoolean :: Nil)
 		val lcalpha: P[Char] = P.charIn(0x61.toChar to 0x7a.toChar) | P.charIn('a' to 'z')
@@ -295,7 +294,7 @@ object Rfc8941 {
 					case d: SfDec => d.double.toString
 					case s: SfString => s.formattedString
 					case tk: Token => tk.t
-					case as: Bytes => ":" + Base64.getEncoder
+					case as: Bytes => ":" + Base64.getEncoder.nn
 						.encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
 					case b: Boolean => if b then "?1" else "?0"
 

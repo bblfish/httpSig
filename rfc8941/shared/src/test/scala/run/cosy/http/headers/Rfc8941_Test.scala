@@ -137,7 +137,8 @@ class Rfc8941_Test extends munit.FunSuite {
 	}
 
 	test("test sfBinary") {
-		assertEquals(sfBinary.parse(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==:"), R(ArraySeq.unsafeWrapArray(Base64.getDecoder.decode("cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg=="))))
+		assertEquals(sfBinary.parse(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==:"),
+			R(ArraySeq.unsafeWrapArray(Base64.getDecoder.nn.decode("cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==").nn)))
 		assertEquals(sfBinary.parseAll(":cafebabe:"), RA(cafebabe))
 		assertEquals(sfBinary.parseAll(":cafedead:"), RA(cafedead))
 		parseFailAll(sfBinary.parseAll(" :cafedead:"), "can't start with space")

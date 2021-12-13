@@ -14,7 +14,7 @@ object StringUtils:
 	 */
 		def rfc8792single: String = singleSlsh.replaceAllIn(str.stripMargin, "")
 
-		def base64Decode: IArray[Byte] = IArray.unsafeFromArray(Base64.getDecoder.decode(str))
+		def base64Decode: IArray[Byte] = IArray.unsafeFromArray(Base64.getDecoder.nn.decode(str).nn)
 
 		def toRfc8792single(leftPad: Int = 4, maxLineLength: Int = 79): String =
 			@tailrec
@@ -26,5 +26,5 @@ object StringUtils:
 					lengthSplit(remainingStr, headStr :: buf, false)
 			end lengthSplit
 
-			str.split("\\R").toList.map { line => lengthSplit(line).mkString("\\\n" + (" " * leftPad)) }.mkString("\n")
+			str.split("\\R").nn.toList.map { line => lengthSplit(line.nn).mkString("\\\n" + (" " * leftPad)) }.mkString("\n")
 end StringUtils

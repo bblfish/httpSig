@@ -21,7 +21,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
 	.settings(
 		name := "rfc8941",
 		description := "RFC8941 (Structured Field Values) parser",
-		scalacOptions := scala3Options,
+//		scalacOptions := scala3Options,
 		libraryDependencies += cats.parse.value,
 		libraryDependencies += munit.value % Test
 		//		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
@@ -38,7 +38,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
 		//		Compile / npmDependencies += NPM.n3,
 		//		Test / npmDependencies += NPM.n3,
 	).jsSettings(
-
+		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	)
 // we only use Java akka here (doing akka-js would be a whole project by itself)
 lazy val akkaSig = project

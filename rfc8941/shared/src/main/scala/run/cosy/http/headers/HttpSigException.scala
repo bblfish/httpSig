@@ -3,9 +3,9 @@ package run.cosy.http.headers
 import scala.util.control.NoStackTrace
 
 //todo for Scala 3.1.1 one could change back to using NoStackTrace https://github.com/lampepfl/dotty/issues/13608
-class HttpSigException(message: String) extends Throwable(message,null,  true,  false)
+class HttpSigException(message: String) extends Throwable(message, null, true, false)
 
-case class NumberOutOfBoundsException(num: Number) extends HttpSigException("num="+num)
+case class NumberOutOfBoundsException(num: Number) extends HttpSigException("num=" + num)
 
 //mutated from akka.http.scaladsl.model.ParsingException
 //todo: is the mutation good?

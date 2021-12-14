@@ -1,22 +1,17 @@
 package run.cosy.http.auth
 
 import akka.http.javadsl.model.headers.Host
-import akka.http.scaladsl.model.headers.{Authorization, CustomHeader, Date, ETag, GenericHttpCredentials, HttpChallenge, HttpCredentials, RawHeader, `Cache-Control`, `WWW-Authenticate`}
-import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model.headers.*
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.server.Directives.AuthenticationResult
 import akka.http.scaladsl.server.directives.AuthenticationResult
 import akka.http.scaladsl.server.directives.AuthenticationResult.{failWithChallenge, success}
 import akka.http.scaladsl.util.FastFuture
-
-import run.cosy.akka.http.headers.{SelectorOps, SigInput, `@signature-params`, `Signature-Input`}
-import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.{Agent, KeyidSubj}
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.{Signature,Signatures}
-import run.cosy.http.headers.HttpSig
-import run.cosy.http.headers.{InvalidSigException, UnableToCreateSigHeaderException}
 import com.nimbusds.jose.util.Base64
+import run.cosy.akka.http.headers.*
+import run.cosy.http.auth.{Agent, KeyidSubj}
+import run.cosy.http.headers.Rfc8941.*
+import run.cosy.http.headers.*
 
 import java.nio.charset.StandardCharsets
 import java.security.{PrivateKey, PublicKey}
@@ -28,14 +23,14 @@ import scala.util.{Failure, Success, Try}
 
 /**
  * Adds extensions methods to sign HttpMessage-s - be they requests or responses.
- **/
+ * */
 object MessageSignature {
 	val urlStrRegex = "<(.*)>".r
-	
+
 	/**
 	 * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
 	 */
-	extension[T <: HttpMessage](msg: T) {
+	extension[T <: HttpMessage] (msg: T) {
 
 		/**
 		 * Generate a proces to create a new HttpRequest with the given Signature-Input header.
@@ -54,6 +49,7 @@ object MessageSignature {
 					sigData.sign(sigString.getBytes(StandardCharsets.US_ASCII)).map { sigbytes =>
 						import akka.http.scaladsl.model.{Uri, UriRendering}
 						import UriRendering.given
+
 						import scala.jdk.CollectionConverters.given
 						msg.addHeaders(Seq(
 							`Signature-Input`(name, sigInput),
@@ -77,7 +73,7 @@ object MessageSignature {
 		 *         todo: it may be more correct if the result is a byte array, rather than a Unicode String.
 		 */
 		def signingString(sigInput: SigInput)(using selector: SelectorOps[HttpMessage]): Try[String] =
-			import Rfc8941.Serialise.{given, _}
+			import Rfc8941.Serialise.{*, given}
 
 			@tailrec
 			def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
@@ -85,11 +81,11 @@ object MessageSignature {
 				else
 					val pih = todo.head
 					if (pih == `@signature-params`.pitem) then
-						val sigp  =`@signature-params`.signingString(sigInput)
+						val sigp = `@signature-params`.signingString(sigInput)
 						Success(if onto == "" then sigp else onto + "\n" + sigp)
-					else selector.select(msg,pih) match
-						case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
-						case f => f
+					else selector.select(msg, pih) match
+					case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
+					case f => f
 				end if
 			end buildSigString
 
@@ -118,17 +114,17 @@ object MessageSignature {
 		 * lift a function to fetch the keyId, signature verification data
 		 * into a function which given the HttpSig parameters
 		 * may return an Authenticated Agent
-		 **/
+		 * */
 		def signatureAuthN[Kid <: Keyidentifier](
 			fetchKeyId: Rfc8941.SfString => Future[SignatureVerifier[Kid]]
 		)(using
-			ec: ExecutionContext, clock: Clock, so : SelectorOps[HttpMessage]
+			ec: ExecutionContext, clock: Clock, so: SelectorOps[HttpMessage]
 		): HttpSig => Future[Kid] = (httpSig) =>
 			val tr = for {
 				(si: SigInput, sig: Bytes) <- msg.getSignature(httpSig.proofName)
-						.toRight(InvalidSigException(
-							s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}' ")
-						).toTry
+					.toRight(InvalidSigException(
+						s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}' ")
+					).toTry
 				if si.isValidAt(clock.instant)
 				sigStr <- msg.signingString(si)
 			} yield (si, sigStr, sig)
@@ -136,7 +132,7 @@ object MessageSignature {
 			for {
 				(si: SigInput, sigStr: String, sig: Bytes) <- FastFuture(tr)
 				sigVer <- fetchKeyId(si.keyid)
-				agent <- FastFuture(sigVer.verifySignature(sigStr,sig))
+				agent <- FastFuture(sigVer.verifySignature(sigStr, sig))
 			} yield agent
 	}
 

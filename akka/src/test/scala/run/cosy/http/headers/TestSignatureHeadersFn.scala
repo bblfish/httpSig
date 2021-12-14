@@ -2,11 +2,10 @@ package run.cosy.http.headers
 
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpMessage, Uri}
-import run.cosy.akka.http.headers.{SigInput, `Signature-Input`}
+import run.cosy.akka.http.headers.{SigInput, `Signature-Input`, host}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 import run.cosy.http.headers.Rfc8941.{SfDict, SfInt, Token, IList as IL}
-import run.cosy.akka.http.headers.host
 import run.cosy.http.utils.StringUtils.*
 
 import java.util.Base64
@@ -63,16 +62,16 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 		assertEquals(value, expectedHdr.canon)
 
 		RawHeader("Signature-Input", ex1) match
-			case `Signature-Input`(sis) =>
-				assertEquals(sis.si.size, 1)
-				assertEquals(sis.si.keys.head, Token("sig1"))
-				assertEquals(sis.si.values.head, sig1)
-				val sigIn: SigInput = sis.si.values.head
-				assert(sigIn.headers.contains("cache-control"))
-				assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
-				assertEquals(sigIn.created, Some(1402170695L))
-				assertEquals(sigIn.expires, Some(1402170995L))
-			case _ => fail
+		case `Signature-Input`(sis) =>
+			assertEquals(sis.si.size, 1)
+			assertEquals(sis.si.keys.head, Token("sig1"))
+			assertEquals(sis.si.values.head, sig1)
+			val sigIn: SigInput = sis.si.values.head
+			assert(sigIn.headers.contains("cache-control"))
+			assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
+			assertEquals(sigIn.created, Some(1402170695L))
+			assertEquals(sigIn.expires, Some(1402170995L))
+		case _ => fail
 	}
 
 	test("`Signature-Input` with two headers") {
@@ -89,23 +88,23 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 		val expectedHdr: SfDict = ListMap(Token("sig1") -> expected1, Token("sig2") -> expected2)
 		assertEquals(value, expectedHdr.canon)
 		RawHeader("Signature-Input", s"$ex1, $ex2, $ex3") match
-			case `Signature-Input`(sis) =>
-				assertEquals(sis.si.size, 2)
-				assertEquals(sis.si.keys.head, Token("sig1"))
-				assertEquals(sis.si.keys.tail.head, Token("sig2"))
-				assertEquals(sis.si.values.head, sig1)
-				assertEquals(sis.si.values.tail.head, sig2)
-				val sigIn: SigInput = sis.si.values.head
-				assertEquals(sigIn.headers, Seq("@request-target", "host", "date", "cache-control"))
-				assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
-				assertEquals(sigIn.created, Some(1402170695L))
-				assertEquals(sigIn.expires, Some(1402170995L))
-				val sigIn2: SigInput = sis.si.values.tail.head
-				assertEquals(sigIn2.headers, Seq("host", "date", "cache-control", "@request-target"))
-				assertEquals(sigIn2.keyid.asciiStr, "https://alice.pdf/k/clef#")
-				assertEquals(sigIn2.created, Some(140217000L))
-				assertEquals(sigIn2.expires, Some(140220000L))
-			case _ => fail
+		case `Signature-Input`(sis) =>
+			assertEquals(sis.si.size, 2)
+			assertEquals(sis.si.keys.head, Token("sig1"))
+			assertEquals(sis.si.keys.tail.head, Token("sig2"))
+			assertEquals(sis.si.values.head, sig1)
+			assertEquals(sis.si.values.tail.head, sig2)
+			val sigIn: SigInput = sis.si.values.head
+			assertEquals(sigIn.headers, Seq("@request-target", "host", "date", "cache-control"))
+			assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
+			assertEquals(sigIn.created, Some(1402170695L))
+			assertEquals(sigIn.expires, Some(1402170995L))
+			val sigIn2: SigInput = sis.si.values.tail.head
+			assertEquals(sigIn2.headers, Seq("host", "date", "cache-control", "@request-target"))
+			assertEquals(sigIn2.keyid.asciiStr, "https://alice.pdf/k/clef#")
+			assertEquals(sigIn2.created, Some(140217000L))
+			assertEquals(sigIn2.expires, Some(140220000L))
+		case _ => fail
 	}
 
 	val base64Ex1 =

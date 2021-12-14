@@ -1,71 +1,70 @@
 package run.cosy.http.auth
 
-import akka.http.scaladsl.model.{DateTime, HttpEntity, HttpMessage, HttpMethods, HttpRequest, MediaTypes, Uri}
-import akka.http.scaladsl.model.headers.{CacheDirectives, Date, GenericHttpCredentials, Host, RawHeader, `Cache-Control`}
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.{HttpSig, Signature, Signatures}
-import Rfc8941.*
-import Rfc8941.SyntaxHelper.*
+import akka.http.scaladsl.model.headers.*
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.util.FastFuture
 import run.cosy.akka.http.headers.{SelectorOps, SigInput, SigInputs, `Signature-Input`}
+import run.cosy.http.headers.Rfc8941.*
+import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import run.cosy.http.headers.{HttpSig, Rfc8941, Signature, Signatures}
 //import com.nimbusds.jose.JWSAlgorithm
 import run.cosy.akka.http.JW2JCA
-
-import scala.concurrent.{Await, Future}
-import run.cosy.akka.http.headers.{AkkaDictSelector, AkkaHeaderSelector, UntypedAkkaSelector}
-import run.cosy.akka.http.headers.{`@request-target`, `cache-control`, `content-length`, `content-type`, `digest`, date, etag, host}
 import run.cosy.akka.http.headers.date.collate
+import run.cosy.akka.http.headers.{AkkaDictSelector, AkkaHeaderSelector, UntypedAkkaSelector, `@request-target`, `cache-control`, `content-length`, `content-type`, `digest`, date, etag, host}
 import run.cosy.http.auth.MessageSignature.*
 import run.cosy.http.utils.StringUtils.*
 
 import java.nio.charset.StandardCharsets
-import java.security.{KeyFactory, MessageDigest, Signature => JSignature}
 import java.security.spec.{PKCS8EncodedKeySpec, X509EncodedKeySpec}
+import java.security.{KeyFactory, MessageDigest, Signature as JSignature}
 import java.time.Clock
 import java.util.Base64
-import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
 
 class TestMessageSigningRFCFn extends munit.FunSuite {
 
 	// special headers used in the spec that we won't find elsewhere
 
-	object `x-example` extends UntypedAkkaSelector:
-		override val lowercaseName: String = "x-example"
-
-	object `x-empty-header` extends UntypedAkkaSelector:
-		override val lowercaseName: String = "x-empty-header"
-
-	object `x-ows-header` extends UntypedAkkaSelector:
-		override val lowercaseName: String = "x-ows-header"
-
-	object `x-obs-fold-header` extends UntypedAkkaSelector:
-		override val lowercaseName: String = "x-obs-fold-header"
-
-	object `x-dictionary` extends AkkaDictSelector:
-		override val lowercaseName: String = "x-dictionary"
-
+	/** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-b.2
+	 * Appendix B.2.]] of the spec */
+	val rfcAppdxB2Req = HttpRequest(method = HttpMethods.POST,
+		uri = Uri("/foo?param=value&pet=dog"),
+		headers = Seq(
+			Host(Uri.Host("example.com"), 0),
+			Date(DateTime(2021, 04, 20, 02, 07, 55)),
+			RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE="),
+		),
+		entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
+	)
 	given specialSelectorOps: SelectorOps[HttpMessage] =
 		run.cosy.akka.http.headers.akkaSelectorOps.append(
-			`x-example`, `x-empty-header`,`x-ows-header`,`x-obs-fold-header`,`x-dictionary`
+			`x-example`, `x-empty-header`, `x-ows-header`, `x-obs-fold-header`, `x-dictionary`
 		)
-
 	given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
 	given clock: Clock = Clock.fixed(java.time.Instant.ofEpochSecond(16188845000), java.time.ZoneOffset.UTC)
+	def expectedHeader(name: String, value: String) = Success("\"" + name + "\": " + value)
+	object `x-example` extends UntypedAkkaSelector :
+		override val lowercaseName: String = "x-example"
+	object `x-empty-header` extends UntypedAkkaSelector :
+		override val lowercaseName: String = "x-empty-header"
+	object `x-ows-header` extends UntypedAkkaSelector :
+		override val lowercaseName: String = "x-ows-header"
+	object `x-obs-fold-header` extends UntypedAkkaSelector :
+		override val lowercaseName: String = "x-obs-fold-header"
 
-	def expectedHeader(name: String, value: String) = Success("\""+name+"\": "+value)
-
-	test("2.1.2 Canoncicalized Examples") {
+	test("2.1.2 Canonicalized Examples") {
 		val rfcCanonReq = HttpRequest(
 			method = HttpMethods.GET,
 			uri = Uri("/foo"),
 			headers = Seq(
 				Host("www.example.com"),
 				Date(DateTime(2014, 06, 07, 20, 51, 35)),
-				RawHeader("X-OWS-Header","   Leading and trailing whitespace.   "),
-				RawHeader("X-Obs-Fold-Header","""Obsolete
-														  |      line folding. """.stripMargin),
+				RawHeader("X-OWS-Header", "   Leading and trailing whitespace.   "),
+				RawHeader("X-Obs-Fold-Header",
+					"""Obsolete
+					  |      line folding. """.stripMargin),
 				RawHeader("X-Example",
 					"""Example header
 					  |   with some whitespace.  """.stripMargin),
@@ -74,38 +73,38 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 				`Cache-Control`(CacheDirectives.`must-revalidate`)
 			),
 		)
-		assertEquals(`cache-control`.signingString(rfcCanonReq),expectedHeader("cache-control","max-age=60, must-revalidate"))
+		assertEquals(`cache-control`.signingString(rfcCanonReq), expectedHeader("cache-control", "max-age=60, must-revalidate"))
 		//note: It is Saturday, not Tuesday: either that is an error in the spec, or example of header with wrong date
 		//   we fixed it here, because it is difficult to get broken dates past akka
-		assertEquals(`date`.signingString(rfcCanonReq),expectedHeader("date","Sat, 07 Jun 2014 20:51:35 GMT"))
-		assertEquals(`host`.signingString(rfcCanonReq),expectedHeader("host","www.example.com"))
-		assertEquals(`x-empty-header`.signingString(rfcCanonReq),expectedHeader("x-empty-header",""))
-		assertEquals(`x-obs-fold-header`.signingString(rfcCanonReq),expectedHeader("x-obs-fold-header","Obsolete line folding."))
-		assertEquals(`x-ows-header`.signingString(rfcCanonReq),expectedHeader("x-ows-header","Leading and trailing whitespace."))
+		assertEquals(`date`.signingString(rfcCanonReq), expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT"))
+		assertEquals(`host`.signingString(rfcCanonReq), expectedHeader("host", "www.example.com"))
+		assertEquals(`x-empty-header`.signingString(rfcCanonReq), expectedHeader("x-empty-header", ""))
+		assertEquals(`x-obs-fold-header`.signingString(rfcCanonReq), expectedHeader("x-obs-fold-header", "Obsolete line folding."))
+		assertEquals(`x-ows-header`.signingString(rfcCanonReq), expectedHeader("x-ows-header", "Leading and trailing whitespace."))
 	}
 
 	test("2.2. Dictionary Structured Field Members") {
 		val rfcCanonReq = HttpRequest(
 			headers = Seq(
-				RawHeader("X-Dictionary"," a=1, b=2;x=1; y=2, c=(a  b   c) "),
+				RawHeader("X-Dictionary", " a=1, b=2;x=1; y=2, c=(a  b   c) "),
 			),
 		)
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq,Token("a")),
-			expectedHeader("x-dictionary","1"))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq,Token("b")),
-			expectedHeader("x-dictionary","2;x=1;y=2"))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq,Token("c")),
-			expectedHeader("x-dictionary","(a b c)"))
+		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("a")),
+			expectedHeader("x-dictionary", "1"))
+		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("b")),
+			expectedHeader("x-dictionary", "2;x=1;y=2"))
+		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("c")),
+			expectedHeader("x-dictionary", "(a b c)"))
 	}
 
 	test("2.3. List Prefixes") {
 		val rfcCanonReq = HttpRequest(
 			headers = Seq(
-				RawHeader("X-List-A"," ( a  b   c  d e   f ) "),
-				RawHeader("X-List-B"," ( ) "),
+				RawHeader("X-List-A", " ( a  b   c  d e   f ) "),
+				RawHeader("X-List-B", " ( ) "),
 			),
 		)
-	   //not yet implemented.
+		//not yet implemented.
 		// it feels like [[https://www.rfc-editor.org/rfc/rfc8941#name-lists RFC8941 §3.1 Lists]] may be
 		// a better fit for what is intended here. Inner Lists on headers require there to be only 1 header of a given
 		// name as multiple lists cannot be split. Or perhaps the same process would work there too?
@@ -114,7 +113,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 
 	test("2.4.1. Request Target") {
 		import akka.http.scaladsl.model.HttpMethods.*
-		def rt(value: String): Success[String] = expectedHeader("@request-target",value)
+		def rt(value: String): Success[String] = expectedHeader("@request-target", value)
 		val req1 = HttpRequest(POST, Uri("/?param=value"),
 			Seq(Host("www.example.com"))
 		)
@@ -140,13 +139,13 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			rt("get /")
 		)
 		//CONNECT: Not sure if this is allowed by Akka. It is not possible to create an HttpRequest with it
-//		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
-//			Seq(Host("www.example.com")))
-//		assertEquals(
-//			`@request-target`.signingString(req5),
-//			rt("connect /")
-//		)
-		val req6 = HttpRequest(OPTIONS, Uri("*"),headers=Seq(Host("server.example.com")))
+		//		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
+		//			Seq(Host("www.example.com")))
+		//		assertEquals(
+		//			`@request-target`.signingString(req5),
+		//			rt("connect /")
+		//		)
+		val req6 = HttpRequest(OPTIONS, Uri("*"), headers = Seq(Host("server.example.com")))
 		assertEquals(
 			`@request-target`.signingString(req6),
 			rt("options *")
@@ -155,7 +154,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 
 	test("2.5. Creating the Signature Input String") {
 		/**
-		 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]] **/
+		 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]] * */
 		val rfcSigInreq = HttpRequest(
 			method = HttpMethods.GET,
 			uri = Uri("/foo"),
@@ -176,21 +175,22 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |"host": example.org
 			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
 			  |"cache-control": max-age=60, must-revalidate
-			  |"x-empty-header": """.stripMargin+ //we make sure we have an extra space after the ':' here.
-			//then we have a newline. todo: Is that right? Difficult to tell from the spec.
-			"""
-			  |"x-example": Example header with some whitespace.
-			  |"@signature-params": ("@request-target" "host" "date" "cache-control" \
+			  |"x-empty-header": """.stripMargin + //we make sure we have an extra space after the ':' here.
+				//then we have a newline. todo: Is that right? Difficult to tell from the spec.
+				"""
+				  |"x-example": Example header with some whitespace.
+				  |"@signature-params": ("@request-target" "host" "date" "cache-control" \
+				  |  "x-empty-header" "x-example");created=1618884475;\
+				  |  keyid="test-key-rsa-pss"""".rfc8792single
+
+		val siginStr =
+			"""("@request-target" "host" "date" "cache-control" \
 			  |  "x-empty-header" "x-example");created=1618884475;\
 			  |  keyid="test-key-rsa-pss"""".rfc8792single
 
-		val siginStr = """("@request-target" "host" "date" "cache-control" \
-							  |  "x-empty-header" "x-example");created=1618884475;\
-							  |  keyid="test-key-rsa-pss"""".rfc8792single
-
 		val sigInIlist = IList(
-			`@request-target`.sf, host.sf,date.sf,`cache-control`.sf,
-			`x-empty-header`.sf,`x-example`.sf
+			`@request-target`.sf, host.sf, date.sf, `cache-control`.sf,
+			`x-empty-header`.sf, `x-example`.sf
 		)(
 			Token("created") -> SfInt(1618884475),
 			Token("keyid") -> sf"test-key-rsa-pss"
@@ -199,12 +199,13 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 
 		val Some(sigInHandBuilt) = SigInput[HttpMessage](sigInIlist)
 		val Some(sigin) = SigInput(siginStr)
-		assertEquals(rfcSigInreq.signingString(sigin),Success(expectedSigInStr))
+		assertEquals(rfcSigInreq.signingString(sigin), Success(expectedSigInStr))
 	}
 
 	//
 	// signature tests
 	//
+
 	import TestMessageSigningRFCFn.*
 
 	test("do the keys parse without throwing an exception?") {
@@ -220,22 +221,22 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 		// let's test the [[https://github.com/httpwg/http-extensions/issues/1493#issuecomment-827103670 fix to version 04. of the spec]]
 		val sigInputStr: String =
 			""""signature";key="sig1": \
-			|  :YlizxWySaL8RiCQOWpl/8TBLlinl/O9K5n+WCYladKkRfmZ4wdo42ikCrepkIoPd\
-			|  csPIx5wYc53Kpq6PLmv3fRk/+BtFSJNdrfClMEg4kX8utYuMQhBHSLiEiDRjNSTWX\
-			|  Wk8hwutEGijbna3FvBVzy1oa5tT08w/ffN7d/6dup1FWVt90KhK1Cx3RkQveMxAKC\
-			|  3HH6Q26lAgJ54MyLqLrLXcjQKWhjWzkMkVjho4JLy87GTU6k4eIQxB4xDHbavbJKE\
-			|  jS0Vlg2pqmcUkGVdL4zQ3NOOttIlKC1HL1SodXNd7UBM0C0R1GGqEi4Lsm9UKWuQP\
-			|  vPFTW7qIgvjAthv/lA==:
-			|"x-forwarded-for": 192.0.2.123
-			|"@signature-params": ("signature";key="sig1" "x-forwarded-for")\
-			|  ;created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256"""".rfc8792single
+			  |  :YlizxWySaL8RiCQOWpl/8TBLlinl/O9K5n+WCYladKkRfmZ4wdo42ikCrepkIoPd\
+			  |  csPIx5wYc53Kpq6PLmv3fRk/+BtFSJNdrfClMEg4kX8utYuMQhBHSLiEiDRjNSTWX\
+			  |  Wk8hwutEGijbna3FvBVzy1oa5tT08w/ffN7d/6dup1FWVt90KhK1Cx3RkQveMxAKC\
+			  |  3HH6Q26lAgJ54MyLqLrLXcjQKWhjWzkMkVjho4JLy87GTU6k4eIQxB4xDHbavbJKE\
+			  |  jS0Vlg2pqmcUkGVdL4zQ3NOOttIlKC1HL1SodXNd7UBM0C0R1GGqEi4Lsm9UKWuQP\
+			  |  vPFTW7qIgvjAthv/lA==:
+			  |"x-forwarded-for": 192.0.2.123
+			  |"@signature-params": ("signature";key="sig1" "x-forwarded-for")\
+			  |  ;created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256"""".rfc8792single
 		val proxySig: String =
 			"""FSqkfwt17TLKqjjWrW9vf6a/r3329amAO3e7ByjkT60jjFTq4xdO74\
-		  |    JTHrpz6DMSlQOKmhIiz8mq7T5SYOjfUZrKXpbP6jUFTStUa4HvNNvjhZc1jiHk9\
-		  |    IhGGPPeOdRcTrzjDxSS+2l7G3nSpJ4t2LjtLnEPa1FIldgnJqwIa0SCiEPWFmnJ\
-		  |    fTdc4VW2ngvYhuKUKFz/Jyx0GfmKQ4lAWxQwVtqRSURTscdY3VvxR+GpydqF8gQ\
-		  |    U8iYslRHlRxBh+29cADAHVnT5j1iBkVdAfLS59xCYLnUc3UG7UfxU6kU1QgJ+2n\
-		  |    A5NNQsxXeREcCFTe2FnjOy2atxG8bm+O8ZcA==""".rfc8792single
+			  |    JTHrpz6DMSlQOKmhIiz8mq7T5SYOjfUZrKXpbP6jUFTStUa4HvNNvjhZc1jiHk9\
+			  |    IhGGPPeOdRcTrzjDxSS+2l7G3nSpJ4t2LjtLnEPa1FIldgnJqwIa0SCiEPWFmnJ\
+			  |    fTdc4VW2ngvYhuKUKFz/Jyx0GfmKQ4lAWxQwVtqRSURTscdY3VvxR+GpydqF8gQ\
+			  |    U8iYslRHlRxBh+29cADAHVnT5j1iBkVdAfLS59xCYLnUc3UG7UfxU6kU1QgJ+2n\
+			  |    A5NNQsxXeREcCFTe2FnjOy2atxG8bm+O8ZcA==""".rfc8792single
 
 		val sigBytes = Base64.getDecoder.decode(proxySig)
 
@@ -244,21 +245,12 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 		javaSig.update(sigInputStr.getBytes(StandardCharsets.US_ASCII))
 		assert(javaSig.verify(sigBytes.toArray))
 	}
-	
-	/** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-b.2
-	 * Appendix B.2.]] of the spec */
-	val rfcAppdxB2Req = HttpRequest(method = HttpMethods.POST,
-		uri = Uri("/foo?param=value&pet=dog"),
-		headers = Seq(
-			Host(Uri.Host("example.com"), 0),
-			Date(DateTime(2021, 04, 20, 02, 07, 55)),
-			RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE="),
-		),
-		entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
-	)
+	object `x-dictionary` extends AkkaDictSelector :
+		override val lowercaseName: String = "x-dictionary"
 
 
 	import run.cosy.http.headers.Rfc8941.Serialise.given
+
 	import scala.concurrent.duration.given
 
 	test("B.2.1. Minimal Signature Header using rsa-pss-sha512") {
@@ -282,7 +274,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |  NQ0Y8umEHjxpnnLLvxUbw2KZrflp+l6m7WlhwXGJ15eAt1+mImanxUCtaKQJvEfcnOQ0S\
 			  |  2jHysSRLheTA==:""".rfc8792single
 		val sigs = Signature.parse(signatureStr)
-		assertEquals(sigs.get.sigmap.canon,signatureStr)
+		assertEquals(sigs.get.sigmap.canon, signatureStr)
 
 		//3. build complete request header and test signature on it
 		val specReq = rfcAppdxB2Req.addHeader(
@@ -292,18 +284,18 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			specReq.signatureAuthN(keyidFetcher)(cred("sig1")),
 			2.seconds
 		)
-// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//		assertEquals(
-//			verifiedKeyId.value,
-//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
-//		)
+		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
+		//		assertEquals(
+		//			verifiedKeyId.value,
+		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
+		//		)
 
-		 //4. create our own signature and test that.
+		//4. create our own signature and test that.
 		//   note: RSASSA returns different signatures at different times. So we run it again
 		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
 
 		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-			.flatMap(_(`test-key-rsa-pss-sigdata`))
+			.flatMap(_ (`test-key-rsa-pss-sigdata`))
 
 		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
 		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
@@ -320,11 +312,11 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
 			  |"content-type": application/json
 			  |"@signature-params": ("host" "date" "content-type");created=1618884475;keyid="test-key-rsa-pss"""".stripMargin
-		val signature = "NtIKWuXjr4SBEXj97gbick4O95ff378I0CZOa2VnIeEXZ1itzAdqTp"+
-			 "SvG91XYrq5CfxCmk8zz1Zg7ZGYD+ngJyVn805r73rh2eFCPO+ZXDs45Is/Ex8srzGC9sf"+
-			"VZfqeEfApRFFe5yXDmANVUwzFWCEnGM6+SJVmWl1/jyEn45qA6Hw+ZDHbrbp6qvD4N0S9"+
-			"2jlPyVVEh/SmCwnkeNiBgnbt+E0K5wCFNHPbo4X1Tj406W+bTtnKzaoKxBWKW8aIQ7rg9"+
-			"2zqE1oqBRjqtRi5/Q6P5ZYYGGINKzNyV3UjZtxeZNnNJ+MAnWS0mofFqcZHVgSU/1wUzP"+
+		val signature = "NtIKWuXjr4SBEXj97gbick4O95ff378I0CZOa2VnIeEXZ1itzAdqTp" +
+			"SvG91XYrq5CfxCmk8zz1Zg7ZGYD+ngJyVn805r73rh2eFCPO+ZXDs45Is/Ex8srzGC9sf" +
+			"VZfqeEfApRFFe5yXDmANVUwzFWCEnGM6+SJVmWl1/jyEn45qA6Hw+ZDHbrbp6qvD4N0S9" +
+			"2jlPyVVEh/SmCwnkeNiBgnbt+E0K5wCFNHPbo4X1Tj406W+bTtnKzaoKxBWKW8aIQ7rg9" +
+			"2zqE1oqBRjqtRi5/Q6P5ZYYGGINKzNyV3UjZtxeZNnNJ+MAnWS0mofFqcZHVgSU/1wUzP" +
 			"7MhzOKLca1Yg=="
 		println(signature)
 		val sigBytes = Base64.getDecoder.decode(signature)
@@ -332,7 +324,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 		val javaSig = `rsa-pss-sha512`()
 		javaSig.initVerify(testKeyPSSpub)
 		javaSig.update(sigInputStr.getBytes(StandardCharsets.US_ASCII))
-//todo:		assert(javaSig.verify(sigBytes.toArray))
+		//todo:		assert(javaSig.verify(sigBytes.toArray))
 	}
 
 	test("B.2.2. Header Coverage") {
@@ -340,7 +332,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 		val sigParametersExpected =
 			"""("host" "date" "content-type");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-		val Some(sigIn) = SigInput[HttpMessage](IList(host.sf,date.sf,`content-type`.sf)(
+		val Some(sigIn) = SigInput[HttpMessage](IList(host.sf, date.sf, `content-type`.sf)(
 			Token("created") -> SfInt(1618884475),
 			Token("keyid") -> sf"test-key-rsa-pss"))
 		assertEquals(sigIn.canon, sigParametersExpected)
@@ -351,7 +343,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |"content-type": application/json
 			  |"@signature-params": ("host" "date" "content-type");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-		assertEquals(rfcAppdxB2Req.signingString(sigIn),Success(sigInputStrExpected))
+		assertEquals(rfcAppdxB2Req.signingString(sigIn), Success(sigInputStrExpected))
 
 		//2. build and test signature
 		val signatureStr =
@@ -362,38 +354,38 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |  2zqE1oqBRjqtRi5/Q6P5ZYYGGINKzNyV3UjZtxeZNnNJ+MAnWS0mofFqcZHVgSU/1wUzP\
 			  |  7MhzOKLca1Yg==:""".rfc8792single
 		val Success(sig1) = Signature.parse(signatureStr)
-		assertEquals(sig1.sigmap.canon,signatureStr)
+		assertEquals(sig1.sigmap.canon, signatureStr)
 
 		//3. build complete request header and test signature on it
 		val specReq: HttpRequest = rfcAppdxB2Req.addHeader(
 			`Signature-Input`(SigInputs(Token("sig1"), sigIn)))
 			.addHeader(Signature(sig1))
 		//verify that the new req still has the same signing string as expected
-		assertEquals(specReq.signingString(sigIn),Success(sigInputStrExpected))
+		assertEquals(specReq.signingString(sigIn), Success(sigInputStrExpected))
 
-//		println(specReq.documented)
+		//		println(specReq.documented)
 		val verifiedKeyId = Await.ready(
 			specReq.signatureAuthN(keyidFetcher)(cred("sig1")),
 			2.seconds
 		)
-// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//		assertEquals(
-//			verifiedKeyId.value,
-//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss",testKeyPSSpub)))
-//		)
+		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
+		//		assertEquals(
+		//			verifiedKeyId.value,
+		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss",testKeyPSSpub)))
+		//		)
 
 		//4. create our own signature and test that.
 		//   note: RSASSA returns different signatures at different times. So we run it again
 		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
 
 		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-			.flatMap(_(`test-key-rsa-pss-sigdata`))
+			.flatMap(_ (`test-key-rsa-pss-sigdata`))
 
 		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
 		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
 		assertEquals(
 			keyIdReady.value,
-			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss",testKeyPSSpub)))
+			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
 		)
 	}
 
@@ -404,7 +396,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |  "digest" "content-length");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
 		val Some(sigIn) = SigInput[HttpMessage](IList(
-			`@request-target`.sf,host.sf,date.sf,`content-type`.sf,digest.sf,`content-length`.sf)(
+			`@request-target`.sf, host.sf, date.sf, `content-type`.sf, digest.sf, `content-length`.sf)(
 			Token("created") -> SfInt(1618884475),
 			Token("keyid") -> sf"test-key-rsa-pss"))
 		assertEquals(sigIn.canon, sigParametersExpected)
@@ -419,7 +411,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |"@signature-params": ("@request-target" "host" "date" "content-type" \
 			  |  "digest" "content-length");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-		assertEquals(rfcAppdxB2Req.signingString(sigIn),Success(sigInputStrExpected))
+		assertEquals(rfcAppdxB2Req.signingString(sigIn), Success(sigInputStrExpected))
 
 		//2. build and test signature
 		val signatureStr =
@@ -430,7 +422,7 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			  |  sQPKzR5QWelXEVdHyv4WIB2lKaYh7mAsz0/ANxFYRRSp2Joms0OAnIAFX9kKCSp4p15/Q\
 			  |  8L9vSIGNpQtw==:""".rfc8792single
 		val Success(sig1) = Signature.parse(signatureStr)
-		assertEquals(sig1.sigmap.canon,signatureStr)
+		assertEquals(sig1.sigmap.canon, signatureStr)
 
 		//3. build complete request header and test signature on it
 		val specReq = rfcAppdxB2Req.addHeader(
@@ -441,23 +433,23 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 			2.seconds
 		)
 		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//		assertEquals(
-//			verifiedKeyId.value,
-//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
-//		)
+		//		assertEquals(
+		//			verifiedKeyId.value,
+		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
+		//		)
 
 		//4. create our own signature and test that.
 		//   note: RSASSA returns different signatures at different times. So we run it again
 		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
 
 		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-			.flatMap(_(`test-key-rsa-pss-sigdata`))
+			.flatMap(_ (`test-key-rsa-pss-sigdata`))
 
 		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
 		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
 		assertEquals(
 			keyIdReady.value,
-			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss",testKeyPSSpub)))
+			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
 		)
 	}
 }
@@ -465,11 +457,29 @@ class TestMessageSigningRFCFn extends munit.FunSuite {
 object TestMessageSigningRFCFn {
 	java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
 
+	lazy val testKeyRSApub = {
+		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
+		import java.math.BigInteger
+		import java.security.spec.RSAPublicKeySpec
+		val pkcs1PublicKey = org.bouncycastle.asn1.pkcs.RSAPublicKey.getInstance(testKeyRSApubStr.base64Decode.unsafeArray)
+		val modulus = pkcs1PublicKey.getModulus
+		val publicExponent = pkcs1PublicKey.getPublicExponent
+		val keySpec = new RSAPublicKeySpec(modulus, publicExponent)
+		KeyFactory.getInstance("RSA").generatePublic(keySpec)
+	}
+	lazy val testKeyRSAPriv = {
+		KeyFactory.getInstance("RSA")
+			.generatePrivate(new PKCS8EncodedKeySpec(testKeyRSAprivStr.base64Decode.unsafeArray))
+	}
+	lazy val testKeyPSSpub = KeyFactory.getInstance("RSA")
+		.generatePublic(new X509EncodedKeySpec(testKeyPSSPubStr.base64Decode.unsafeArray))
+	lazy val testKeyPSSpriv = KeyFactory.getInstance("RSASSA-PSS")
+		.generatePrivate(new PKCS8EncodedKeySpec(testKeyPSSPrivStr.base64Decode.unsafeArray))
 	/**
 	 * Public and Private keys from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-b.1.1 Message Signatures §Appendix B.1.1]]
 	 * Obviously, these should not be used other than for test cases!
 	 * So place them here to make them available in other tests.
-	 **/
+	 * */
 	val testKeyRSApubStr: String =
 		"""MIIBCgKCAQEAhAKYdtoeoy8zcAcR874L8cnZxKzAGwd7v36APp7Pv6Q2jdsPBRrw\
 		  |WEBnez6d0UDKDwGbc6nxfEXAy5mbhgajzrw3MOEt8uA5txSKobBpKDeBLOsdJKFq\
@@ -538,58 +548,33 @@ object TestMessageSigningRFCFn {
 		  |dl2kZTXqGAk8dOhpUiw/HdM3OGWbhHj2NdCzBliOmPyQtAr770GITWvbAI+IRYyF\
 		  |S7Fnk6ZVVVHsxjtaHy1uJGFlaZzKR4AGNaUTOJMs6NadzCmGPAxNQQOCqoUjn4XR\
 		  |rOjr9w349JooGXhOxbu8nOxX""".rfc8792single
-
-	lazy val testKeyRSApub = {
-		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
-		import java.math.BigInteger
-		import java.security.spec.RSAPublicKeySpec
-		val pkcs1PublicKey = org.bouncycastle.asn1.pkcs.RSAPublicKey.getInstance(testKeyRSApubStr.base64Decode.unsafeArray)
-		val modulus = pkcs1PublicKey.getModulus
-		val publicExponent = pkcs1PublicKey.getPublicExponent
-		val keySpec = new RSAPublicKeySpec(modulus, publicExponent)
-		KeyFactory.getInstance("RSA").generatePublic(keySpec)
-	}
-	lazy val testKeyRSAPriv = {
-		KeyFactory.getInstance("RSA")
-			.generatePrivate(new PKCS8EncodedKeySpec(testKeyRSAprivStr.base64Decode.unsafeArray))
-	}
-	lazy val testKeyPSSpub = KeyFactory.getInstance("RSA")
-		.generatePublic(new X509EncodedKeySpec(testKeyPSSPubStr.base64Decode.unsafeArray))
-	lazy val testKeyPSSpriv = KeyFactory.getInstance("RSASSA-PSS")
-		.generatePrivate(new PKCS8EncodedKeySpec(testKeyPSSPrivStr.base64Decode.unsafeArray))
-
-	/** one always has to create a new signature on each verification if in multi-threaded environement */
-	def `rsa-pss-sha512`(): JSignature =
-//	   also tried see [[https://tools.ietf.org/html/rfc7518 JSON Web Algorithms (JWA) RFC]]
-//		com.nimbusds.jose.crypto.impl.RSASSA.getSignerAndVerifier(JWSAlgorithm.PS512, new BouncyCastleProvider() )
-		val rsapss = JSignature.getInstance("RSASSA-PSS")
-		import java.security.spec.{PSSParameterSpec, MGF1ParameterSpec}
-		val pssSpec = new PSSParameterSpec(
-			"SHA-512", "MGF1", MGF1ParameterSpec.SHA512, 512 / 8, 1)
-		println("PSSParameterSpec="+pssSpec)
-		rsapss.setParameter(pssSpec)
-		rsapss
-
-	//todo: remove dependence on JW2JCA
-	def sha256rsaSig(): JSignature = JW2JCA.getSignerAndVerifier("SHA256withRSA").get
-
 	/** Sigdata should always be new too in multithreaded environements, as it uses stateful signatures. */
 	def `test-key-rsa-pss-sigdata`: SigningData = SigningData(testKeyPSSpriv, `rsa-pss-sha512`())
 	def `test-key-rsa-sigdata`: SigningData = SigningData(testKeyRSAPriv, sha256rsaSig())
-
 	/**
 	 * emulate fetching the signature verification info for the keyids given in the Spec
 	 * */
 	def keyidFetcher(keyid: Rfc8941.SfString): Future[SignatureVerifier[KeyidSubj]] =
 		import run.cosy.http.auth.SignatureVerifier.keyidVerifier
 		keyid.asciiStr match
-			case "test-key-rsa-pss" =>
-				FastFuture.successful(keyidVerifier(keyid, testKeyPSSpub, `rsa-pss-sha512`()))
-			case "test-key-rsa" =>
-				FastFuture.successful(keyidVerifier(keyid,testKeyRSApub, sha256rsaSig()))
-			case x => FastFuture.failed(new Throwable(s"can't get info on sig $x"))
-
-
+		case "test-key-rsa-pss" =>
+			FastFuture.successful(keyidVerifier(keyid, testKeyPSSpub, `rsa-pss-sha512`()))
+		case "test-key-rsa" =>
+			FastFuture.successful(keyidVerifier(keyid, testKeyRSApub, sha256rsaSig()))
+		case x => FastFuture.failed(new Throwable(s"can't get info on sig $x"))
+	/** one always has to create a new signature on each verification if in multi-threaded environement */
+	def `rsa-pss-sha512`(): JSignature =
+		//	   also tried see [[https://tools.ietf.org/html/rfc7518 JSON Web Algorithms (JWA) RFC]]
+		//		com.nimbusds.jose.crypto.impl.RSASSA.getSignerAndVerifier(JWSAlgorithm.PS512, new BouncyCastleProvider() )
+		val rsapss = JSignature.getInstance("RSASSA-PSS")
+		import java.security.spec.{MGF1ParameterSpec, PSSParameterSpec}
+		val pssSpec = new PSSParameterSpec(
+			"SHA-512", "MGF1", MGF1ParameterSpec.SHA512, 512 / 8, 1)
+		println("PSSParameterSpec=" + pssSpec)
+		rsapss.setParameter(pssSpec)
+		rsapss
+	//todo: remove dependence on JW2JCA
+	def sha256rsaSig(): JSignature = JW2JCA.getSignerAndVerifier("SHA256withRSA").get
 	/** we are using [[https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md HttpSig]]
 	 * extension to verify Signing HTTP Messages */
 	def cred(signame: String) = HttpSig(Rfc8941.Token(signame))

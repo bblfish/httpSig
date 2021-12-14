@@ -1,16 +1,14 @@
 package run.cosy.http.auth
 
 import akka.http.scaladsl.model.Uri
-import run.cosy.http.auth.{KeyidSubj, KeyIdAgent}
-import run.cosy.http.headers.Rfc8941
+import run.cosy.http.auth.{KeyIdAgent, KeyidSubj}
 import run.cosy.http.headers.Rfc8941.Bytes
-import run.cosy.http.headers.InvalidSigException
-import run.cosy.http.headers.{InvalidSigException, UnableToCreateSigHeaderException}
+import run.cosy.http.headers.{InvalidSigException, Rfc8941, UnableToCreateSigHeaderException}
 
 import java.nio.charset.StandardCharsets
-import java.security.{PrivateKey, PublicKey, SignatureException, Signature => JSignature}
-import scala.util.{Failure, Success, Try}
+import java.security.{PrivateKey, PublicKey, SignatureException, Signature as JSignature}
 import scala.util
+import scala.util.{Failure, Success, Try}
 
 /**
  * SignatureVerifier is essentially a function that verifies that a signing string is signed
@@ -21,29 +19,13 @@ import scala.util
  * This is only secure if the KeyId is tied to the signature proof.
  *
  * @returns a verified keyid, if the signature is good, or a failure explaining the problem.
- *   the implementation of Keyid can contain more informaiton than the keyid but must contain
- *   at least that.
- **/
-trait SignatureVerifier[T<:Keyidentifier]:
+ *          the implementation of Keyid can contain more informaiton than the keyid but must contain
+ *          at least that.
+ * */
+trait SignatureVerifier[T <: Keyidentifier]:
 	def verifySignature(signingStr: String, signature: Rfc8941.Bytes): Try[T]
 
 object SignatureVerifier {
-	/**
-	 * this just returns a verification function on signatures and signing strings.
-	 * Note that JSignature objects are not thread safe: so this should be wrapped in some IO Monad,
-	 * if one were strict.
-	 **/
-	def jsigVerifier(pubKey: PublicKey, sig: JSignature): (String, Rfc8941.Bytes) => Try[Unit] =
-		(signingStr, signature) =>
-			try {
-				sig.initVerify(pubKey)
-				sig.update(signingStr.getBytes(StandardCharsets.US_ASCII))
-				if sig.verify(signature.toArray) then Success(())
-				else Failure(InvalidSigException(s"cannot verify signature"))
-			} catch {
-				case e: SignatureException => Failure(e)
-			}
-
 	/**
 	 * given a keyId Uri, a public key and a signature algorithm return a
 	 * verifier that will return an WebKeyIdAgent for verified signatures.
@@ -55,27 +37,41 @@ object SignatureVerifier {
 	 * (at least the name), as say different strenght of hashes will give different levels of confidence in the idenity.
 	 *
 	 * We call this apply, because for the HttpSig framework all the time
-	 **/
+	 * */
 	def apply(keydId: Uri, pubKey: PublicKey, sigAlgorithm: JSignature): SignatureVerifier[KeyIdAgent] =
 		new SignatureVerifier[KeyIdAgent] {
 			override def verifySignature(signingStr: String, signature: Rfc8941.Bytes): Try[KeyIdAgent] =
-				jsigVerifier(pubKey,sigAlgorithm)(signingStr,signature)
+				jsigVerifier(pubKey, sigAlgorithm)(signingStr, signature)
 					.map(_ => KeyIdAgent(keydId, pubKey))
 		}
-
 	/** the same as pubKeyIdUriVerifier, but for protocols that don't consider the keyID to be a Uri */
 	def keyidVerifier(keydId: Rfc8941.SfString, pubKey: PublicKey, sigAlg: JSignature): SignatureVerifier[KeyidSubj] =
 		new SignatureVerifier[KeyidSubj] {
 			override def verifySignature(signingStr: String, signature: Rfc8941.Bytes): Try[KeyidSubj] =
-				jsigVerifier(pubKey,sigAlg)(signingStr,signature)
+				jsigVerifier(pubKey, sigAlg)(signingStr, signature)
 					.map(_ => KeyidSubj(keydId.asciiStr, pubKey))
 		}
+	/**
+	 * this just returns a verification function on signatures and signing strings.
+	 * Note that JSignature objects are not thread safe: so this should be wrapped in some IO Monad,
+	 * if one were strict.
+	 * */
+	def jsigVerifier(pubKey: PublicKey, sig: JSignature): (String, Rfc8941.Bytes) => Try[Unit] =
+		(signingStr, signature) =>
+			try {
+				sig.initVerify(pubKey)
+				sig.update(signingStr.getBytes(StandardCharsets.US_ASCII))
+				if sig.verify(signature.toArray) then Success(())
+				else Failure(InvalidSigException(s"cannot verify signature"))
+			} catch {
+				case e: SignatureException => Failure(e)
+			}
 
 }
 
 /**
  * Used for Signing bytes.
- **/
+ * */
 case class SigningData(privateKey: PrivateKey, sig: JSignature):
 	//this is not thread safe!
 	def sign(bytes: Array[Byte]): Try[Array[Byte]] = Try {

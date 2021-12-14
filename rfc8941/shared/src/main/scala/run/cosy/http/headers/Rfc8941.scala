@@ -18,55 +18,28 @@ object Rfc8941 {
 	//
 	//types used by RFC8941
 	//
-
+	/**
+	 * see [[https://www.rfc-editor.org/rfc/rfc8941.html#section-3.3 §3.3 Items]] of RFC8941.
+	 */
+	type Item = SfInt | SfDec | SfString | Token | Bytes | Boolean
+	type Bytes = ArraySeq[Byte]
+	type Param = (Token, Item)
+	type Params = ListMap[Token, Item]
+	type SfList = List[Parameterized]
+	type SfDict = ListMap[Token, Parameterized]
+	def Param(tk: String, i: Item): Param = (Token(tk), i)
+	def Params(ps: Param*): Params = ListMap(ps *)
+	def SfDict(entries: (Token, Parameterized)*) = ListMap(entries *)
+	private def paramConversion(paras: Param*): Params = ListMap(paras *)
+	sealed trait Parameterized {
+		def params: Params
+	}
 	/** SFInt's cover a subspace of Java Longs.
 	 * An Opaque type would not do, as these need to be pattern matched.
 	 * Only the object constructor can build these */
 	final case class SfInt private(val long: Long) extends AnyVal
-
-	object SfInt:
-		val MAX_VALUE: Long = 999_999_999_999_999
-		val MIN_VALUE: Long = -MAX_VALUE
-
-		/** We throw a stackfree exception. Calling code can wrap in Try. */
-		@throws[NumberOutOfBoundsException]
-		def apply(long: Long): SfInt =
-			if long <= MAX_VALUE && long >= MIN_VALUE then new SfInt(long)
-			else throw NumberOutOfBoundsException(long)
-
-		@throws[NumberOutOfBoundsException]
-		@throws[NumberFormatException]
-		def apply(longStr: String): SfInt = apply(longStr.toLong)
-
-		//no need to check bounds if parsed by parser below
-		private[Rfc8941] def unsafeParsed(longStr: String): SfInt = new SfInt(longStr.toLong)
-	end SfInt
-
 	/* https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal */
 	final case class SfDec private(val double: Double) extends AnyVal
-
-	object SfDec:
-		val MAX_VALUE: Double = 999_999_999_999.999
-		val MIN_VALUE: Double = -MAX_VALUE
-		val mathContext = new MathContext(3, RoundingMode.HALF_EVEN)
-
-		@throws[NumberOutOfBoundsException]
-		def apply(d: Double): SfDec =
-			if d <= MAX_VALUE && d >= MIN_VALUE then {
-				new SfDec(BigDecimal(d).setScale(3, BigDecimal.RoundingMode.HALF_EVEN).doubleValue)
-			} else throw NumberOutOfBoundsException(d)
-
-		@throws[NumberFormatException]
-		def apply(sfDecStr: String): SfDec = Parser.sfDecimal.parseAll(sfDecStr) match {
-			case Left(err) => throw new NumberFormatException(err.toString)
-			case Right(num) => num
-		}
-
-		//no need to check bounds if parsed by parser below
-		private[Rfc8941] def unsafeParsed(int: String, fract: String): SfDec =
-			new SfDec(BigDecimal(int + "." + fract).setScale(3, BigDecimal.RoundingMode.HALF_EVEN).doubleValue)
-	end SfDec
-
 	/**
 	 * class has to be abstract to remove the `copy` operation which would allow objects
 	 * outside this package to create illegal values.
@@ -85,52 +58,8 @@ object Rfc8941 {
 			sb.append('"')
 			sb.toString()
 		}
-
-	object SfString:
-		def isAsciiChar(c: Int): Boolean = (c > 0x1f) && (c < 0x7f)
-
-		val bs = '\\'
-
-		@throws[IllegalArgumentException]
-		def apply(str: String): SfString =
-			if str.forall(isAsciiChar) then new SfString(str)
-			else throw new IllegalArgumentException(s"$str<<< contains non ascii chars ")
-
-		private[Rfc8941] def unsafeParsed(asciiStr: List[Char]): SfString = new SfString(asciiStr.mkString)
-	end SfString
-
 	// class is abstract to remove copy operation
 	final case class Token private(t: String) extends AnyVal
-
-	object Token:
-		@throws[ParsingException]
-		def apply(t: String): Token = Parser.sfToken.parseAll(t) match
-			case Right(value) => value
-			case Left(err) => throw ParsingException(s"error paring token $t", s"failed at offset ${err.failedAtOffset}")
-
-		private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
-	end Token
-
-	sealed trait Parameterized {
-		def params: Params
-	}
-
-	/**
-	 * see [[https://www.rfc-editor.org/rfc/rfc8941.html#section-3.3 §3.3 Items]] of RFC8941.
-	 */
-	type Item = SfInt | SfDec | SfString | Token | Bytes | Boolean
-	type Bytes = ArraySeq[Byte]
-	type Param = (Token, Item)
-	type Params = ListMap[Token, Item]
-	type SfList = List[Parameterized]
-	type SfDict = ListMap[Token, Parameterized]
-
-	def Param(tk: String, i: Item): Param = (Token(tk), i)
-
-	def Params(ps: Param*): Params = ListMap(ps *)
-
-	def SfDict(entries: (Token, Parameterized)*) = ListMap(entries *)
-
 	/**
 	 * dict-member    = member-key ( parameters / ( "=" member-value ))
 	 * member-value   = sf-item / inner-list
@@ -140,25 +69,87 @@ object Rfc8941 {
 	 */
 	final
 	case class DictMember(key: Token, values: Parameterized)
-
 	/** Parameterized Item */
 	final
 	case class PItem[T <: Item](item: T, params: Params) extends Parameterized
+	/** Inner List */
+	final case class IList(items: List[PItem[?]], params: Params) extends Parameterized
+
+	object SfInt:
+		val MAX_VALUE: Long = 999_999_999_999_999
+		val MIN_VALUE: Long = -MAX_VALUE
+
+		@throws[NumberOutOfBoundsException]
+		@throws[NumberFormatException]
+		def apply(longStr: String): SfInt = apply(longStr.toLong)
+		/** We throw a stackfree exception. Calling code can wrap in Try. */
+
+		@throws[NumberOutOfBoundsException]
+		def apply(long: Long): SfInt =
+			if long <= MAX_VALUE && long >= MIN_VALUE then new SfInt(long)
+			else throw NumberOutOfBoundsException(long)
+
+		//no need to check bounds if parsed by parser below
+		private[Rfc8941] def unsafeParsed(longStr: String): SfInt = new SfInt(longStr.toLong)
+	end SfInt
+
+	object SfDec:
+		val MAX_VALUE: Double = 999_999_999_999.999
+		val MIN_VALUE: Double = -MAX_VALUE
+		val mathContext = new MathContext(3, RoundingMode.HALF_EVEN)
+
+		@throws[NumberOutOfBoundsException]
+		def apply(d: Double): SfDec =
+			if d <= MAX_VALUE && d >= MIN_VALUE then
+				new SfDec(BigDecimal(d).setScale(3, BigDecimal.RoundingMode.HALF_EVEN).doubleValue)
+			else throw NumberOutOfBoundsException(d)
+
+		@throws[NumberFormatException]
+		def apply(sfDecStr: String): SfDec = Parser.sfDecimal.parseAll(sfDecStr) match
+			case Left(err) => throw new NumberFormatException(err.toString)
+			case Right(num) => num
+
+
+		//no need to check bounds if parsed by parser below
+		private[Rfc8941] def unsafeParsed(int: String, fract: String): SfDec =
+			new SfDec(BigDecimal(int + "." + fract).setScale(3, BigDecimal.RoundingMode.HALF_EVEN).doubleValue)
+	end SfDec
+
+	object SfString:
+		val bs = '\\'
+
+		@throws[IllegalArgumentException]
+		def apply(str: String): SfString =
+			if str.forall(isAsciiChar) then new SfString(str)
+			else throw new IllegalArgumentException(s"$str<<< contains non ascii chars ")
+
+		def isAsciiChar(c: Int): Boolean = (c > 0x1f) && (c < 0x7f)
+
+		private[Rfc8941] def unsafeParsed(asciiStr: List[Char]): SfString = new SfString(asciiStr.mkString)
+	end SfString
+
+	object Token:
+		@throws[ParsingException]
+		def apply(t: String): Token =
+			Parser.sfToken.parseAll(t) match
+			case Right(value) => value
+			case Left(err) => throw ParsingException(
+				s"error paring token $t",
+				s"failed at offset ${err.failedAtOffset}"
+			)
+
+		private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
+	end Token
 
 	object PItem:
 		def apply[T <: Item](item: T): PItem[T] = new PItem[T](item, ListMap())
 
 		def apply[T <: Item](item: T)(params: Param*): PItem[T] = new PItem(item, ListMap(params *))
 
-	/** Inner List */
-	final case class IList(items: List[PItem[?]], params: Params) extends Parameterized
+	implicit def token2PI[T <: Item]: Conversion[T, PItem[T]] = (i: T) => PItem[T](i)
 
 	object IList:
 		def apply(items: PItem[?]*)(params: Param*): IList = new IList(items.toList, ListMap(params *))
-
-	implicit def token2PI[T <: Item]: Conversion[T, PItem[T]] = (i: T) => PItem[T](i)
-
-	private def paramConversion(paras: Param*): Params = ListMap(paras *)
 
 	implicit val paramConv: Conversion[Seq[Param], Params] = paramConversion
 
@@ -181,6 +172,7 @@ object Rfc8941 {
 		import cats.parse.{Parser as P, Parser0 as P0, Rfc5234 as R5234}
 		import run.cosy.http.headers.Rfc7230.ows
 
+		//these have to be at the top, or all the vals below have to be lazy
 		private val `*` = P.charIn('*')
 		private val `:` = P.char(':')
 		private val `?` = P.char('?')
@@ -189,7 +181,7 @@ object Rfc8941 {
 		private val minus = P.char('-')
 		private val `\\`: P[Unit] = P.char(bs)
 
-		val boolean: P[Boolean] = R5234.bit.map(_ == '1')
+		lazy val boolean: P[Boolean] = R5234.bit.map(_ == '1')
 		val sfBoolean: P[Boolean] = (`?` *> boolean)
 		val sfInteger: P[SfInt] = (minus.?.with1 ~ R5234.digit.rep(1, 15)).string.map(s => Rfc8941.SfInt.unsafeParsed(s))
 		val decFraction: P[String] = R5234.digit.rep(1, 3).string
@@ -200,11 +192,9 @@ object Rfc8941 {
 			(signedDecIntegral ~ (`.` *> decFraction)).map { case (dec, frac) =>
 				SfDec.unsafeParsed(dec, frac.toList.mkString) //todo: keep the non-empty list?
 			}
-
 		// first we have to check for decimals, then for integers, or there is the risk that the `.` won't be noticed
 		// todo: optimisation would remove backtracking here
 		val sfNumber: P[SfDec | SfInt] = (sfDecimal.backtrack.orElse(sfInteger))
-
 		/**
 		 * unescaped      =  SP / %x21 / %x23-5B / %x5D-7E
 		 * note: this is similar to [[run.cosy.http.headers.Rfc5234]] except
@@ -225,22 +215,17 @@ object Rfc8941 {
 		}
 		val bareItem: P[Item] = P.oneOf(sfNumber :: sfString :: sfToken :: sfBinary :: sfBoolean :: Nil)
 		val lcalpha: P[Char] = P.charIn(0x61.toChar to 0x7a.toChar) | P.charIn('a' to 'z')
-
 		val key: P[Token] = ((lcalpha | `*`) ~ (lcalpha | R5234.digit | P.charIn('_', '-', '.', '*')).rep0)
 			.map((c, lc) => Token((c :: lc).mkString))
-
 		val parameter: P[Param] =
 			(key ~ (P.char('=') *> bareItem).orElse(P.pure(true)))
-
 		//note: parameters always returns an answer (the empty list) as everything can have parameters
 		//todo: this is not exeactly how it is specified, so check here if something goes wrong
 		val parameters: P0[Params] =
 		(P.char(';') *> ows *> parameter).rep0.orElse(P.pure(List())).map { list =>
 			ListMap.from[Token, Item](list.iterator)
 		}
-
 		val sfItem: P[PItem[Item]] = (bareItem ~ parameters).map((item, params) => PItem(item, params))
-
 		val innerList: P[IList] = {
 			import R5234.sp
 			(((P.char('(') ~ sp.rep0) *> (sfItem ~ ((sp.rep(1) *> sfItem).backtrack.rep0) <* sp.rep0).? <* P.char(')')) ~ parameters)
@@ -250,10 +235,8 @@ object Rfc8941 {
 				}
 		}
 		val listMember: P[Parameterized] = (sfItem | innerList)
-
 		val sfList: P[SfList] =
 			(listMember ~ ((ows *> P.char(',') *> ows).void.with1 *> listMember).rep0).map((p, lp) => p :: lp)
-
 		val memberValue: P[Parameterized] = (sfItem | innerList)
 		//note: we have to go with parsing `=` first as parameters always returns an answer.
 		val dictMember: P[DictMember] = (key ~ (P.char('=') *> memberValue).eitherOr(parameters))
@@ -264,9 +247,8 @@ object Rfc8941 {
 		val sfDictionary: P[SfDict] =
 			(dictMember ~ ((ows *> P.char(',') *> ows).with1 *> dictMember).rep0).map((dm, list) =>
 				val x: List[DictMember] = dm :: list
-					//todo: avoid this tupling
-					ListMap
-				.from(x.map((d: DictMember) => Tuple.fromProductTyped(d)))
+				//todo: avoid this tupling
+				ListMap.from(x.map((d: DictMember) => Tuple.fromProductTyped(d)))
 			)
 	end Parser
 
@@ -289,14 +271,14 @@ object Rfc8941 {
 		given itemSer: Serialise[Item] with
 			extension (o: Item)
 				def canon: String = o match
-					case i: SfInt => i.long.toString
-					//todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
-					case d: SfDec => d.double.toString
-					case s: SfString => s.formattedString
-					case tk: Token => tk.t
-					case as: Bytes => ":" + Base64.getEncoder.nn
-						.encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
-					case b: Boolean => if b then "?1" else "?0"
+				case i: SfInt => i.long.toString
+				//todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
+				case d: SfDec => d.double.toString
+				case s: SfString => s.formattedString
+				case tk: Token => tk.t
+				case as: Bytes => ":" + Base64.getEncoder.nn
+					.encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
+				case b: Boolean => if b then "?1" else "?0"
 
 		//
 		// complex types
@@ -305,10 +287,9 @@ object Rfc8941 {
 		given paramSer(using Serialise[Item]): Serialise[Param] with
 			extension (o: Param)
 				def canon: String = ";" + o._1.canon + {
-					o._2 match {
-						case b: Boolean => ""
-						case other => "=" + other.canon
-					}
+					o._2 match
+					case b: Boolean => ""
+					case other => "=" + other.canon
 				}
 
 		given paramsSer(using Serialise[Param]): Serialise[Params] with

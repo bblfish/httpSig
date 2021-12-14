@@ -55,12 +55,6 @@ object Rfc7230 {
 	/* quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text ) */
 	val quotedPair: Parser[Char] = char('\\') *> qdPairChar
 
-	private def surroundedBy[A](a: Parser0[A], b: Parser[Any]): Parser[A] =
-		b *> a <* b
-
-	private def between[A](a: Parser[Any], b: Parser0[A], c: Parser[Any]): Parser[A] =
-		a *> b <* c
-
 	/*quoted-string  = DQUOTE *( qdtext / quoted-pair ) DQUOTE*/
 	val quotedString: Parser[String] =
 		surroundedBy(qdText.orElse(quotedPair).rep0.string, dquote)
@@ -72,7 +66,6 @@ object Rfc7230 {
 			.orElse(charIn(0x2a.toChar to 0x5b.toChar))
 			.orElse(charIn(0x5d.toChar to 0x7e.toChar))
 			.orElse(obsText)
-
 	/* "(" *( ctext / quoted-pair / comment ) ")" */
 	val comment: Parser[String] = Parser.recursive[String] { (comment: Parser[String]) =>
 		between(char('('), cText.orElse(quotedPair).orElse(comment).rep0.string, char(')'))
@@ -88,6 +81,9 @@ object Rfc7230 {
 			NonEmptyList(h, t)
 		}
 	}
-
 	def listSep = Parser.char(',').surroundedBy(ows)
+	private def surroundedBy[A](a: Parser0[A], b: Parser[Any]): Parser[A] =
+		b *> a <* b
+	private def between[A](a: Parser[Any], b: Parser0[A], c: Parser[Any]): Parser[A] =
+		a *> b <* c
 }

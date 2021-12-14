@@ -10,16 +10,16 @@ import scala.util.{Failure, Try}
  *
  * @tparam HttpMsg the type of the Http Message (req or response) to look at when
  *                 constructing the signing strings for that header
- **/
+ * */
 trait HeaderSelector[HttpMessage] {
-	def lowercaseName: String
 	lazy val sf = Rfc8941.SfString(lowercaseName)
 	lazy val special: Boolean = lowercaseName.startsWith("@")
+	def lowercaseName: String
 	def valid(params: Rfc8941.Params): Boolean = params.isEmpty
 	/**
-	 *  @return a signing string for this header for a given HttpMessage
-	 *          Fail if the header does not exist or is malformed
-	 **/
+	 * @return a signing string for this header for a given HttpMessage
+	 *         Fail if the header does not exist or is malformed
+	 * */
 	def signingString(msg: HttpMessage): Try[String]
 }
 
@@ -29,8 +29,8 @@ trait DictSelector[HM] extends HeaderSelector[HM] {
 	 *
 	 * @param key the element of the dictionary to build a signing string on
 	 * @return a signing string for the selected entry of the sf-dictionary encoded header.
-	 *          Fail if the header does not exist or is malformed
-	 **/
+	 *         Fail if the header does not exist or is malformed
+	 * */
 	def signingString(msg: HM, key: Rfc8941.Token): Try[String]
 
 	override def valid(params: Rfc8941.Params): Boolean =
@@ -41,10 +41,10 @@ trait DictSelector[HM] extends HeaderSelector[HM] {
 trait ListSelector[HM] extends HeaderSelector[HM] {
 	val validParams = Set(SelectorOps.prefix)
 	/**
-	 *  @param prefix the first n elements of the list to select
-	 *  @return a signing string for this first `prefix` elements of the sf-list encoded header
-	 *          Fail if the header does not exist or is malformed
-	 **/
+	 * @param prefix the first n elements of the list to select
+	 * @return a signing string for this first `prefix` elements of the sf-list encoded header
+	 *         Fail if the header does not exist or is malformed
+	 * */
 	def signingString(msg: HM, prefix: Rfc8941.SfInt): Try[String]
 
 	override def valid(params: Rfc8941.Params): Boolean =
@@ -63,7 +63,7 @@ object `@signature-params` {
  * @param selectorFor
  * @tparam HM
  */
-case class SelectorOps[HM](selectorFor: Map[Rfc8941.SfString,HeaderSelector[HM]] ):
+case class SelectorOps[HM](selectorFor: Map[Rfc8941.SfString, HeaderSelector[HM]]):
 
 	import Rfc8941.Serialise.given
 	import SelectorOps.{key, prefix}
@@ -77,22 +77,22 @@ case class SelectorOps[HM](selectorFor: Map[Rfc8941.SfString,HeaderSelector[HM]]
 	def valid(selector: Rfc8941.PItem[Rfc8941.SfString]): Boolean =
 		selectorFor.get(selector.item).map(_.valid(selector.params)).getOrElse(false)
 
-	def select(msg: HM, hselector: Rfc8941.PItem[Rfc8941.SfString]): Try[String] = 
+	def select(msg: HM, hselector: Rfc8941.PItem[Rfc8941.SfString]): Try[String] =
 		def withParams(hs: HeaderSelector[HM], params: Rfc8941.Params): Try[String] =
 			hs match {
-				case ds: DictSelector[HM] =>
-					params.get(prefix) match
-						case Some(tk: Rfc8941.Token) if params.size == 1 => ds.signingString(msg, tk)
-						case None if params.size == 0 => ds.signingString(msg)
-						case _ => Failure(InvalidSigException(s"""Dictionary Selector »${hselector.canon}« is malformed """))
-				case ls: ListSelector[HM] =>
-					params.get(key) match
-						case Some(pos: Rfc8941.SfInt) if hselector.params.size == 1 => ls.signingString(msg, pos)
-						case None if hselector.params.size == 0 => ls.signingString(msg)
-						case _ => Failure(InvalidSigException(s"""List Selector »${hselector.canon}« is malformed"""))
-				case normal =>
-					if params.size == 0 then normal.signingString(msg)
-					else Failure(InvalidSigException(s"""Normal Selector »${hselector.canon}« is malformed"""))
+			case ds: DictSelector[HM] =>
+				params.get(prefix) match
+				case Some(tk: Rfc8941.Token) if params.size == 1 => ds.signingString(msg, tk)
+				case None if params.size == 0 => ds.signingString(msg)
+				case _ => Failure(InvalidSigException(s"""Dictionary Selector »${hselector.canon}« is malformed """))
+			case ls: ListSelector[HM] =>
+				params.get(key) match
+				case Some(pos: Rfc8941.SfInt) if hselector.params.size == 1 => ls.signingString(msg, pos)
+				case None if hselector.params.size == 0 => ls.signingString(msg)
+				case _ => Failure(InvalidSigException(s"""List Selector »${hselector.canon}« is malformed"""))
+			case normal =>
+				if params.size == 0 then normal.signingString(msg)
+				else Failure(InvalidSigException(s"""Normal Selector »${hselector.canon}« is malformed"""))
 			}
 		end withParams
 
@@ -109,5 +109,5 @@ object SelectorOps:
 
 	def apply[Msg](headers: HeaderSelector[Msg]*): SelectorOps[Msg] =
 		val pairs = for (header <- headers) yield (Rfc8941.SfString(header.lowercaseName) -> header)
-		new SelectorOps(Map(pairs*))
+		new SelectorOps(Map(pairs *))
 

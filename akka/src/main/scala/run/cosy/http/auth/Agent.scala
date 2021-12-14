@@ -20,18 +20,18 @@ case class KeyidSubj(keyId: String, pubKey: PublicKey) extends Agent with Keyide
 
 /**
  * KeyId agents interpret the `keyid`  field of Message Signing as a URI.
+ *
  * @param keyIdUri
  * @param pubKey
  */
 case class KeyIdAgent(keyIdUri: Uri, pubKey: PublicKey) extends Agent with KeyId with PubKey
 
 object KeyIdAgent:
-//	@deprecated("used only to get framework going")
-	case class TmpKeyIdAgent(keyIdUri: Uri) extends KeyId with Agent
-
-//	@deprecated("this is only used for temporarily to get some things going")
+	//	@deprecated("this is only used for temporarily to get some things going")
 	def apply(keyId: String): Option[TmpKeyIdAgent] =
 		Try(TmpKeyIdAgent(keyId)).toOption
+	//	@deprecated("used only to get framework going")
+	case class TmpKeyIdAgent(keyIdUri: Uri) extends KeyId with Agent
 
 class Anonymous extends Agent
 object WebServerAgent extends Agent

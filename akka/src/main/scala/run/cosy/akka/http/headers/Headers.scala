@@ -2,7 +2,7 @@ package run.cosy.akka.http.headers
 
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{CustomHeader, ModeledCustomHeader, ModeledCustomHeaderCompanion, RawHeader}
-import run.cosy.akka.http.headers.{BetterCustomHeader,BetterCustomHeaderCompanion}
+import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
 
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.Charset
@@ -12,20 +12,20 @@ import scala.language.{existentials, implicitConversions}
 import scala.util.{Failure, Success, Try}
 
 object Encoding {
-	val utf8 = Charset.forName("UTF-8")
 	opaque type UnicodeString = String
 	opaque type UrlEncoded = String
-	
+	val utf8 = Charset.forName("UTF-8")
+
 	implicit def toUnicode(str: String): UnicodeString = str
-	
+
 	extension (string: String)
-		def asClean : UnicodeString = string
-		def asEncoded : UrlEncoded = string
-	
+		def asClean: UnicodeString = string
+		def asEncoded: UrlEncoded = string
+
 	extension (clean: UnicodeString)
-	   def toString: String = clean
-	   def urlEncode: UrlEncoded = URLEncoder.encode(clean, utf8)
-	
+		def toString: String = clean
+		def urlEncode: UrlEncoded = URLEncoder.encode(clean, utf8)
+
 	extension (encoded: UrlEncoded)
 		def decode: Try[UnicodeString] = Try(URLDecoder.decode(encoded, utf8))
 		def onTheWire: String = encoded
@@ -39,7 +39,7 @@ object Encoding {
 abstract class BetterCustomHeaderCompanion[H <: BetterCustomHeader[H]] {
 	def name: String
 	def lowercaseName: String = name.toLowerCase(Locale.ROOT)
-	
+
 	final implicit val implicitlyLocatableCompanion: BetterCustomHeaderCompanion[H] = this
 }
 
@@ -49,9 +49,9 @@ abstract class BetterCustomHeaderCompanion[H <: BetterCustomHeader[H]] {
  * methods are provided for this class, such that it can be pattern matched on from [[RawHeader]] and
  * the other way around as well.
  */
-abstract class BetterCustomHeader[H <: BetterCustomHeader[H]] extends CustomHeader { this: H =>
-	def companion: BetterCustomHeaderCompanion[H]
-
-	final override def name = companion.name
+abstract class BetterCustomHeader[H <: BetterCustomHeader[H]] extends CustomHeader {
+	this: H =>
 	final override def lowercaseName = name.toLowerCase(Locale.ROOT)
+	final override def name = companion.name
+	def companion: BetterCustomHeaderCompanion[H]
 }

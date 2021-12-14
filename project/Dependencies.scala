@@ -4,6 +4,7 @@ import sbt.{Def, _}
 object Dependencies {
 	val scalajsDom = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
 	val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
+	// https://github.com/scalameta/munit
 	val munit = Def.setting("org.scalameta" %%% "munit" % "1.0.0-M1")
 	val utest = Def.setting("com.lihaoyi" %%% "utest" % "0.7.10")
 	val modelJS = Def.setting("net.bblfish.rdf" %%% "rdf-model-js" % "0.1a-SNAPSHOT")

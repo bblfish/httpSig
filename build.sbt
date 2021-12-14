@@ -13,23 +13,17 @@ lazy val commonSettings = Seq(
 	scalaVersion := Ver.scala,
 	updateOptions := updateOptions.value.withCachedResolution(true) //to speed up dependency resolution
 )
-lazy val rfc8941 = crossProject(JVMPlatform)//, JSPlatform)
+lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
 	.crossType(CrossType.Full)
 	.in(file("rfc8941"))
 	.settings(commonSettings: _*)
-//	.enablePlugins(ScalaJSPlugin)
 //	.enablePlugins(ScalaJSBundlerPlugin)
 	.settings(
 		name := "rfc8941",
 		description := "RFC8941 (Structured Field Values) parser",
 		scalacOptions := scala3Options,
-		libraryDependencies ++= Seq(
-			http4s.client.value,
-			cats.parse.value
-		),
-		libraryDependencies ++= Seq(
-			munit.value % Test
-		)
+		libraryDependencies += cats.parse.value,
+		libraryDependencies += munit.value % Test
 		//		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
 		// Test / requireJsDomEnv := true,
 		// scalaJSUseMainModuleInitializer := true,
@@ -43,6 +37,8 @@ lazy val rfc8941 = crossProject(JVMPlatform)//, JSPlatform)
 		// do I also need to run `npm install n3` ?
 		//		Compile / npmDependencies += NPM.n3,
 		//		Test / npmDependencies += NPM.n3,
+	).jsSettings(
+
 	)
 // we only use Java akka here (doing akka-js would be a whole project by itself)
 lazy val akkaSig = project

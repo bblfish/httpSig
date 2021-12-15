@@ -13,11 +13,12 @@ This contains the following projects
   needed by "Signing HTTP Messages" that compiles to Java and JavaScript.
 * akka: Implementation for the [akka-http](https://akka.io/) Actor Framework of
   of [Signing HTTP Messages](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html)
-* todo: http4s: same to sign http4s messages
+* todo: write a [http4s](https://http4s.org) messages signing project for client and (later) servers
 
 ### TODO
 
-see if one can extract a common part of Signing HTTP Messages that can abstract betweeen akka and
+* see if one can extract a common part of Signing HTTP Messages that can abstract betweeen akka and
   http4s headers.
 * make it Java friendly (see how [akka](https://akka.io/) achieves that)
-* make it JS friendly
+* make it JS friendly (client and server)
+* publish libs to maven

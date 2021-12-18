@@ -1,8 +1,9 @@
+
 ## Http Sig library
 
 This library consists of Scala and Scala-JS components needed for
-[Signing HTTP Messages](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html)
-spec put forward by the HTTP-Bis WG, in order to build protocols such as
+[Signing HTTP Messages](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html)
+spec worked on in the HTTP-Bis WG, in order to build protocols such as
 the [HttpSig](https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md)
 authentication protocol.
 

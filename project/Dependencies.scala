@@ -12,19 +12,22 @@ object Dependencies {
 	val sonatypeSNAPSHOT: MavenRepository = "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 	object Ver {
 		val scala = "3.1.0"
-		val http4s = "1.0.0-M29"
+
 	}
 	//https://http4s.org/v1.0/client/
 	object http4s {
+		val Ver = "1.0.0-M30"
+
 		lazy val core = http4s("http4s-core")
 		lazy val client = http4s("http4s-client")
 		lazy val server = http4s("http4s-server")
 		lazy val theDsl = http4s("http4s-dsl")
+
+		//https://search.maven.org/artifact/org.http4s/http4s-dom_sjs1_3/1.0.0-M30/jar
 		// https://github.com/http4s/http4s-dom
-		//https://search.maven.org/artifact/org.http4s/http4s-dom_sjs1_3/1.0.0-M29/jar
 		lazy val Dom = http4s("http4s-dom")
 		def apply(packg: String): Def.Initialize[sbt.ModuleID] =
-			Def.setting("org.http4s" %%% packg % Ver.http4s)
+			Def.setting("org.http4s" %%% packg % Ver)
 	}
 	object cats {
 		// https://github.com/typelevel/munit-cats-effect

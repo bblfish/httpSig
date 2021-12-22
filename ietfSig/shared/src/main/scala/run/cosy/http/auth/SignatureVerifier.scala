@@ -1,7 +1,6 @@
-//REMOVE
 package run.cosy.http.auth
 
-import akka.http.scaladsl.model.Uri
+//import akka.http.scaladsl.model.Uri
 import run.cosy.http.auth.{KeyIdAgent, KeyidSubj}
 import run.cosy.http.headers.Rfc8941.Bytes
 import run.cosy.http.headers.{InvalidSigException, Rfc8941, UnableToCreateSigHeaderException}
@@ -12,7 +11,7 @@ import scala.util
 import scala.util.{Failure, Success, Try}
 
 /**
- * SignatureVerifier is essentially a function that verifies that a signing string is signed
+ * SignatureVerifier is a function that verifies that a signing string is signed
  * by the signature in bytes.
  * (There are many algorithms to verify a signature but this trait abstracts them all.)
  * This goes beyond a simple function though: it is Object Oriented in the CoAlgebraic sense,
@@ -26,7 +25,7 @@ import scala.util.{Failure, Success, Try}
 trait SignatureVerifier[T <: Keyidentifier]:
 	def verifySignature(signingStr: String, signature: Rfc8941.Bytes): Try[T]
 
-object SignatureVerifier {
+class SignatureVerifier() {
 	/**
 	 * given a keyId Uri, a public key and a signature algorithm return a
 	 * verifier that will return an WebKeyIdAgent for verified signatures.
@@ -80,3 +79,4 @@ case class SigningData(privateKey: PrivateKey, sig: JSignature):
 		sig.update(bytes)
 		sig.sign()
 	}
+

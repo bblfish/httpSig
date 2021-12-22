@@ -48,9 +48,9 @@ lazy val akkaSig = project
 	.in(file("akka"))
 	.settings(commonSettings: _*)
 	.settings(
-		name := "SigningHttpMessagesAkka",
+		name := "AkkaHttpSig",
 		description := "Signing HTTP Messages parser for Akka headers",
-		// scalacOptions := scala3jsOptions,
+		scalacOptions := scala3Options,
 		libraryDependencies ++= Seq(
 			akka.http.value, akka.stream.value, akka.typed.value,
 			java.nimbusDS
@@ -59,21 +59,53 @@ lazy val akkaSig = project
 			munit.value % Test,
 			cats.munitEffect.value % Test
 		) ++ java.bouncy
+	).dependsOn(ietfSigHttp.jvm)
 
-		//		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
-		// Test / requireJsDomEnv := true,
-		// scalaJSUseMainModuleInitializer := true,
-		// scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)), // configure Scala.js to emit a JavaScript module instead of a top-level script
-		// ESModule cannot be used because we are using ScalaJSBundlerPlugin
-		// scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
+	.in(file("ietfSig"))
+	.settings(commonSettings: _*)
+	.settings(
+		name := "ietfSig",
+		description := "generic implementation of IETF `Signing Http Messages`",
+		libraryDependencies ++= Seq(
+			munit.value % Test,
+			cats.munitEffect.value % Test
+		)
+	)
+	.jsSettings(
+		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
+		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
+	)
+	.jvmSettings(
+		scalacOptions := scala3Options,
+		libraryDependencies ++= java.bouncy
+	)
+	.dependsOn(rfc8941)
 
-		//		fastOptJS / webpackConfigFile := Some(baseDirectory.value / "webpack.config.dev.js"),
-
-		// https://github.com/rdfjs/N3.js/
-		// do I also need to run `npm install n3` ?
-		//		Compile / npmDependencies += NPM.n3,
-		//		Test / npmDependencies += NPM.n3
-	).dependsOn(rfc8941.jvm)
+// we only use Java akka here (doing akka-js would be a whole project by itself)
+lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
+	.in(file("http4s"))
+	.settings(commonSettings: _*)
+	.settings(
+		name := "http4s Sig",
+		description := "Signing HTTP Messages parser for http4s headers library",
+		libraryDependencies ++= Seq(
+			http4s.client.value
+		),
+		libraryDependencies ++= Seq(
+			munit.value % Test,
+			cats.munitEffect.value % Test
+		)
+	)
+	.jsSettings(
+		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
+		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
+	)
+	.jvmSettings(
+		scalacOptions := scala3Options,
+		libraryDependencies ++= java.bouncy
+	)
+	.dependsOn(ietfSigHttp)
 
 val scala3Options = Seq(
 	// "-classpath", "foo:bar:...",         // Add to the classpath.

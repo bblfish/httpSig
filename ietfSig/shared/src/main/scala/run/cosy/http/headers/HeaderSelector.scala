@@ -1,7 +1,4 @@
-//REMOVE
-package run.cosy.akka.http.headers
-
-import run.cosy.http.headers.*
+package run.cosy.http.headers
 
 import scala.util.{Failure, Try}
 

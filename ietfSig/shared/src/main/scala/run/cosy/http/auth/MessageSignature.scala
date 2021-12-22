@@ -1,4 +1,3 @@
-//REMOVE
 package run.cosy.http.auth
 
 //import akka.http.javadsl.model.headers.Host
@@ -9,7 +8,6 @@ package run.cosy.http.auth
 //import akka.http.scaladsl.server.directives.AuthenticationResult.{failWithChallenge, success}
 //import akka.http.scaladsl.util.FastFuture
 import com.nimbusds.jose.util.Base64
-import run.cosy.akka.http.headers.*
 import run.cosy.http.auth.{Agent, KeyidSubj}
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.*
@@ -100,7 +98,7 @@ object MessageSignature {
 		 *         and how to interpret them, i.e. what the headers are that were signed, where
 		 *         the key is and what the signing algorithm used was
 		 * */
-		def getSignature(name: Rfc8941.Token)(using selector: SelectorOps[HttpMessage]): Option[(SigInput, Bytes)] =
+		def getSignature(name: Rfc8941.Token)(using selector: SelectorOps[T]): Option[(SigInput, Bytes)] =
 			import msg.headers
 			headers.collectFirst {
 				case `Signature-Input`(inputs) if inputs.get(name).isDefined =>

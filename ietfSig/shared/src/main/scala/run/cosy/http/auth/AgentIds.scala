@@ -6,10 +6,10 @@ trait Agent
 trait Keyidentifier:
 	def keyId: String
 
-class AgentIds:
+object AgentIds:
 	type Uri
 	type PublicKey
-	type KeyIdAgent = Agent with KeyId with PubKey
+	type KeyIdAgent = Agent & KeyId & PubKey
 
 	trait KeyId extends Keyidentifier:
 		def keyIdUri: Uri
@@ -18,7 +18,7 @@ class AgentIds:
 		def pubKey: PublicKey
 
 	case class KeyidSubj(keyId: String, pubKey: PublicKey) extends Agent with Keyidentifier with PubKey
-
+	case class PureKeyId(keyId: String) extends Keyidentifier
 	/**
 	 * KeyId agents interpret the `keyid`  field of Message Signing as a URI.
 	 *

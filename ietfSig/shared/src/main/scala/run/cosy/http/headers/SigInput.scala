@@ -35,11 +35,17 @@ object SigInputs:
 /**
  * A SigInput is a valid Signature-Input build on an Rfc8941 Internal List.
  * restricted to those this server can understand.
+ * For example:
+ * <pre>
+ *  Signature-Input: sig1=("@method" "@target-uri" "host" "date" \
+ *      "cache-control" "x-empty-header" "x-example");created=1618884475\
+ *      ;keyid="test-key-rsa-pss"
+ * </pre>
  * todo: An improved version would be more lenient, allowing opt-in refinements.
  *
  * As a Validated data structure, we can keep all the data present in a header for a particular
  * signature, as that is needed to verify the signature itself. Indeed extra attributes will be
- * vital to verify a signatue, since the data from this header is part of the signature
+ * vital to verify a signature, since the data from this header is part of the signature
  *
  * @param il
  */
@@ -66,7 +72,6 @@ final case class SigInput private(val il: IList) extends AnyVal {
 }
 
 object SigInput {
-
 	/** registered metadata parameters as per [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-5.2.2 §5.2.2]].
 	 * To avoid them being confused with pattern matches variables enclose in ` `. */
 	val algTk = Token("alg")

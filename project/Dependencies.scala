@@ -34,6 +34,7 @@ object Dependencies {
 		lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
 		// https://search.maven.org/artifact/org.typelevel/cats-parse_3/0.3.6/jar
 		lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.6")
+		val bobcats = Def.setting("com.armanbilge" %%% "bobcats" % "0.1-2333fd5-SNAPSHOT")
 	}
 	object akka {
 		lazy val typed = akka("akka-actor-typed", CoreVersion)

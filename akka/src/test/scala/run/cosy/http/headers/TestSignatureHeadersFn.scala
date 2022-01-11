@@ -2,7 +2,7 @@ package run.cosy.http.headers
 
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpMessage, Uri}
-import run.cosy.akka.http.headers.{SigInput, `Signature-Input`, host}
+import run.cosy.akka.http.headers.{`Signature-Input`, host}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 import run.cosy.http.headers.Rfc8941.{SfDict, SfInt, Token, IList as IL}
@@ -52,11 +52,11 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 	)
 
 	test("`Signature-Input` with one header") {
-		val Success(tsi1) = `Signature-Input`.parse[HttpMessage](ex1)
-		val Some(sig1) = tsi1.get(Token("sig1"))
+		val Success(tsi1) = `Signature-Input`.parse[HttpMessage](ex1) : @unchecked
+		val Some(sig1) = tsi1.get(Token("sig1")) : @unchecked
 		assertEquals(sig1.il, expected1)
 
-		val RawHeader(name, value) = `Signature-Input`(tsi1)
+		val RawHeader(name, value) = `Signature-Input`(tsi1) : @unchecked
 		assertEquals(name, "Signature-Input")
 		val expectedHdr: SfDict = ListMap(Token("sig1") -> expected1)
 		assertEquals(value, expectedHdr.canon)
@@ -76,14 +76,14 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 
 	test("`Signature-Input` with two headers") {
 		val sigTxt = s"$ex1, $ex3,  $ex2"
-		val Success(tsi1) = `Signature-Input`.parse(sigTxt)
+		val Success(tsi1) = `Signature-Input`.parse(sigTxt) : @unchecked
 		assertEquals(tsi1.si.size, 2) // filtered out ex3
-		val Some(sig1) = tsi1.get(Token("sig1"))
-		val Some(sig2) = tsi1.get(Token("sig2"))
+		val Some(sig1) = tsi1.get(Token("sig1")) : @unchecked
+		val Some(sig2) = tsi1.get(Token("sig2")) : @unchecked
 		assertEquals(sig1.il, expected1)
 		assertEquals(sig2.il, expected2)
 
-		val RawHeader(name, value) = `Signature-Input`(tsi1)
+		val RawHeader(name, value) = `Signature-Input`(tsi1): @unchecked
 		assertEquals(name, "Signature-Input")
 		val expectedHdr: SfDict = ListMap(Token("sig1") -> expected1, Token("sig2") -> expected2)
 		assertEquals(value, expectedHdr.canon)
@@ -126,17 +126,17 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 
 	test("Signature") {
 		import Rfc8941.Token as Tk
-		val Success(sigs1) = Signature.parse(signEx1)
+		val Success(sigs1) = Signature.parse(signEx1) : @unchecked
 		assertEquals(sigs1.sigmap.size, 1)
-		val Some(sig1Arr) = sigs1.get(Tk("sig1"))
-		assertEquals(sig1Arr, ArraySeq.from(Base64.getDecoder.decode(base64Ex1)))
+		val Some(sig1Arr) = sigs1.get(Tk("sig1")) : @unchecked
+		assertEquals(sig1Arr, ArraySeq.from(Base64.getDecoder.nn.decode(base64Ex1).nn))
 
-		val Success(sigs2) = Signature.parse(signEx2)
+		val Success(sigs2) = Signature.parse(signEx2) : @unchecked
 		assertEquals(sigs2.sigmap.size, 2)
-		val Some(sig2Arr) = sigs2.get(Tk("sig1"))
-		assertEquals(sig2Arr, ArraySeq.from(Base64.getDecoder.decode(base64Ex1)))
-		val Some(sig3Arr) = sigs2.get(Tk("reverse_proxy_sig"))
-		assertEquals(sig3Arr, ArraySeq.from(Base64.getDecoder.decode(base64Ex2)))
+		val Some(sig2Arr) = sigs2.get(Tk("sig1")) : @unchecked
+		assertEquals(sig2Arr, ArraySeq.from(Base64.getDecoder.nn.decode(base64Ex1).nn))
+		val Some(sig3Arr) = sigs2.get(Tk("reverse_proxy_sig")) : @unchecked
+		assertEquals(sig3Arr, ArraySeq.from(Base64.getDecoder.nn.decode(base64Ex2).nn))
 
 	}
 

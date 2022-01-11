@@ -1,4 +1,4 @@
-import Dependencies._
+import Dependencies.{cats, _}
 
 organization := "cosy.run"
 name := "httpSig"
@@ -53,7 +53,9 @@ lazy val akkaSig = project
 		scalacOptions := scala3Options,
 		libraryDependencies ++= Seq(
 			akka.http.value, akka.stream.value, akka.typed.value,
-			java.nimbusDS
+			java.nimbusDS,
+			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
+			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
 		),
 		libraryDependencies ++= Seq(
 			munit.value % Test,
@@ -68,6 +70,7 @@ lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 		name := "ietfSig",
 		description := "generic implementation of IETF `Signing Http Messages`",
 		libraryDependencies ++= Seq(
+			cats.bobcats.value,
 			munit.value % Test,
 			cats.munitEffect.value % Test
 		)

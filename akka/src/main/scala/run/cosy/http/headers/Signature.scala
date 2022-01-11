@@ -3,18 +3,22 @@ package run.cosy.http.headers
 import akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
 import akka.http.scaladsl.model.{HttpHeader, ParsingException}
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
+import run.cosy.http.auth.SignatureMatcher
+import run.cosy.http.headers
 import run.cosy.http.headers.Rfc8941.{Bytes, IList, PItem, SfDict}
 
 import scala.collection.immutable
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.util.{Failure, Success, Try}
+import run.cosy.http.headers.Signatures
 
 /**
  * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.2 §4.2 The Signature HTTP header]] defined in "Signing HTTP Messages" HttpBis RFC.
  *
  * @param text
  */
-final case class Signature(sig: Signatures) extends BetterCustomHeader[Signature] :
+final case class Signature(sig: Signatures)
+	extends BetterCustomHeader[Signature]:
 	override val companion = Signature
 	override def renderInRequests = true
 	override def renderInResponses = true
@@ -23,9 +27,14 @@ final case class Signature(sig: Signatures) extends BetterCustomHeader[Signature
 		sig.sigmap.asInstanceOf[Rfc8941.SfDict].canon
 
 
-object Signature extends BetterCustomHeaderCompanion[Signature] :
+object Signature
+	extends BetterCustomHeaderCompanion[Signature]
+		with SignatureMatcher:
+	override type Header = run.cosy.http.auth.AkkaHttpMessageSignature.HttpHeader
+	override type H = run.cosy.http.headers.Signature
 	override val name = "Signature"
-	def unapply(h: HttpHeader): Option[Signatures] =
+	def apply(sig: Signatures): H = new run.cosy.http.headers.Signature(sig)
+	def unapply(h:  Header): Option[Signatures] =
 		h match
 		case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName => parse(h.value).toOption
 		case _ => None
@@ -34,30 +43,6 @@ object Signature extends BetterCustomHeaderCompanion[Signature] :
 		case Left(e) => Failure(HTTPHeaderParseException(e, value))
 		case Right(lm) => Success(Signatures(lm))
 end Signature
-
-/**
- * A Signature is an SfDict, refined to contain only PItems of Arrays of Bytees.
- * We want to keep potential attributes as they could be useful. */
-final class Signatures private(val sigmap: ListMap[Rfc8941.Token, PItem[Bytes]]) extends AnyVal :
-
-	def get(signame: Rfc8941.Token): Option[Bytes] = sigmap.get(signame).map(_.item)
-
-	//add the signature to the list.
-	def add(signame: Rfc8941.Token, signbytes: Bytes) =
-		new Signatures(sigmap.updated(signame, PItem(signbytes)))
-
-object Signatures:
-	def apply(lm: SfDict): Signatures = new Signatures(filterValid(lm))
-
-	def filterValid(lm: SfDict): ListMap[Rfc8941.Token, PItem[Bytes]] = lm.collect {
-		case (sigName, pi@PItem(bytes: ArraySeq[_], attr)) =>
-			// if it is an ArraySeq, it is a ByteArraySequence!
-			(sigName, pi.asInstanceOf[PItem[Bytes]])
-	}
-
-	def apply(signame: Rfc8941.Token, signbytes: Bytes): Signatures =
-		new Signatures(ListMap(signame -> PItem(signbytes)))
-end Signatures
 
 
 

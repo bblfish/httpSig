@@ -5,13 +5,13 @@ import akka.http.scaladsl.model.*
 import run.cosy.akka.http.headers.BetterCustomHeader
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.{PItem, Params, Serialise, SfDict, SfString}
-import run.cosy.http.headers.{Rfc8941, UnableToCreateSigHeaderException}
+import run.cosy.http.headers.{DictSelector, ListSelector, Rfc8941, SelectorOps, UnableToCreateSigHeaderException}
 
 import java.util.Locale
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-trait AkkaHeaderSelector extends HeaderSelector[HttpMessage] :
+trait AkkaHeaderSelector extends run.cosy.http.headers.HeaderSelector[HttpMessage] :
 	/**
 	 * default for non-rfc 8941 headers.
 	 * */
@@ -127,20 +127,20 @@ object `digest` extends UntypedAkkaSelector :
 	override val lowercaseName: String = "digest"
 
 /**
- * `@request-target` is very special. It does not work on individual headers, but
- * on the whole request
+ * `@request-target` refers to the full request target of the HTTP request message, as defined in "HTTP Semantics"
+ * For HTTP 1.1, the component value is equivalent to the request target portion of the request line.
+ * However, this value is more difficult to reliably construct in other versions of HTTP. Therefore,
+ * it is NOT RECOMMENDED that this identifier be used when versions of HTTP other than 1.1 might be in use.
+ * @see https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-request-target
  */
 object `@request-target` extends AkkaHeaderSelector :
 	override val lowercaseName: String = "@request-target"
 	override def signingString(msg: HttpMessage): Try[String] =
 		msg match
-		case req: HttpRequest => Success(
-			s""""$lowercaseName$": """ +
-				req.method.value.toLowerCase(Locale.ROOT) + " " + {
-				if req.uri.path.isEmpty then Uri.Path./ else req.uri.path
-			} + {
-				req.uri.rawQueryString.map("?" + _).getOrElse("")
-			})
+		case req: HttpRequest =>
+			req.method match
+			case HttpMethods.CONNECT => Failure(UnableToCreateSigHeaderException("Akka cannot correctly prcess @request-target on CONNECT requests"))
+			case _ => Success(s""""$lowercaseName$": ${req.uri}""")
 		case _: HttpResponse => Failure(
 			UnableToCreateSigHeaderException("cannot build @request-target for response message"))
 	/** this is perhaps the only object where this mathod is not used */

@@ -24,10 +24,10 @@ object Encoding {
 
 	extension (clean: UnicodeString)
 		def toString: String = clean
-		def urlEncode: UrlEncoded = URLEncoder.encode(clean, utf8)
+		def urlEncode: UrlEncoded = URLEncoder.encode(clean, utf8).nn
 
 	extension (encoded: UrlEncoded)
-		def decode: Try[UnicodeString] = Try(URLDecoder.decode(encoded, utf8))
+		def decode: Try[UnicodeString] = Try(URLDecoder.decode(encoded, utf8).nn)
 		def onTheWire: String = encoded
 }
 
@@ -38,7 +38,7 @@ object Encoding {
  */
 abstract class BetterCustomHeaderCompanion[H <: BetterCustomHeader[H]] {
 	def name: String
-	def lowercaseName: String = name.toLowerCase(Locale.ROOT)
+	def lowercaseName: String = name.toLowerCase(Locale.ROOT).nn
 
 	final implicit val implicitlyLocatableCompanion: BetterCustomHeaderCompanion[H] = this
 }
@@ -49,9 +49,9 @@ abstract class BetterCustomHeaderCompanion[H <: BetterCustomHeader[H]] {
  * methods are provided for this class, such that it can be pattern matched on from [[RawHeader]] and
  * the other way around as well.
  */
-abstract class BetterCustomHeader[H <: BetterCustomHeader[H]] extends CustomHeader {
-	this: H =>
-	final override def lowercaseName = name.toLowerCase(Locale.ROOT)
+abstract class BetterCustomHeader[H <: BetterCustomHeader[H]]
+	extends CustomHeader { this: H =>
+	final override def lowercaseName = name.toLowerCase(Locale.ROOT).nn
 	final override def name = companion.name
 	def companion: BetterCustomHeaderCompanion[H]
 }

@@ -5,6 +5,7 @@ import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import cats.parse.Parser
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
+import run.cosy.http.auth.SignatureInputMatcher
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, Params, SfDict, SfInt, SfList, SfString, Token}
 
@@ -22,16 +23,22 @@ import scala.util.{Failure, Success, Try}
  *
  * @param text
  */
-final case class `Signature-Input`(sig: SigInputs) extends BetterCustomHeader[`Signature-Input`] :
+final case class `Signature-Input`(sig: SigInputs)
+	extends BetterCustomHeader[`Signature-Input`]:
 	override val companion = `Signature-Input`
 	override def renderInRequests = true
 	override def renderInResponses = true
 	override def value: String =
 		import Rfc8941.Serialise.given
 		sig.si.map { (tk, si) => (tk, si.il) }.asInstanceOf[Rfc8941.SfDict].canon
+end `Signature-Input`
 
 
-object `Signature-Input` extends BetterCustomHeaderCompanion[`Signature-Input`] :
+object `Signature-Input`
+	extends BetterCustomHeaderCompanion[`Signature-Input`]
+		with SignatureInputMatcher:
+	type Header = HttpHeader
+	type H = `Signature-Input`
 	override val name = "Signature-Input"
 
 	def apply[M](name: Rfc8941.Token, sigInput: SigInput)(using SelectorOps[M]): `Signature-Input` =
@@ -44,5 +51,4 @@ object `Signature-Input` extends BetterCustomHeaderCompanion[`Signature-Input`] 
 		Rfc8941.Parser.sfDictionary.parseAll(value) match
 		case Left(e) => Failure(HTTPHeaderParseException(e, value))
 		case Right(lm) => Success(SigInputs.filterValid(lm))
-
 end `Signature-Input`

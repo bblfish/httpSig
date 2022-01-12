@@ -54,6 +54,8 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 	given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
 	given clock: Clock = Clock.fixed(java.time.Instant.ofEpochSecond(16188845000), java.time.ZoneOffset.UTC).nn
 	def expectedHeader(name: String, value: String) = Success("\"" + name + "\": " + value)
+	def expectedKeyedHeader(name: String, key: String, value: String) = Success("\"" + name + "\";key=\""+key+"\": " + value)
+
 	object `x-example` extends UntypedAkkaSelector :
 		override val lowercaseName: String = "x-example"
 	object `x-empty-header` extends UntypedAkkaSelector :
@@ -65,9 +67,7 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 	object `x-dictionary` extends AkkaDictSelector :
 		override val lowercaseName: String = "x-dictionary"
 
-	test("2.1.2 Canonicalized Examples") {
-		import run.cosy.http.auth.AkkaHttpMessageSignature.signingString
-		val rfcCanonReq = HttpRequest(
+	val rfcCanonReq: HttpRequest = HttpRequest(
 			method = HttpMethods.GET,
 			uri = Uri("/foo"),
 			headers = Seq(
@@ -83,9 +83,12 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 				`Cache-Control`(CacheDirectives.`max-age`(60)),
 				RawHeader("X-Empty-Header", ""),
 				`Cache-Control`(CacheDirectives.`must-revalidate`),
-				RawHeader("X-Dictionary", "a=1,    b=2;x=1;y=2,   c=(a   b   c)")
+				RawHeader("X-Dictionary", "   a=1,    b=2;x=1;y=2,   c=(a   b   c)")
 			),
 		)
+
+	test("§2.1.2 HTTP Field Examples") {
+		import run.cosy.http.auth.AkkaHttpMessageSignature.signingString
 		assertEquals(
 			`cache-control`.signingString(rfcCanonReq),
 			expectedHeader("cache-control", "max-age=60, must-revalidate"))
@@ -119,18 +122,15 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		))
 	}
 
-	test("2.2. Dictionary Structured Field Members") {
-		val rfcCanonReq = HttpRequest(
-			headers = Seq(
-				RawHeader("X-Dictionary", " a=1, b=2;x=1; y=2, c=(a  b   c) "),
-			),
-		)
+	test("§2.1.3 Dictionary Structured Field Members") {
+		assertEquals(`x-dictionary`.signingString(rfcCanonReq),
+			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
 		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("a")),
-			expectedHeader("x-dictionary", "1"))
+			expectedKeyedHeader("x-dictionary","a", "1"))
 		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("b")),
-			expectedHeader("x-dictionary", "2;x=1;y=2"))
+			expectedKeyedHeader("x-dictionary","b", "2;x=1;y=2"))
 		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Token("c")),
-			expectedHeader("x-dictionary", "(a b c)"))
+			expectedKeyedHeader("x-dictionary", "c", "(a b c)"))
 	}
 
 	test("2.3. List Prefixes") {

@@ -1,11 +1,11 @@
 package run.cosy.akka.http.headers
 
-import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.headers.*
 import run.cosy.akka.http.headers.BetterCustomHeader
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.{PItem, Params, Serialise, SfDict, SfString}
-import run.cosy.http.headers.{DictSelector, ListSelector, Rfc8941, SelectorOps, UnableToCreateSigHeaderException}
+import run.cosy.http.headers.*
 
 import java.util.Locale
 import scala.collection.immutable.ListMap
@@ -48,28 +48,30 @@ trait UntypedAkkaSelector extends AkkaHeaderSelector :
 /** todo: the UntypedAkkaSelector inheritance may not be long term */
 trait AkkaDictSelector extends DictSelector[HttpMessage] with UntypedAkkaSelector :
 	override def signingString(msg: HttpMessage): Try[String] = sfDictParse(msg).map(headerName + _.canon)
-	def sfDictParse(msg: HttpMessage): Try[SfDict] =
-		for {
-			headers <- filterHeaders(msg) match {
-			case Seq() => Failure(UnableToCreateSigHeaderException(s"No headers »$lowercaseName« in request"))
-			case nonempty => Success(nonempty)
-			}
-			str <- collate(headers)
-			sfDict <- parse(str)
-		} yield sfDict
-	def parse(hdrStr: String): Try[SfDict] =
-		Rfc8941.Parser.sfDictionary.parseAll(hdrStr) match
-		case Left(err) => Failure(
-			UnableToCreateSigHeaderException(
-				s"parsing problem on header [$hdrStr] caused by $err"))
-		case Right(sfDict) => Success(sfDict)
 	override def signingString(msg: HttpMessage, key: Rfc8941.Token): Try[String] =
 		for {
 			dict <- sfDictParse(msg)
 			value <- dict.get(key).toRight(UnableToCreateSigHeaderException(
 				s"could not find $key in header [$dict]")
 			).toTry
-		} yield headerName + value.canon
+		} yield headerName(key) + value.canon
+	def sfDictParse(msg: HttpMessage): Try[SfDict] =
+		for
+			headers <- filterHeaders(msg) match
+				case Seq() => Failure(UnableToCreateSigHeaderException(
+					s"No headers »$lowercaseName« in request"))
+				case nonempty => Success(nonempty)
+			str <- collate(headers)
+			sfDict <- parse(str)
+		yield sfDict
+	//note: the reason the token must be surrounded by quotes `"` is because a Token may end with `:`
+	final def headerName(key: Rfc8941.Token): String = s""""$lowercaseName";key="${key.canon}": """
+	def parse(hdrStr: String): Try[SfDict] =
+		Rfc8941.Parser.sfDictionary.parseAll(hdrStr) match
+		case Left(err) => Failure(
+			UnableToCreateSigHeaderException(
+				s"parsing problem on header [$hdrStr] caused by $err"))
+		case Right(sfDict) => Success(sfDict)
 
 /**
  * Wait to implement:
@@ -131,6 +133,7 @@ object `digest` extends UntypedAkkaSelector :
  * For HTTP 1.1, the component value is equivalent to the request target portion of the request line.
  * However, this value is more difficult to reliably construct in other versions of HTTP. Therefore,
  * it is NOT RECOMMENDED that this identifier be used when versions of HTTP other than 1.1 might be in use.
+ *
  * @see https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-request-target
  */
 object `@request-target` extends AkkaHeaderSelector :

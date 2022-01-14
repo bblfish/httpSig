@@ -82,7 +82,7 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 			assertEquals(sis.si.values.head, sig1)
 			val sigIn: SigInput = sis.si.values.head
 			assert(sigIn.headers.contains("cache-control"))
-			assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
+			assertEquals(sigIn.keyid.get.asciiStr, "/keys/key#k1")
 			assertEquals(sigIn.created, Some(1402170695L))
 			assertEquals(sigIn.expires, Some(1402170995L))
 		case _ => fail
@@ -111,12 +111,12 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 			assertEquals(sis.si.values.tail.head, sig2)
 			val sigIn: SigInput = sis.si.values.head
 			assertEquals(sigIn.headers, Seq("@request-target", "host", "date", "cache-control"))
-			assertEquals(sigIn.keyid.asciiStr, "/keys/key#k1")
+			assertEquals(sigIn.keyid.get.asciiStr, "/keys/key#k1")
 			assertEquals(sigIn.created, Some(1402170695L))
 			assertEquals(sigIn.expires, Some(1402170995L))
 			val sigIn2: SigInput = sis.si.values.tail.head
 			assertEquals(sigIn2.headers, Seq("host", "date", "cache-control", "@request-target"))
-			assertEquals(sigIn2.keyid.asciiStr, "https://alice.pdf/k/clef#")
+			assertEquals(sigIn2.keyid.get.asciiStr, "https://alice.pdf/k/clef#")
 			assertEquals(sigIn2.created, Some(140217000L))
 			assertEquals(sigIn2.expires, Some(140220000L))
 		case _ => fail

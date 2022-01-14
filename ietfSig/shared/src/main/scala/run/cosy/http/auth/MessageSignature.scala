@@ -109,8 +109,8 @@ trait MessageSignature {
 						val sigp = `@signature-params`.signingString(sigInput)
 						Success(if onto == "" then sigp else onto + "\n" + sigp)
 					else selector.select(msg, pih) match
-					case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
-					case f => f
+						case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
+						case f => f
 			end buildSigString
 
 			buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
@@ -180,7 +180,7 @@ trait MessageSignature {
 		)(using
 			ME: MonadError[F, Throwable]
 		): HttpSig => F[A] = (httpSig) =>
-			for {
+			for
 				(si: SigInput, sig: Bytes) <- ME.fromTry(msg.getSignature(httpSig.proofName)
 					.toRight(InvalidSigException(
 						s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}' ")
@@ -189,9 +189,10 @@ trait MessageSignature {
 				sigStr <- if si.isValidAt(now)
 					then ME.fromTry(msg.signingString(si))
 					else ME.fromTry(Failure(new Throwable(s"Signature no longer valid at $now"))) //todo exception tuning
-				signatureVerificiationFn <- fetchKeyId(si.keyid)
+				keyId <- ME.fromOption(si.keyid,KeyIdException("keyId missing or badly formatted"))
+				signatureVerificiationFn <- fetchKeyId(keyId)
 				agent <- signatureVerificiationFn(sigStr, ByteVector(sig.toArray)) //todo: unify bytes
-			} yield agent
+			yield agent
 	}
 
 }

@@ -1,5 +1,7 @@
 package run.cosy.http.headers
 
+import run.cosy.http.auth.{InvalidSigException, SelectorException}
+
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Try}
 

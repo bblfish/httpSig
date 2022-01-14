@@ -3,7 +3,7 @@ package run.cosy.http.headers
 import akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
 import akka.http.scaladsl.model.{HttpHeader, ParsingException}
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.SignatureMatcher
+import run.cosy.http.auth.{HTTPHeaderParseException, SignatureMatcher}
 import run.cosy.http.headers
 import run.cosy.http.headers.Rfc8941.{Bytes, IList, PItem, SfDict}
 

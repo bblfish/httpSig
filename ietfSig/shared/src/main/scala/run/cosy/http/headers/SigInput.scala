@@ -58,7 +58,10 @@ final case class SigInput private(val il: IList) extends AnyVal {
 	def headers: Seq[String] = il.items.collect { case PItem(SfString(str), _) => str }
 	def headerItems: Seq[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])
 
-	def keyid: Rfc8941.SfString = il.params.get(keyidTk).get.asInstanceOf[Rfc8941.SfString]
+	def keyid: Option[Rfc8941.SfString] =
+		il.params.get(keyidTk) match
+			case Some(s: SfString) => Some(s)
+			case _ => None
 
 	def alg: Option[String] = il.params.get(algTk).collect { case SfString(str) => str }
 	def nonce: Option[String] = il.params.get(nonceTk).collect { case SfString(str) => str }
@@ -114,8 +117,7 @@ object SigInput {
 			// we are lenient on non-registered params
 			case (attr, _) => !registeredParams.contains(attr)
 		}
-		def keyIdExists = il.params.get(`keyidTk`).isDefined
-		keyIdExists && headersOk && paramsOk
+		headersOk && paramsOk
 	end valid
 
 }

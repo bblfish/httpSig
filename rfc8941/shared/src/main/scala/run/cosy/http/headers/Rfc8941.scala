@@ -2,7 +2,7 @@ package run.cosy.http.headers
 
 import cats.parse.Parser
 import run.cosy.http.headers.Rfc8941.Serialise.Serialise
-import run.cosy.http.headers.{HttpSigException, NumberOutOfBoundsException, ParsingException}
+import run.cosy.http.headers.{RFC8941Exception, NumberOutOfBoundsException, ParsingException}
 
 import java.math.{MathContext, RoundingMode}
 import java.util.Base64
@@ -37,14 +37,14 @@ object Rfc8941 {
 	/** SFInt's cover a subspace of Java Longs.
 	 * An Opaque type would not do, as these need to be pattern matched.
 	 * Only the object constructor can build these */
-	final case class SfInt private(val long: Long) extends AnyVal
+	final case class SfInt private(val long: Long)
 	/* https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal */
-	final case class SfDec private(val double: Double) extends AnyVal
+	final case class SfDec private(val double: Double)
 	/**
 	 * class has to be abstract to remove the `copy` operation which would allow objects
 	 * outside this package to create illegal values.
 	 * */
-	final case class SfString private(val asciiStr: String) extends AnyVal :
+	final case class SfString private(val asciiStr: String):
 		/** the string formatted for inclusion in Rfc8941 output with surrounding "..." and escaped \ and " */
 		def formattedString: String = {
 			import SfString.bs
@@ -59,7 +59,7 @@ object Rfc8941 {
 			sb.toString()
 		}
 	// class is abstract to remove copy operation
-	final case class Token private(t: String) extends AnyVal
+	final case class Token private(t: String)
 	/**
 	 * dict-member    = member-key ( parameters / ( "=" member-value ))
 	 * member-value   = sf-item / inner-list

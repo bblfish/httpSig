@@ -5,7 +5,7 @@ import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import cats.parse.Parser
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.SignatureInputMatcher
+import run.cosy.http.auth.{HTTPHeaderParseException, SignatureInputMatcher}
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, Params, SfDict, SfInt, SfList, SfString, Token}
 

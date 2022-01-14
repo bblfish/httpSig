@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.*
 import run.cosy.akka.http.headers.BetterCustomHeader
+import run.cosy.http.auth.{SelectorException, UnableToCreateSigHeaderException}
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.{PItem, Params, Serialise, SfDict, SfString}
 import run.cosy.http.headers.*
@@ -82,7 +83,7 @@ trait AkkaDictSelector[HM <: HttpMessage] extends DictSelector[HM]:
 		for
 			headers <- filterHeaders(msg) match
 				case Seq() => Failure(
-					UnableToCreateSigHeaderException(s"No headers »$lowercaseName« in request"))
+					UnableToCreateSigHeaderException(s"No headers »$lowercaseName« in http message"))
 				case nonempty =>
 					Success(nonempty)
 			str <- Selector.collate(headers,lowercaseName)

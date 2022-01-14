@@ -113,8 +113,8 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		val il = IList(
 			`cache-control`.sf, date.sf, host.sf, `x-empty-header`.sf, `x-obs-fold-header`.sf,
 			`x-ows-header`.sf, `x-dictionary`.sf)(Token("keyid") -> sf"some-key")
-		val Some(sigStr) = SigInput(il)
-		assertEquals(rfcCanonReq.signingString(sigStr).toAscii, Success(
+		val Some(signatureInput) = SigInput(il): @unchecked
+		assertEquals(rfcCanonReq.signingString(signatureInput).toAscii, Success(
 			""""cache-control": max-age=60, must-revalidate
 			  |"date": Sat, 07 Jun 2014 20:51:35 GMT
 			  |"host": www.example.com
@@ -126,6 +126,26 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 			  |"@signature-params": ("cache-control" "date" "host" "x-empty-header" \
 			  |"x-obs-fold-header" "x-ows-header" "x-dictionary");keyid="some-key"""".rfc8792single
 		))
+		//should fail because there is a header we don't know how to interpret
+		val il2 = IList(
+			`cache-control`.sf, date.sf, host.sf, `x-empty-header`.sf, sf"x-not-implemented",
+			`x-obs-fold-header`.sf, `x-ows-header`.sf, `x-dictionary`.sf)(Token("keyid") -> sf"some-key")
+		val Some(signatureInputFail) = SigInput(il2): @unchecked
+		rfcCanonReq.signingString(signatureInputFail) match {
+			case Failure(InvalidSigException(msg)) if msg.contains("x-not-implemented") => assert(true)
+			case x => fail("this should have failed because header x-not-implemented is not supported")
+		}
+
+		//fail because one of the headers is missing
+		rfcCanonReq.removeHeader("X-Empty-Header").signingString(signatureInput) match
+			case Failure(UnableToCreateSigHeaderException(msg)) if msg.contains("x-empty-header") => assert(true)
+			case x => fail("not failing in the right way? received:"+x.toString)
+
+		//fail because keyid is not specified (note: this is no longer required in the spec,..., check)
+		val ilNoKeyId = IList( date.sf, host.sf)()
+		val Some(signatureInputNoKeyId) = SigInput(ilNoKeyId): @unchecked
+		assert(rfcCanonReq.signingString(signatureInputNoKeyId).isSuccess)
+
 	}
 
 	test("§2.1.3 Dictionary Structured Field Members") {

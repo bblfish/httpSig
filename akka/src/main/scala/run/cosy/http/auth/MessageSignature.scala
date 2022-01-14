@@ -1,5 +1,6 @@
 package run.cosy.http.auth
 
+import akka.http.scaladsl.model.{HttpRequest,HttpResponse}
 import akka.http.scaladsl.util.FastFuture
 import cats.Applicative
 import run.cosy.http.headers.SelectorOps
@@ -17,7 +18,7 @@ object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature {
 	override val Signature: SignatureMatcher{ type Header = HttpHeader } = run.cosy.http.headers.Signature
 	override val `Signature-Input`: SignatureInputMatcher{ type Header = HttpHeader } = run.cosy.akka.http.headers.`Signature-Input`
 
-	extension(msg: HttpMessage)(using selector: SelectorOps[HttpMessage]) {
+	extension[R<: HttpMessage](msg: R)(using selector: SelectorOps[R]) {
 		def addHeaders(headers: Seq[HttpHeader]): HttpMessage =
 			msg.withHeaders(msg.headers ++ headers)
 		def headers: Seq[HttpHeader] = msg.headers

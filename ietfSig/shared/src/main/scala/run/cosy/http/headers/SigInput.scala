@@ -5,6 +5,7 @@ import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, SfDict,
 
 import java.time.Instant
 import scala.collection.immutable.ListMap
+import scala.concurrent.duration.FiniteDuration
 
 /**
  * SigInputs are Maps from Signature Names to SigInput entries that this
@@ -13,7 +14,7 @@ import scala.collection.immutable.ListMap
  * @param value
  * @return
  */
-final case class SigInputs private(val si: ListMap[Rfc8941.Token, SigInput]) extends AnyVal {
+final case class SigInputs private (val si: ListMap[Rfc8941.Token, SigInput]) extends AnyVal {
 	def get(key: Rfc8941.Token): Option[SigInput] = si.get(key)
 	def append(more: SigInputs): SigInputs = new SigInputs(si ++ more.si)
 	def append(key: Rfc8941.Token, sigInput: SigInput): SigInputs = new SigInputs(si + (key -> sigInput))
@@ -21,13 +22,12 @@ final case class SigInputs private(val si: ListMap[Rfc8941.Token, SigInput]) ext
 
 object SigInputs:
 	/* create a SigInput with a single element */
-	def apply[M](name: Rfc8941.Token, siginput: SigInput)(using SelectorOps[M]) =
+	def apply(name: Rfc8941.Token, siginput: SigInput) =
 		new SigInputs(ListMap(name -> siginput))
-
 	/**
 	 * Filter out the inputs that this framework does not accept.
 	 * */
-	def filterValid[M](lm: SfDict)(using SelectorOps[M]): SigInputs = SigInputs(lm.collect {
+	def filterValid(lm: SfDict): SigInputs = SigInputs(lm.collect {
 		case (sigName, SigInput(sigInput)) => (sigName, sigInput)
 	})
 
@@ -62,9 +62,9 @@ final case class SigInput private(val il: IList) extends AnyVal {
 
 	def alg: Option[String] = il.params.get(algTk).collect { case SfString(str) => str }
 	def nonce: Option[String] = il.params.get(nonceTk).collect { case SfString(str) => str }
-	def isValidAt(i: Instant, shift: Long = 0): Boolean =
-		created.map(_ - shift <= i.getEpochSecond).getOrElse(true) &&
-			expires.map(_ + shift >= i.getEpochSecond).getOrElse(true)
+	def isValidAt(i: FiniteDuration, shift: Long = 0): Boolean =
+		created.map(_ - shift <= i.toSeconds).getOrElse(true) &&
+			expires.map(_ + shift >= i.toSeconds).getOrElse(true)
 	def created: Option[Long] = il.params.get(createdTk).collect { case SfInt(time) => time }
 	def expires: Option[Long] = il.params.get(expiresTk).collect { case SfInt(time) => time }
 	def canon: String = il.canon
@@ -72,8 +72,10 @@ final case class SigInput private(val il: IList) extends AnyVal {
 }
 
 object SigInput {
-	/** registered metadata parameters as per [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-5.2.2 §5.2.2]].
-	 * To avoid them being confused with pattern matches variables enclose in ` `. */
+	/**
+	 * registered metadata parameters for Signature specifications as per
+	 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-initial-contents-2 §6.2.2 of 07 spec]].
+	 */
 	val algTk = Token("alg")
 	val createdTk = Token("created")
 	val expiresTk = Token("expires")
@@ -84,28 +86,26 @@ object SigInput {
 
 	val Empty = ListMap.empty[Token, Item]
 
-	def apply[M](innerListStr: String)(using SelectorOps[M]): Option[SigInput] =
-		Rfc8941.Parser.innerList.parseAll(innerListStr).toOption.flatMap(il => SigInput[M](il))
+	/** parse the string to a SigInput */
+	def apply(innerListStr: String): Option[SigInput] =
+		Rfc8941.Parser.innerList.parseAll(innerListStr).toOption.flatMap(SigInput.apply)
 
-	def apply[M](il: IList)(using SelectorOps[M]): Option[SigInput] =
+	def apply(il: IList): Option[SigInput] =
 		if valid(il) then Some(new SigInput(il)) else None
 
 	//this is really functioning as a constructor in pattern matching contexts
-	def unapply[M](pzd: Parameterized)(using SelectorOps[M]): Option[SigInput] =
+	def unapply(pzd: Parameterized): Option[SigInput] =
 		pzd match
-		case il: IList if valid(il) => Some(new SigInput(il))
+		case il: IList => Some(new SigInput(il))
 		case _ => None
-
 
 	/**
 	 * A Valid SigInput IList has an Internal list of parameterized SfStrings which must contain
 	 * a keyid attribute.
 	 * */
-	def valid[H](il: IList)(using o: SelectorOps[H]): Boolean =
+	def valid[H](il: IList): Boolean =
 		def headersOk = il.items.forall { pit =>
-			pit.item match
-			case str: SfString => o.valid(pit.asInstanceOf[PItem[SfString]]) // todo: remove asInstanceOf?
-			case _ => false
+			pit.item.isInstanceOf[SfString] //todo: one could check the parameters follow a pattern...
 		}
 		def paramsOk = il.params.forall {
 			case (`keyidTk`, item: SfString) => true

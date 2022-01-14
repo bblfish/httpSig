@@ -30,9 +30,15 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 		  |       created=140217000;    expires=140220000;   \
 		  |       keyid="https://alice.pdf/k/clef#"""".rfc8792single
 
-	// we don't recognise this one (yet), so it will be filtered out
+	//missing keyId, should be filtered out
 	val ex3 =
 		"""sig3=("@request-target" "host" "date" "cache-control" "x-empty-header" \
+		  |     "x-example"); alg="rsa-pss-sha512"; \
+		  |     created=1402170695; expires=1402170995""".rfc8792single
+
+	// broken header, should be filtered out
+	val ex4 =
+		"""sig3=("@request-target" 5 "host" "date" "cache-control" "x-empty-header" \
 		  |     "x-example"); keyid="test-key-a"; alg="rsa-pss-sha512"; \
 		  |     created=1402170695; expires=1402170995""".rfc8792single
 
@@ -51,8 +57,16 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 		Token("keyid") -> sf"https://alice.pdf/k/clef#"
 	)
 
+	//keyid missing
+	val expected3 = IL(
+		sf"@request-target", sf"host", sf"date", sf"cache-control", sf"x-empty-header", sf"x-example")(
+		Token("alg") -> sf"rsa-pss-sha512",
+		Token("created") -> SfInt("1402170695"),
+		Token("expires") -> SfInt("1402170995"),
+	)
+
 	test("`Signature-Input` with one header") {
-		val Success(tsi1) = `Signature-Input`.parse[HttpMessage](ex1) : @unchecked
+		val Success(tsi1) = `Signature-Input`.parse(ex1) : @unchecked
 		val Some(sig1) = tsi1.get(Token("sig1")) : @unchecked
 		assertEquals(sig1.il, expected1)
 
@@ -74,22 +88,23 @@ class TestSignatureHeadersFn extends munit.FunSuite {
 		case _ => fail
 	}
 
-	test("`Signature-Input` with two headers") {
+	test("`Signature-Input` with three headers") {
 		val sigTxt = s"$ex1, $ex3,  $ex2"
 		val Success(tsi1) = `Signature-Input`.parse(sigTxt) : @unchecked
-		assertEquals(tsi1.si.size, 2) // filtered out ex3
+		assertEquals(tsi1.si.size, 3) // filtered out ex3
 		val Some(sig1) = tsi1.get(Token("sig1")) : @unchecked
 		val Some(sig2) = tsi1.get(Token("sig2")) : @unchecked
+		val Some(sig3) = tsi1.get(Token("sig3")) : @unchecked
 		assertEquals(sig1.il, expected1)
 		assertEquals(sig2.il, expected2)
-
+		assertEquals(sig3.il, expected3)
 		val RawHeader(name, value) = `Signature-Input`(tsi1): @unchecked
 		assertEquals(name, "Signature-Input")
-		val expectedHdr: SfDict = ListMap(Token("sig1") -> expected1, Token("sig2") -> expected2)
+		val expectedHdr: SfDict = ListMap(Token("sig1") -> expected1, Token("sig3") -> expected3, Token("sig2") -> expected2)
 		assertEquals(value, expectedHdr.canon)
 		RawHeader("Signature-Input", s"$ex1, $ex2, $ex3") match
 		case `Signature-Input`(sis) =>
-			assertEquals(sis.si.size, 2)
+			assertEquals(sis.si.size, 3)
 			assertEquals(sis.si.keys.head, Token("sig1"))
 			assertEquals(sis.si.keys.tail.head, Token("sig2"))
 			assertEquals(sis.si.values.head, sig1)

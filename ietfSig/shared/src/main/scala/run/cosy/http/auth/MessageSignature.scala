@@ -5,7 +5,7 @@ import cats.effect.kernel.{Clock, MonadCancel}
 import cats.syntax.all.*
 import run.cosy.http.auth.Agent
 import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.*
+import run.cosy.http.headers.{SelectorOps, *}
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
@@ -20,8 +20,8 @@ import scala.util.{Failure, Success, Try}
 trait SignatureInputMatcher {
 	type Header
 	type H <: Header
-	def unapply[M](h: Header)(using SelectorOps[M]): Option[SigInputs]
-	def apply[M](name: Rfc8941.Token, sigInput: SigInput)(using SelectorOps[M]): H
+	def unapply(h: Header): Option[SigInputs]
+	def apply(name: Rfc8941.Token, sigInput: SigInput): H
 }
 
 
@@ -31,11 +31,11 @@ trait SignatureMatcher {
 	def apply(sig: Signatures): H
 	def unapply(h: Header): Option[Signatures]
 }
+
 object MessageSignature {
 	import bobcats.Verifier.{Signature, SigningString}
 	type SignatureVerifier[F[_], A] = (SigningString, Signature) => F[A]
 	type Signer[F[_]] = SigningString => F[Signature]
-
 }
 
 /**
@@ -55,7 +55,7 @@ trait MessageSignature {
 	/**
 	 * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
 	 */
-	extension (msg: HttpMessage)(using selector: SelectorOps[HttpMessage]) {
+	extension [R <: HttpMessage](msg: R)(using selector: SelectorOps[R]) {
 		//todo: these two should be package private and inline:
 		//     we just need them to abstract over implementations
 		def addHeaders(headers: Seq[HttpHeader]): HttpMessage
@@ -102,16 +102,15 @@ trait MessageSignature {
 
 			@tailrec
 			def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
-				if todo.isEmpty then Success(onto)
-				else
-					val pih = todo.head
+				todo match
+				case Seq() => Success(onto)
+				case pih::tail =>
 					if (pih == `@signature-params`.pitem) then
 						val sigp = `@signature-params`.signingString(sigInput)
 						Success(if onto == "" then sigp else onto + "\n" + sigp)
 					else selector.select(msg, pih) match
 					case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
 					case f => f
-				end if
 			end buildSigString
 
 			buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
@@ -125,12 +124,8 @@ trait MessageSignature {
 		 * <pre>
 		 * Signature-Input: sig1=("@authority" "content-type")\
 		 * ;created=1618884475;keyid="test-key-rsa-pss"
-		 * Signature: sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu5rif3g7ckTbbX7C4\
-		 * Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79gBeqvHNUO4bhI27p\
-		 * 4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7OjkfsHAm/enxf1fA\
-		 * wkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+EfFg4NVfqtSJch2WDY\
-		 * 7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94v6qP8pq0sQVq2DLt\
-		 * 4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:</pre>
+		 * Signature: sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvu...:
+		 * </pre>
 		 *
 		 * @return a pair of SigInput Data, and the signature bytes
 		 *         The SigInput Data tells us what the signature bytes are a signature of
@@ -190,7 +185,7 @@ trait MessageSignature {
 					.toRight(InvalidSigException(
 						s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}' ")
 					).toTry)
-				now <- summon[Clock[F]].realTimeInstant
+				now <- summon[Clock[F]].realTime
 				sigStr <- if si.isValidAt(now)
 					then ME.fromTry(msg.signingString(si))
 					else ME.fromTry(Failure(new Throwable(s"Signature no longer valid at $now"))) //todo exception tuning

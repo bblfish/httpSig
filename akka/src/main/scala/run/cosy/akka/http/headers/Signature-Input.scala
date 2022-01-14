@@ -41,13 +41,14 @@ object `Signature-Input`
 	type H = `Signature-Input`
 	override val name = "Signature-Input"
 
-	def apply[M](name: Rfc8941.Token, sigInput: SigInput)(using SelectorOps[M]): `Signature-Input` =
+	def apply(name: Rfc8941.Token, sigInput: SigInput): `Signature-Input` =
 		`Signature-Input`(SigInputs(name, sigInput))
-	def unapply[M](h: HttpHeader)(using SelectorOps[M]): Option[SigInputs] =
+	def unapply(h: HttpHeader): Option[SigInputs] =
 		h match
 		case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName => parse(h.value).toOption
 		case _ => None
-	def parse[M](value: String)(using SelectorOps[M]): Try[SigInputs] =
+
+	def parse(value: String): Try[SigInputs] =
 		Rfc8941.Parser.sfDictionary.parseAll(value) match
 		case Left(e) => Failure(HTTPHeaderParseException(e, value))
 		case Right(lm) => Success(SigInputs.filterValid(lm))

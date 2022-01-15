@@ -267,20 +267,29 @@ object `@status` extends BasicMessageSelector[HttpResponse]:
 
 	override protected
 	def signingStringValue(msg: HttpResponse): Try[String] =
-		Try(""+msg.status)
+		Try(""+msg.status.intValue())
 end `@status`
 
 /** @see https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-query */
-object `@query` extends MessageSelector[HttpRequest]:
-	val nameParam: Rfc8941.Token = Rfc8941.Token("name")
+object `@query` extends BasicMessageSelector[HttpRequest]:
 	val ASCII: Charset = Charset.forName("ASCII").nn
 	override
 	def lowercaseName: String = "@query"
 
+	override protected
+	def signingStringValue(msg: HttpRequest): Try[String] =
+		Try(msg.uri.queryString(ASCII).map("?"+_).getOrElse(""))
+end `@query`
+
+object `@query-params` extends MessageSelector[HttpRequest]:
+	val nameParam: Rfc8941.Token = Rfc8941.Token("name")
+	val ASCII: Charset = Charset.forName("ASCII").nn
 	override
-	def signingString(msg: HttpRequest, params: Rfc8941.Params = ListMap()): Try[String] =
+	def lowercaseName: String = "@query-params"
+
+	override
+	def signingString(msg: HttpRequest, params: Rfc8941.Params): Try[String] =
 		params.toSeq match
-		case Seq() => signingStringFor(msg)
 		case Seq(nameParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
 		case _ => Failure(
 			SelectorException(
@@ -288,22 +297,19 @@ object `@query` extends MessageSelector[HttpRequest]:
 			))
 
 	protected
-	def signingStringFor(msg: HttpRequest): Try[String] =
-		Try(msg.uri.queryString(ASCII).getOrElse(""))
-
-	protected
 	def signingStringFor(msg: HttpRequest, key: Rfc8941.SfString): Try[String] =
 		Try{
-			val queryStr = msg.uri.query().get(key.toString).getOrElse("")
-			s""""$lowercaseName":name="$key": $queryStr"""
+			val queryStr = msg.uri.query().get(key.asciiStr).getOrElse("")
+			s""""$lowercaseName";name=${key.canon}: $queryStr"""
 		}
-end `@query`
+end `@query-params`
+
 
 /** Note: @target-uri and @scheme can only be set by application code as a choice needs to be made */
 given akkaRequestSelectorOps: SelectorOps[HttpRequest] =
 	SelectorOps[HttpRequest](
 		authorization,  host,
-		`@request-target`, `@method`, `@path`, `@query`,
+		`@request-target`, `@method`, `@path`, `@query`, `@query-params`,
 		//all the below are good for responses too
 		digest, `content-length`, `content-type`, signature, date, `cache-control`
 	)

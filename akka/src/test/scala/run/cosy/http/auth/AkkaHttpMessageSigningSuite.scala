@@ -1,19 +1,20 @@
 package run.cosy.http.auth
 
-import akka.http.scaladsl.model.HttpMethods.CONNECT
-import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.HttpMethods.{CONNECT, GET, OPTIONS, POST}
+import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.util.FastFuture
+import cats.effect.Async
 //todo: SignatureBytes is less likely to class with objects like Signature
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
 import bobcats.util.BouncyJavaPEMUtils
 import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
 import munit.CatsEffectSuite
-import run.cosy.akka.http.headers.{akkaRequestSelectorOps,akkaResponseSelectorOps,`Signature-Input`}
+import run.cosy.akka.http.headers.{`Signature-Input`, akkaRequestSelectorOps, akkaResponseSelectorOps}
 import run.cosy.http.auth.AgentIds.PureKeyId
+import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
-import run.cosy.http.headers.*
 import scodec.bits.ByteVector
 //import com.nimbusds.jose.JWSAlgorithm
 //import run.cosy.akka.http.JW2JCA
@@ -65,7 +66,9 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		),
 	)
 	val `@targetUriTst` = `@target-uri`(true,Host("bblfish.net"))
-	val `@schemeTst` = `@scheme`(true)
+	val `@schemeSecure` = `@scheme`(true)
+	val `@schemeInSecure` = `@scheme`(false)
+	val `@authorityTst` = `@authority`(Host("bblfish.net"))
 
 	object `x-example` extends UntypedAkkaSelector[HttpRequest]:
 		override val lowercaseName: String = "x-example"
@@ -81,7 +84,7 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 	given specialRequestSelectorOps: run.cosy.http.headers.SelectorOps[HttpRequest] =
 		akkaRequestSelectorOps.append(
 			`x-example`, `x-empty-header`, `x-ows-header`, `x-obs-fold-header`, `x-dictionary`,
-			`@targetUriTst`, `@schemeTst`
+			`@targetUriTst`, `@schemeSecure`, `@authorityTst`
 		)
 	given specialResponseSelectorOps: run.cosy.http.headers.SelectorOps[HttpResponse] =
 		akkaResponseSelectorOps.append(`x-dictionary`)
@@ -89,7 +92,7 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 	given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
 	given clock: Clock = Clock.fixed(java.time.Instant.ofEpochSecond(16188845000), java.time.ZoneOffset.UTC).nn
 	def expectedKeyedHeader(name: String, key: String, value: String) = Success("\"" + name + "\";key=\"" + key + "\": " + value)
-	def rt(value: String): Success[String] = expectedHeader("@request-target", value)
+	def expectedNameHeader(name: String, nameVal: String, value: String) = Success("\"" + name + "\";name=\"" + nameVal + "\": " + value)
 	def expectedHeader(name: String, value: String) = Success("\"" + name + "\": " + value)
 
 
@@ -165,72 +168,136 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 			expectedKeyedHeader("x-dictionary", "c", "(a b c)"))
 	}
 
-	test("2.3. List Prefixes") {
-		val rfcCanonReq = HttpRequest(
-			headers = Seq(
-				RawHeader("X-List-A", " ( a  b   c  d e   f ) "),
-				RawHeader("X-List-B", " ( ) "),
-			),
-		)
-		//not yet implemented.
-		// it feels like [[https://www.rfc-editor.org/rfc/rfc8941#name-lists RFC8941 §3.1 Lists]] may be
-		// a better fit for what is intended here. Inner Lists on headers require there to be only 1 header of a given
-		// name as multiple lists cannot be split. Or perhaps the same process would work there too?
-		// Let us wait to see how the spec evolves.
+	test("§2.2.1 Signature Parameters") {
+		val si: Option[SigInput] = SigInput(IList(`@targetUriTst`.sf, `@authorityTst`.sf, date.sf, `cache-control`.sf,
+			`x-empty-header`.sf, `x-example`.sf)(
+			Token("keyid") -> SfString("test-key-rsa-pss"),
+			Token("alg") -> SfString("rsa-pss-sha512"),
+			Token("created") -> SfInt(1618884475),
+			Token("expires") -> SfInt(1618884775)
+		))
+		si match
+		case Some(si) =>
+			val sig = `@signature-params`.signingString(si)
+			assertEquals(sig,
+				""""@signature-params": ("@target-uri" "@authority" "date" "cache-control" "x-empty-header" \
+				  |  "x-example");keyid="test-key-rsa-pss";alg="rsa-pss-sha512";\
+				  |  created=1618884475;expires=1618884775""".rfc8792single)
+		case None => fail("SigInput is not available")
 	}
 
-	test("§2.2.6. Request Target") {
-		import akka.http.scaladsl.model.HttpMethods.*
-		val req1 = HttpRequest(POST, Uri("/?param=value"),
-			Seq(Host("www.example.com"))
+	val `req_2.2.2` = HttpRequest(POST, Uri("/path?param=value"),
+		headers = Seq(Host("www.example.com"))
+	)
+	val `req_2.2.3`: HttpRequest = `req_2.2.2`
+	val `req_2.2.4`: HttpRequest = `req_2.2.2`
+	val `req_2.2.5`: HttpRequest = `req_2.2.2`
+	val `req_2.2.6`: HttpRequest = `req_2.2.2`
+	val `req_2.2.7`: HttpRequest = `req_2.2.2`
+	val `req_2.2.8`: HttpRequest = HttpRequest( POST,
+			Uri("/path?param=value&foo=bar&baz=batman"
+		).withHost("www.example.com")
+	)
+	val `req_2.2.8a`: HttpRequest = HttpRequest( POST,
+			Uri("/path?queryString"
+		).withHost("www.example.com")
+	)
+
+	test("§2.2.2 Method") {
+		assertEquals(
+			`@method`.signingString(`req_2.2.2`),
+			expectedHeader("@method", "POST")
+		)
+	}
+
+	test("§2.2.3 Target URI") {
+		assertEquals(
+			`@targetUriTst`.signingString(`req_2.2.3`),
+			expectedHeader("@target-uri","https://www.example.com/path?param=value")
+		)
+
+		assertEquals(
+			`@targetUriTst`.signingString(`req_2.2.3`.removeHeader("Host")),
+			expectedHeader("@target-uri","https://bblfish.net/path?param=value")
+		)
+
+		assertEquals(
+			`@targetUriTst`.signingString(HttpRequest(GET, Uri("http://www.example.com"))),
+			//todo: should this really end in a slash??
+			expectedHeader(`@targetUriTst`.lowercaseName,"http://www.example.com")
+		)
+
+		assertEquals(
+			`@targetUriTst`.signingString(HttpRequest(GET, Uri("http://www.example.com/a/"))),
+			expectedHeader(`@targetUriTst`.lowercaseName, "http://www.example.com/a/")
+		)
+	}
+
+	test("§2.2.4 Authority") {
+		assertEquals(
+			`@authorityTst`.signingString(`req_2.2.4`),
+			expectedHeader("@authority","www.example.com")
 		)
 		assertEquals(
-			`@request-target`.signingString(req1),
-			rt("/?param=value")
+			`@authorityTst`.signingString(`req_2.2.4`.removeHeader("Host")),
+			expectedHeader("@authority","bblfish.net")
+		)
+	}
+
+	test("§2.2.5 Scheme") {
+		assertEquals(
+			`@schemeSecure`.signingString(`req_2.2.5`),
+			expectedHeader("@scheme","https")
+		)
+		assertEquals(
+			`@schemeInSecure`.signingString(`req_2.2.5`),
+			expectedHeader("@scheme","http")
+		)
+
+	}
+
+	def `request-target`(value: String): Success[String] = expectedHeader("@request-target", value)
+	test("§2.2.6. Request Target") {
+		import akka.http.scaladsl.model.HttpMethods.*
+
+		assertEquals(
+			`@request-target`.signingString(`req_2.2.6`),
+			`request-target`("/path?param=value")
 		)
 		val reqGETAbsoluteURI = HttpRequest(GET, Uri("https://www.example.com/path?param=value"))
 		assertEquals(
 			`@request-target`.signingString(reqGETAbsoluteURI),
-			rt("/path?param=value")
+			`request-target`("/path?param=value")
 		)
-
 		val req2 = HttpRequest(POST, Uri("/a/b"),
 			Seq(Host("www.example.com"))
 		)
 		assertEquals(
 			`@request-target`.signingString(req2),
-			rt("/a/b")
+			`request-target`("/a/b")
 		)
+
 		val req3 = HttpRequest(GET, Uri("http://www.example.com/a/"))
 		assertEquals(
-			`@targetUriTst`.signingString(req3),
-			expectedHeader(`@targetUriTst`.lowercaseName, "http://www.example.com/a/")
-		)
-		assertEquals(
 			`@request-target`.signingString(req3),
-			rt("/a/")
+			`request-target`("/a/")
 		)
-		val req4 = HttpRequest(GET, Uri("http://www.example.com"))
+
 		assertEquals(
-			`@request-target`.signingString(req4),
-			rt("/")
-		)
-		assertEquals(
-			`@targetUriTst`.signingString(req4),
-			//todo: should this really end in a slash??
-			expectedHeader(`@targetUriTst`.lowercaseName,"http://www.example.com")
+			`@request-target`.signingString(HttpRequest(GET, Uri("http://www.example.com/a"))),
+			`request-target`("/a")
 		)
 		//CONNECT: Not sure if this is allowed by Akka. It is not possible to create an HttpRequest with it
-		//		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
-		//			Seq(Host("www.example.com")))
-		//		assertEquals(
-		//			`@request-target`.signingString(req5),
-		//			rt("connect /")
-		//		)
+//		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
+//			Seq(Host("www.example.com")))
+//		assertEquals(
+//			`@request-target`.signingString(req5),
+//			`request-target`("connect /")
+//		)
 		val req6 = HttpRequest(OPTIONS, Uri("*"), headers = Seq(Host("server.example.com")))
 		assertEquals(
 			`@request-target`.signingString(req6),
-			rt("*")
+			`request-target`("*")
 		)
 	}
 
@@ -243,9 +310,67 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 
 		assertEquals(
 			`@request-target`.signingString(reqCONNECT),
-			rt("www.example.com:80")
+			`request-target`("www.example.com:80")
 		)
 	}
+
+	test("§2.2.7 Path") {
+		assertEquals(
+			`@path`.signingString(`req_2.2.7`),
+			expectedHeader("@path","/path")
+		)
+	}
+
+	test("§2.2.8 Query") {
+		assertEquals(
+			`@query`.signingString(`req_2.2.8`),
+			expectedHeader("@query","?param=value&foo=bar&baz=batman")
+		)
+		assertEquals(
+			`@query`.signingString(`req_2.2.8a`),
+			expectedHeader("@query","?queryString")
+		)
+		//is this correct?
+		assertEquals(
+			`@query`.signingString(HttpRequest(GET, Uri("http://www.example.com/a"))),
+			expectedHeader("@query","")
+		)
+		//is this correct?
+		assertEquals(
+			`@query`.signingString(HttpRequest(GET, Uri("http://www.example.com/a?"))),
+			expectedHeader("@query","?")
+		)
+
+	}
+
+	test("§2.2.9 Query Parameters") {
+		assertEquals(
+			`@query-params`.signingString(`req_2.2.8`,Params(Token("name") -> SfString("baz"))),
+			expectedNameHeader("@query-params","baz","batman")
+		)
+		assertEquals(
+			`@query-params`.signingString(`req_2.2.8`,Params(Token("name") -> SfString("qux"))),
+			expectedNameHeader("@query-params","qux","")
+		)
+		assertEquals(
+			`@query-params`.signingString(`req_2.2.8`,Params(Token("name") -> SfString("param"))),
+			expectedNameHeader("@query-params","param","value")
+		)
+
+	}
+
+	test("§2.2.10 Status Code") {
+		assertEquals(
+			`@status`.signingString(HttpResponse(StatusCodes.OK).withHeaders(Date(DateTime.now))),
+			Success("\"@status\": 200")
+		)
+	}
+
+	test("§2.2.11 Request-Response Signature Binding") {
+
+	}
+
+
 
 	test("§2.3 Creating the Signature Input String") {
 		import run.cosy.http.auth.AkkaHttpMessageSignature.signingString

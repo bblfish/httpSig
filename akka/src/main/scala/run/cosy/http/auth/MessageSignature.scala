@@ -13,14 +13,20 @@ import scala.util.Try
 // selector needs to be filled in
 object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature {
 	import AkkaHttpMessageSignature.*
-	override type HttpMessage = akka.http.scaladsl.model.HttpMessage
+//	override type Message = HttpMessage
+	override type Request = HttpRequest
+	override type Response = HttpResponse
 	override type HttpHeader = akka.http.scaladsl.model.HttpHeader
 	override val Signature: SignatureMatcher{ type Header = HttpHeader } = run.cosy.http.headers.Signature
 	override val `Signature-Input`: SignatureInputMatcher{ type Header = HttpHeader } = run.cosy.akka.http.headers.`Signature-Input`
 
-	extension[R<: HttpMessage](msg: R)(using selector: SelectorOps[R]) {
-		def addHeaders(headers: Seq[HttpHeader]): HttpMessage =
-			msg.withHeaders(msg.headers ++ headers)
+	extension[R <: Message](msg: R) {
+		def addHeaders(headers: Seq[HttpHeader]): R =
+			//don't know how to get rid of the asInstanceOf
+			msg.withHeaders(msg.headers ++ headers).asInstanceOf[R]
+	}
+
+	extension(msg: Message) {
 		def headers: Seq[HttpHeader] = msg.headers
 	}
 

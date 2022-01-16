@@ -103,8 +103,7 @@ object SigInput {
 		case _ => None
 
 	/**
-	 * A Valid SigInput IList has an Internal list of parameterized SfStrings which must contain
-	 * a keyid attribute.
+	 * A Valid SigInput IList has an Internal list of parameterized SfStrings
 	 * */
 	def valid[H](il: IList): Boolean =
 		def headersOk = il.items.forall { pit =>

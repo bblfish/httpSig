@@ -366,8 +366,64 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		)
 	}
 
-	test("§2.2.11 Request-Response Signature Binding") {
+	val `req_2.2.11` = HttpRequest(POST, Uri("/foo?param=value&pet=dog"),
+		headers = Seq(
+			Host("example.com"),
+			Date(DateTime(2021,04,20,02,07,55)),
+			`Signature-Input`(SigInputs(Rfc8941.Token("sig1"), SigInput(IList(
+				`@authorityTst`.sf,`content-type`.sf)(
+				Param("created",SfInt(1618884475)), Param("keyid", SfString("test-key-rsa-pss"))
+			)).get)),
+			run.cosy.http.headers.Signature(Signatures(Token("sig1"),
+				"""KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu5rif3g7ckTbbX7C4\
+				  |  Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79gBeqvHNUO4bhI27p\
+				  |  4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7OjkfsHAm/enxf1fA\
+				  |  wkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+EfFg4NVfqtSJch2WDY\
+				  |  7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94v6qP8pq0sQVq2DLt\
+				  |  4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==""".rfc8792single.base64Decode
+			)))
+	).withEntity(ContentTypes.`application/json`,"""{"hello": "world"}""")
 
+	val `res_2.2.11` = HttpResponse(StatusCodes.OK,
+		headers = Seq(Date(DateTime(2021,04,20,02,07,56)))
+	).withEntity( ContentTypes.`application/json`,
+	"""{"busy": true, "message": "Your call is very important to us"}"""
+	)
+
+	val `res_2.2.11_siginput`: SigInput = SigInput("""("content-type" "content-length" "@status" \
+														|  "@request-response";key="sig1");created=1618884475\
+														|  ;keyid="test-key-ecc-p256"""".rfc8792single).get
+
+	test("§2.2.11 Request-Response Signature Binding") {
+		import run.cosy.http.auth.AkkaHttpMessageSignature.signingString
+		assertEquals(
+			`@request-response`.signingString(`req_2.2.11`,Params(Token("key") -> SfString("sig1"))),
+			expectedKeyedHeader("@request-response", "sig1",
+				""":KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu\
+				  |  5rif3g7ckTbbX7C4Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79\
+				  |  gBeqvHNUO4bhI27p4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7\
+				  |  OjkfsHAm/enxf1fAwkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+Ef\
+				  |  Fg4NVfqtSJch2WDY7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94\
+				  |  v6qP8pq0sQVq2DLt4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:""".rfc8792single)
+		)
+
+		assertEquals(
+			`res_2.2.11`.signingString(`res_2.2.11_siginput`,`req_2.2.11`).toAscii,
+			Success(
+			""""content-type": application/json
+			  |"content-length": 62
+			  |"@status": 200
+			  |"@request-response";key="sig1": :KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu\
+			  |  5rif3g7ckTbbX7C4Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79\
+			  |  gBeqvHNUO4bhI27p4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7\
+			  |  OjkfsHAm/enxf1fAwkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+Ef\
+			  |  Fg4NVfqtSJch2WDY7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94\
+			  |  v6qP8pq0sQVq2DLt4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:
+			  |"@signature-params": ("content-type" "content-length" "@status" \
+			  |  "@request-response";key="sig1");created=1618884475\
+			  |  ;keyid="test-key-ecc-p256"""".rfc8792single
+			)
+		)
 	}
 
 

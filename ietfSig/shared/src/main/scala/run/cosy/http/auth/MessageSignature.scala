@@ -8,6 +8,7 @@ import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.{SelectorOps, *}
 import scodec.bits.ByteVector
 
+import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.security.{PrivateKey, PublicKey}
 import java.util.Locale
@@ -43,7 +44,9 @@ object MessageSignature {
  * */
 trait MessageSignature {
 	import bobcats.Verifier.{Signature, SigningString}
-	type HttpMessage
+	type Message = Request | Response
+	type Request
+	type Response
 	type HttpHeader
 	import MessageSignature.*
 
@@ -52,14 +55,19 @@ trait MessageSignature {
 	val `Signature-Input`: SignatureInputMatcher {type Header = HttpHeader}
 	val Signature: SignatureMatcher {type Header = HttpHeader}
 
+	/** extensions needed to abstract across HTTP implementations */
+	extension(msg: Message) {
+		def headers: Seq[HttpHeader]
+	}
+
+	extension[R <: Message](msg: R) {
+		def addHeaders(headers: Seq[HttpHeader]): R
+	}
+
 	/**
 	 * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
 	 */
-	extension [R <: HttpMessage](msg: R)(using selector: SelectorOps[R]) {
-		//todo: these two should be package private and inline:
-		//     we just need them to abstract over implementations
-		def addHeaders(headers: Seq[HttpHeader]): HttpMessage
-		def headers: Seq[HttpHeader]
+	extension [R <: Message](msg: R)(using selectorDB: SelectorOps[R]) {
 
 		/**
 		 * Generate a function to create a new HttpRequest with the given Signature-Input header.
@@ -75,10 +83,10 @@ trait MessageSignature {
 		 */
 		def withSigInput[F[_]](
 			name: Rfc8941.Token, sigInput: SigInput, signerF: Signer[F]
-		)(using meF: MonadError[F, Throwable]): F[HttpMessage] =
-			for {toSignBytes <- meF.fromTry(signingString(sigInput))
-				  (signature: ByteVector) <- signerF(toSignBytes)
-				  } yield msg.addHeaders(Seq(
+		)(using meF: MonadError[F, Throwable]): F[R] =
+			for toSignBytes <- meF.fromTry(signingString(sigInput))
+				 (signature: ByteVector) <- signerF(toSignBytes)
+			yield msg.addHeaders(Seq(
 				`Signature-Input`(name, sigInput),
 				Signature(Signatures(name, ArraySeq.unsafeWrapArray(signature.toArray))) //todo: align the types everywhere if poss
 			))
@@ -86,12 +94,10 @@ trait MessageSignature {
 
 		/**
 		 * Generate the signature string, given the `signature-input` header.
-		 * This is to be called the server to verify a signature,
-		 * but also by `withSigInput` to generate the signature.
 		 * Note, that the headers to be signed, always contains the `signature-input` header itself.
 		 *
 		 * @param sigInput the sigInput header specifying the
-		 * @return signing String for given Signature Input on this http requets.
+		 * @return signing String for given Signature Input on this http message.
 		 *         This string will either need to be verified with a public key against the
 		 *         given one, or will need to be signed to be added to the Request.
 		 *         In the latter case use the withSigInput method.
@@ -108,7 +114,7 @@ trait MessageSignature {
 					if (pih == `@signature-params`.pitem) then
 						val sigp = `@signature-params`.signingString(sigInput)
 						Success(if onto == "" then sigp else onto + "\n" + sigp)
-					else selector.select(msg, pih) match
+					else selectorDB.select(msg, pih) match
 						case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
 						case f => f
 			end buildSigString
@@ -137,7 +143,7 @@ trait MessageSignature {
 				case `Signature-Input`(inputs) if inputs.get(name).isDefined =>
 					inputs.get(name).get
 			}.flatMap { siginput =>
-				headers.collectFirst {
+				msg.headers.collectFirst {
 					case Signature(sigs) if sigs.get(name).isDefined => (siginput, sigs.get(name).get)
 				}
 			}
@@ -193,6 +199,41 @@ trait MessageSignature {
 				signatureVerificiationFn <- fetchKeyId(keyId)
 				agent <- signatureVerificiationFn(sigStr, ByteVector(sig.toArray)) //todo: unify bytes
 			yield agent
+	}
+
+	/* needed for request-response dependencies */
+	extension (response: Response)(using
+		requestSelDB: SelectorOps[Request],
+		responseSelDB: SelectorOps[Response]
+	) {
+
+	def signingString(sigInput: SigInput, request: Request): Try[SigningString] =
+		import Rfc8941.Serialise.{*, given}
+
+		@tailrec
+		def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
+			todo match
+			case Seq() => Success(onto)
+			case pih::tail =>
+				if (pih == `@signature-params`.pitem) then
+					val sigp = `@signature-params`.signingString(sigInput)
+					Success(if onto == "" then sigp else onto + "\n" + sigp)
+				else
+					val x = responseSelDB.get(pih.item) match
+						case Success(selector) => selector.signingString(response, pih.params)
+						case Failure(x) => requestSelDB.get(pih.item).flatMap{ selector =>
+							if selector.specialForRequests then selector.signingString(request,pih.params)
+							else Failure(x)
+						}
+					x match
+					case Success(hdr) => buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
+					case f => f
+		end buildSigString
+
+		buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
+			.flatMap(string => ByteVector.encodeAscii(string).toTry)
+	end signingString
+
 	}
 
 }

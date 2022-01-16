@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.*
 import run.cosy.akka.http.headers.BetterCustomHeader
-import run.cosy.http.auth.{SelectorException, UnableToCreateSigHeaderException}
+import run.cosy.http.auth.{AttributeMissingException, HTTPHeaderParseException, SelectorException, UnableToCreateSigHeaderException}
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.{PItem, Params, Serialise, SfDict, SfString}
 import run.cosy.http.headers.*
@@ -26,17 +26,20 @@ object Selector:
 				_.value.split('\n').map(_.trim).mkString(" ")
 			).mkString(", ")
 		)
+	def filterHeaders(msg: HttpMessage, lowercaseName: String): Seq[HttpHeader] =
+		msg.headers.filter(_.lowercaseName() == lowercaseName)
 end Selector
 
 /** Selectors that work on headers but take no parameters. */
 trait AkkaBasicHeaderSelector[HM <: HttpMessage]
 	extends run.cosy.http.headers.MessageSelector[HM]:
-	/**
+/**
 	 * default for non-rfc 8941 headers.
 	 * */
 	override def signingString(msg: HM,  params: Rfc8941.Params): Try[String] =
+		import Selector.collate
 		if params.isEmpty then
-			Selector.collate(filterHeaders(msg),lowercaseName).map(headerName + _)
+			collate(filterHeaders(msg),lowercaseName).map(headerName + _)
 		else
 			Failure(SelectorException(s"selector $lowercaseName does not take parameters. Received "+params))
 
@@ -60,8 +63,7 @@ trait TypedAkkaSelector[HM <: HttpMessage, HdrType <: HttpHeader : scala.reflect
 /** for all headers for which Akka HTTP does not provide a built-in parser */
 trait UntypedAkkaSelector[HM <: HttpMessage] extends AkkaBasicHeaderSelector[HM]:
 	override protected
-	def filterHeaders(msg: HM): Seq[HttpHeader] =
-		msg.headers.filter(_.lowercaseName() == lowercaseName)
+	def filterHeaders(msg: HM): Seq[HttpHeader] = Selector.filterHeaders(msg,lowercaseName)
 end UntypedAkkaSelector
 
 /** todo: the UntypedAkkaSelector inheritance may not be long term */
@@ -84,8 +86,7 @@ trait AkkaDictSelector[HM <: HttpMessage] extends DictSelector[HM]:
 			headers <- filterHeaders(msg) match
 				case Seq() => Failure(
 					UnableToCreateSigHeaderException(s"No headers »$lowercaseName« in http message"))
-				case nonempty =>
-					Success(nonempty)
+				case nonempty => Success(nonempty)
 			str <- Selector.collate(headers,lowercaseName)
 			sfDict <- parse(str)
 		yield
@@ -175,6 +176,9 @@ object digest extends UntypedAkkaSelector[HttpMessage] :
  */
 object `@request-target` extends BasicMessageSelector[HttpRequest] :
 	override val lowercaseName: String = "@request-target"
+	override
+	def specialForRequests: Boolean = true
+
 	override protected
 	def signingStringValue(req: HttpRequest): Try[String] =
 		Try(req.uri.toRelative.toString()) //tests needed with connnect
@@ -191,6 +195,7 @@ end `@request-target`
 object `@method` extends BasicMessageSelector[HttpRequest]:
 	override
 	def lowercaseName: String = "@method"
+	override def specialForRequests: Boolean = true
 
 	override protected
 	def signingStringValue(msg: HttpRequest): Try[String] =
@@ -208,6 +213,7 @@ case class `@target-uri`(securedConnection: Boolean, defaultHostHeader: Host)
 	extends BasicMessageSelector[HttpRequest]:
 	override
 	def lowercaseName: String = "@target-uri"
+	override def specialForRequests: Boolean = true
 
 	override protected
 	def signingStringValue(msg: HttpRequest): Try[String] =
@@ -223,6 +229,8 @@ end `@target-uri`
 case class `@authority`(defaultHostHeader: Host) extends BasicMessageSelector[HttpRequest]:
 	override
 	def lowercaseName: String = "@authority"
+	override
+	def specialForRequests: Boolean = true
 
 	//todo: inefficient as it builds whole URI to extract only a small piece
 	override protected
@@ -240,6 +248,8 @@ end `@authority`
 case class `@scheme`(secure: Boolean) extends BasicMessageSelector[HttpRequest]:
 	override
 	def lowercaseName: String = "@scheme"
+	override
+	def specialForRequests: Boolean = true
 
 	//todo: inefficient as it builds whole URI to extract only a small piece
 	override protected
@@ -254,6 +264,8 @@ end `@scheme`
 object `@path` extends BasicMessageSelector[HttpRequest]:
 	override
 	def lowercaseName: String = "@path"
+	override
+	def specialForRequests: Boolean = true
 
 	override protected
 	def signingStringValue(msg: HttpRequest): Try[String] = Try(
@@ -275,6 +287,8 @@ object `@query` extends BasicMessageSelector[HttpRequest]:
 	val ASCII: Charset = Charset.forName("ASCII").nn
 	override
 	def lowercaseName: String = "@query"
+	override
+	def specialForRequests: Boolean = true
 
 	override protected
 	def signingStringValue(msg: HttpRequest): Try[String] =
@@ -286,6 +300,8 @@ object `@query-params` extends MessageSelector[HttpRequest]:
 	val ASCII: Charset = Charset.forName("ASCII").nn
 	override
 	def lowercaseName: String = "@query-params"
+	override
+	def specialForRequests: Boolean = true
 
 	override
 	def signingString(msg: HttpRequest, params: Rfc8941.Params): Try[String] =
@@ -304,13 +320,42 @@ object `@query-params` extends MessageSelector[HttpRequest]:
 		}
 end `@query-params`
 
+object `@request-response` extends MessageSelector[HttpRequest]:
+	val keyParam: Rfc8941.Token = Rfc8941.Token("key")
+	override
+	def lowercaseName: String = "@request-response"
+	override
+	def specialForRequests: Boolean = true
+
+	override
+	def signingString(msg: HttpRequest, params: Rfc8941.Params): Try[String] =
+		params.toSeq match
+		case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+		case _ => Failure(
+			SelectorException(
+				s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received "+params
+			))
+
+	protected
+	def signingStringFor(msg: HttpRequest, key: Rfc8941.SfString): Try[String] =
+		for
+			sigsDict <- signature.sfDictParse(msg)
+			keyStr <- Try(Rfc8941.Token(key.asciiStr))
+			signature <- sigsDict.get(keyStr)
+				.toRight(AttributeMissingException(s"could not find signature '$keyStr'"))
+				.toTry
+		yield
+			s""""$lowercaseName";key=${key.canon}: ${signature.canon}"""
+end `@request-response`
+
 
 /** Note: @target-uri and @scheme can only be set by application code as a choice needs to be made */
 given akkaRequestSelectorOps: SelectorOps[HttpRequest] =
 	SelectorOps[HttpRequest](
 		authorization,  host,
 		`@request-target`, `@method`, `@path`, `@query`, `@query-params`,
-		//all the below are good for responses too
+		`@request-response`,
+			//all the below are good for responses too
 		digest, `content-length`, `content-type`, signature, date, `cache-control`
 	)
 

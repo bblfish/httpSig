@@ -17,6 +17,9 @@ trait MessageSelector[-HttpMessage]:
 	lazy val sf = Rfc8941.SfString(lowercaseName)
 	lazy val special: Boolean = lowercaseName.startsWith("@")
 	def lowercaseName: String
+	/* Is this a special @message selector that must be used on requests even if signing a response?
+	 * By default no.*/
+	def specialForRequests: Boolean = false
 
 	/**
 	 * @return a signing string for this header for a given HttpMessage
@@ -71,6 +74,7 @@ end DictSelector
 
 
 object `@signature-params` {
+	def onlyForRequests: Boolean = false
 	val lowercaseName = "@signature-params"
 	val pitem = Rfc8941.PItem(Rfc8941.SfString(lowercaseName))
 	def signingString(sigInput: SigInput): String = s""""@signature-params": ${sigInput.canon}"""
@@ -104,11 +108,18 @@ case class SelectorOps[HM] private (selectorDB: Map[Rfc8941.SfString, MessageSel
 
 	def select(msg: HM, selectorInfo: Rfc8941.PItem[Rfc8941.SfString]): Try[String] =
 		for
-			selector <- selectorDB.get(selectorInfo.item)
-				.toRight(InvalidSigException(s"Header ${selectorInfo.item} is not supported")).toTry
+			selector <- get(selectorInfo.item)
 			str <- selector.signingString(msg, selectorInfo.params)
 		yield str
 	end select
+
+	def get(selectorName: Rfc8941.SfString): Try[MessageSelector[HM]] =
+		selectorDB.get(selectorName.item)
+			.toRight(
+				InvalidSigException(s"Header ${selectorName.item} is not supported")
+			).toTry
+
+end SelectorOps
 
 object SelectorOps:
 	def apply[Msg](msgSelectors: MessageSelector[Msg]*): SelectorOps[Msg] =

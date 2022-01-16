@@ -7,8 +7,7 @@ import scala.collection.immutable.{ArraySeq, ListMap}
 /**
  * A Signature is an SfDict, refined to contain only PItems of Arrays of Bytees.
  * We want to keep potential attributes as they could be useful. */
-final class Signatures private(val sigmap: ListMap[Rfc8941.Token, PItem[Bytes]]) extends AnyVal :
-
+final class Signatures private(val sigmap: ListMap[Rfc8941.Token, PItem[Bytes]]):
 	def get(signame: Rfc8941.Token): Option[Bytes] = sigmap.get(signame).map(_.item)
 
 	//add the signature to the list.

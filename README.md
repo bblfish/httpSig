@@ -21,6 +21,14 @@ This repository contains the following projects:
 * make it JS friendly (client and server)
 * publish libs to maven
 
+### Thanks
+
+This work was made possible by the generous EU grant from nlnet for 
+the [Solid Control Project](https://nlnet.nl/project/SolidControl/).
+That project is to end in January 2022. 
+
 If you wish to have the library run on a specific client or server environment, please
 contact [henry.story@co-operating.systems](mailto:henry.story@co-operating.systems) or leave
 issues in the Issue DataBase.
+
+We are looking for further funding opportunities to continue the work.

@@ -1,5 +1,6 @@
 package run.cosy.http.headers
 
+import run.cosy.http.auth.{AuthExc, InvalidSigException}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, SfDict, SfInt, SfString, Token}
 
@@ -14,7 +15,7 @@ import scala.concurrent.duration.FiniteDuration
  * @param value
  * @return
  */
-final case class SigInputs private (val si: ListMap[Rfc8941.Token, SigInput]) extends AnyVal {
+final case class SigInputs private (si: ListMap[Rfc8941.Token, SigInput]) {
 	def get(key: Rfc8941.Token): Option[SigInput] = si.get(key)
 	def append(more: SigInputs): SigInputs = new SigInputs(si ++ more.si)
 	def append(key: Rfc8941.Token, sigInput: SigInput): SigInputs = new SigInputs(si + (key -> sigInput))
@@ -25,12 +26,15 @@ object SigInputs:
 	def apply(name: Rfc8941.Token, siginput: SigInput) =
 		new SigInputs(ListMap(name -> siginput))
 	/**
-	 * Filter out the inputs that this framework does not accept.
-	 * */
-	def filterValid(lm: SfDict): SigInputs = SigInputs(lm.collect {
-		case (sigName, SigInput(sigInput)) => (sigName, sigInput)
-	})
-
+	 * Filter out the clearly invalid inputs.
+	 **/
+	def build(lm: SfDict): Option[SigInputs] =
+		val valid = lm.collect {
+			case (sigName, SigInput(sigInput)) => (sigName, sigInput)
+		}
+		if valid.isEmpty then None
+		else Some(SigInputs(valid))
+	end build
 
 /**
  * A SigInput is a valid Signature-Input build on an Rfc8941 Internal List.
@@ -49,7 +53,7 @@ object SigInputs:
  *
  * @param il
  */
-final case class SigInput private(val il: IList) extends AnyVal {
+final case class SigInput private(val il: IList) {
 
 	import Rfc8941.Serialise.given
 	import SigInput.*
@@ -99,7 +103,7 @@ object SigInput {
 	//this is really functioning as a constructor in pattern matching contexts
 	def unapply(pzd: Parameterized): Option[SigInput] =
 		pzd match
-		case il: IList => Some(new SigInput(il))
+		case il: IList if valid(il) => Some(new SigInput(il))
 		case _ => None
 
 	/**

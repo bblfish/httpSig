@@ -93,11 +93,14 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 		name := "http4s Sig",
 		description := "Signing HTTP Messages parser for http4s headers library",
 		libraryDependencies ++= Seq(
-			http4s.client.value
+			http4s.client.value,
+			http4s.theDsl.value
 		),
 		libraryDependencies ++= Seq(
 			munit.value % Test,
-			cats.munitEffect.value % Test
+			cats.munitEffect.value % Test,
+			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
+			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
 		)
 	)
 	.jsSettings(
@@ -108,7 +111,15 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 		scalacOptions := scala3Options,
 		libraryDependencies ++= java.bouncy
 	)
-	.dependsOn(ietfSigHttp)
+	.dependsOn(ietfSigHttp, testUtils % Test)
+
+lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
+	.in(file("test"))
+	.settings(commonSettings: _*)
+	.settings(
+		name := "testUtils",
+		description := "Test Utilities"
+	)
 
 val scala3Options = Seq(
 	// "-classpath", "foo:bar:...",         // Add to the classpath.

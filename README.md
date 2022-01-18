@@ -1,4 +1,4 @@
-## Http Sig library
+## HttpSig library
 
 This library consists of Scala and Scala-JS components implementing the
 IETF's HTTP-Bis [Signing HTTP Messages](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html)

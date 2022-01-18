@@ -29,7 +29,8 @@ object Rfc8941 {
 	type SfDict = ListMap[Token, Parameterized]
 	def Param(tk: String, i: Item): Param = (Token(tk), i)
 	def Params(ps: Param*): Params = ListMap(ps *)
-	def SfDict(entries: (Token, Parameterized)*) = ListMap(entries *)
+	def SfDict(entries: (Token, Parameterized)*): ListMap[Token, Parameterized] =
+		ListMap(entries *)
 	private def paramConversion(paras: Param*): Params = ListMap(paras *)
 	sealed trait Parameterized {
 		def params: Params

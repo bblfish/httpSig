@@ -17,7 +17,7 @@ import scala.util.{Failure, Success, Try}
 
 
 /**
- * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 4.1 The 'Signature-Input' HTTP header]]
+ * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-the-signature-input-http-fi 4.1 The 'Signature-Input' HTTP header]]
  * defined in "Signing HTTP Messages" HttpBis RFC.
  * Since version 03 signature algorithms have been re-introduced, but we only implement "hs2019" for simplicity.
  *
@@ -51,5 +51,5 @@ object `Signature-Input`
 	def parse(value: String): Try[SigInputs] =
 		Rfc8941.Parser.sfDictionary.parseAll(value) match
 		case Left(e) => Failure(HTTPHeaderParseException(e, value))
-		case Right(lm) => Success(SigInputs.filterValid(lm))
+		case Right(lm) => Success(SigInputs.build(lm))
 end `Signature-Input`

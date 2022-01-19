@@ -9,12 +9,10 @@ import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
+import run.cosy.http.headers.NumberOutOfBoundsException
 
 /** Structured Field Values for HTTP */
 object Rfc8941 {
-
-	type NumberOutOfBoundsException = run.cosy.http.headers.NumberOutOfBoundsException
-
 	//
 	//types used by RFC8941
 	//

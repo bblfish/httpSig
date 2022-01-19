@@ -13,13 +13,14 @@ import scala.collection.immutable.ListMap
 
 /**
  * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-the-signature-input-http-fi 4.1 The 'Signature-Input' HTTP header]]
- *
  */
+case class `Signature-Input`(values: SigInputs)
+
 object `Signature-Input`:
 	def parse(s: String): ParseResult[`Signature-Input`] =
-		for dict     <- fromParser(Rfc8941.Parser.sfDictionary,
-				"Invalid `Signature-Input` header")(s)
-			sigInputs <- SigInputs.build(dict).toRight(ParseFailure(
+		for dict     <- util.fromParser(Rfc8941.Parser.sfDictionary,
+				"Invalid `Signature-Input` header")(s.trim.nn)
+			sigInputs <- SigInputs(dict).toRight(ParseFailure(
 						 "Invalid `Signature-Input` header",
 						 "valid SfDictionary elements are empty"))
 		yield `Signature-Input`(sigInputs)
@@ -40,11 +41,11 @@ object `Signature-Input`:
 		(a, b) => `Signature-Input`(a.values.append(b.values))
 end `Signature-Input`
 
-//copied from org.http4s.ParseResult.fromParser where it is private
-def fromParser[A](parser: Parser0[A], errorMessage: => String)(
-	s: String
-): ParseResult[A] =
-	try parser.parseAll(s).leftMap(e => ParseFailure(errorMessage, e.toString))
-	catch { case p: ParseFailure => p.asLeft[A] }
+object util:
+	//copied from org.http4s.ParseResult.fromParser where it is private
+	def fromParser[A](parser: Parser0[A], errorMessage: => String)(
+		s: String
+	): ParseResult[A] =
+		try parser.parseAll(s).leftMap(e => ParseFailure(errorMessage, e.toString))
+		catch { case p: ParseFailure => p.asLeft[A] }
 
-case class `Signature-Input`(values: SigInputs)

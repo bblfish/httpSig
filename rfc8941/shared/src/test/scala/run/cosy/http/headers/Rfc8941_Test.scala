@@ -42,7 +42,7 @@ class Rfc8941_Test extends munit.FunSuite {
 		assertEquals(SfInt("42").long, 42L)
 		assertEquals(SfInt("-42").long, -42L)
 		assertEquals(SfInt(42L).long, 42L)
-		intercept[Rfc8941.NumberOutOfBoundsException] {
+		intercept[NumberOutOfBoundsException] {
 			SfInt(("999" * 5) + "0")
 		}
 	}
@@ -61,7 +61,7 @@ class Rfc8941_Test extends munit.FunSuite {
 		assertEquals(SfDec("-42.011").double, -42.011)
 		assertEquals(SfDec("-42.015").double, -42.015)
 		assertEquals(SfDec(42.0015).double, 42.002)
-		intercept[Rfc8941.NumberOutOfBoundsException] {
+		intercept[NumberOutOfBoundsException] {
 			SfDec(SfDec.MAX_VALUE + 1).double
 		}
 		intercept[NumberFormatException] {

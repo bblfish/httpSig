@@ -5,7 +5,7 @@ import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import cats.parse.Parser
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.{HTTPHeaderParseException, SignatureInputMatcher}
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SignatureInputMatcher}
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, Params, SfDict, SfInt, SfList, SfString, Token}
 
@@ -51,5 +51,7 @@ object `Signature-Input`
 	def parse(value: String): Try[SigInputs] =
 		Rfc8941.Parser.sfDictionary.parseAll(value) match
 		case Left(e) => Failure(HTTPHeaderParseException(e, value))
-		case Right(lm) => Success(SigInputs.build(lm))
+		case Right(lm) => SigInputs(lm).toRight(
+			InvalidSigException("Signature-Input Header Parses but data structure is not appropriate")
+		).toTry
 end `Signature-Input`

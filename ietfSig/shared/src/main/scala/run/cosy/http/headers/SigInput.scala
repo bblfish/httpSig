@@ -25,16 +25,19 @@ object SigInputs:
 	/* create a SigInput with a single element */
 	def apply(name: Rfc8941.Token, siginput: SigInput) =
 		new SigInputs(ListMap(name -> siginput))
+
+	def apply(lm: SfDict): Option[SigInputs] =
+		val valid = filter(lm)
+		if valid.isEmpty then None
+		else Some(SigInputs(valid))
 	/**
 	 * Filter out the clearly invalid inputs.
 	 **/
-	def build(lm: SfDict): Option[SigInputs] =
-		val valid = lm.collect {
+	def filter(lm: SfDict): ListMap[Rfc8941.Token, SigInput] =
+		lm.collect {
 			case (sigName, SigInput(sigInput)) => (sigName, sigInput)
 		}
-		if valid.isEmpty then None
-		else Some(SigInputs(valid))
-	end build
+	end filter
 
 /**
  * A SigInput is a valid Signature-Input build on an Rfc8941 Internal List.

@@ -267,7 +267,7 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		val reqGETAbsoluteURI = HttpRequest(GET, Uri("https://www.example.com/path?param=value"))
 		assertEquals(
 			`@request-target`.signingString(reqGETAbsoluteURI),
-			`request-target`("/path?param=value")
+			`request-target`("https://www.example.com/path?param=value")
 		)
 		val req2 = HttpRequest(POST, Uri("/a/b"),
 			Seq(Host("www.example.com"))
@@ -280,12 +280,12 @@ class AkkaHttpMessageSigningSuite extends CatsEffectSuite {
 		val req3 = HttpRequest(GET, Uri("http://www.example.com/a/"))
 		assertEquals(
 			`@request-target`.signingString(req3),
-			`request-target`("/a/")
+			`request-target`("http://www.example.com/a/")
 		)
 
 		assertEquals(
 			`@request-target`.signingString(HttpRequest(GET, Uri("http://www.example.com/a"))),
-			`request-target`("/a")
+			`request-target`("http://www.example.com/a")
 		)
 		//CONNECT: Not sure if this is allowed by Akka. It is not possible to create an HttpRequest with it
 //		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),

@@ -1,9 +1,13 @@
 package run.cosy.http.headers
 
-import run.cosy.http.auth.{InvalidSigException, SelectorException}
+import cats.data.NonEmptyList
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SelectorException, UnableToCreateSigHeaderException}
+import run.cosy.http.headers.Rfc8941.SfDict
 
 import scala.collection.immutable.ListMap
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
+import run.cosy.http.headers.Rfc8941.Serialise.given
+
 
 
 /**
@@ -16,6 +20,7 @@ import scala.util.{Failure, Try}
 trait MessageSelector[-HttpMessage]:
 	lazy val sf = Rfc8941.SfString(lowercaseName)
 	lazy val special: Boolean = lowercaseName.startsWith("@")
+
 	def lowercaseName: String
 	/* Is this a special @message selector that must be used on requests even if signing a response?
 	 * By default no.*/
@@ -46,8 +51,13 @@ trait BasicMessageSelector[HttpMessage] extends MessageSelector[HttpMessage]:
 		"\""+lowercaseName+"\": "+str
 end BasicMessageSelector
 
+/* types that specifically select in the headers only */
+trait HeaderSelector[HM]:
+	def lowercaseHeaderName: String
+	def filterHeaders(msg: HM): Try[NonEmptyList[String]]
+end HeaderSelector
 
-trait DictSelector[HM] extends MessageSelector[HM]:
+trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
 	val keyParam = Rfc8941.Token("key")
 	/**
 	 *
@@ -62,14 +72,38 @@ trait DictSelector[HM] extends MessageSelector[HM]:
 		case Seq(keyParam -> (tk: Rfc8941.SfString)) => signingStringFor(msg, tk)
 		case _ => Failure(InvalidSigException(s"""Dictionary Selector params »${params}« is malformed """))
 
-	protected
-	def signingStringFor(msg: HM): Try[String]
+	final
+	def signingStringFor(msg: HM): Try[String] = sfDictParse(msg).map{dict =>
+			headerName + dict.canon
+		}
 
-	protected
-	def signingStringFor(hm: HM, item: Rfc8941.SfString): Try[String]
+	final
+	def signingStringFor(msg: HM, key: Rfc8941.SfString): Try[String] =
+		for
+			dict  <- sfDictParse(msg)
+			value <- dict.get(Rfc8941.Token(key.asciiStr)).toRight(UnableToCreateSigHeaderException(
+				s"could not find $key in header [$dict]")
+			).toTry
+		yield headerName(key) + value.canon
 
-//	override def valid(params: Rfc8941.Params): Boolean =
-//		params.keys.isEmpty || (params.size == 1 && params.keys.head == keyParam)
+	final
+	def sfDictParse(msg: HM): Try[SfDict] =
+		for
+			headerValues <- filterHeaders(msg)
+			sfDict <- parse(SelectorOps.collate(headerValues))
+		yield
+			sfDict
+
+	//note: the reason the token must be surrounded by quotes `"` is because a Token may end with `:`
+	final def headerName(key: Rfc8941.SfString): String =
+		s""""$lowercaseName";key=${key.canon}: """
+	final def headerName: String = s""""$lowercaseName": """
+
+	def parse(headerValue: String): Try[SfDict] =
+		Rfc8941.Parser.sfDictionary.parseAll(headerValue) match
+			case Left(err) => Failure(HTTPHeaderParseException(err, headerValue))
+			case Right(dict) => Success(dict)
+
 end DictSelector
 
 
@@ -86,7 +120,7 @@ object `@signature-params` {
  * @tparam HM The Type of the HttpMessage for the platform
  */
 case class SelectorOps[HM] private (selectorDB: Map[Rfc8941.SfString, MessageSelector[HM]]):
-
+	import scala.language.implicitConversions
 	import Rfc8941.Serialise.given
 
 	/** add new selectors to this one */
@@ -125,5 +159,10 @@ object SelectorOps:
 	def apply[Msg](msgSelectors: MessageSelector[Msg]*): SelectorOps[Msg] =
 		val pairs = for (selector <- msgSelectors) yield Rfc8941.SfString(selector.lowercaseName) -> selector
 		new SelectorOps(Map(pairs *))
+
+	def collate(values: NonEmptyList[String]): String =
+		values.map( //remove obsolete line folding and trim
+			_.split('\n').map(_.trim).mkString(" ")
+		).toList.mkString(", ")
 
 

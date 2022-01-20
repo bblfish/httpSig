@@ -3,6 +3,7 @@ package run.cosy.akka.http.headers
 import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.*
+import cats.data.NonEmptyList
 import run.cosy.akka.http.headers.BetterCustomHeader
 import run.cosy.http.auth.{AttributeMissingException, HTTPHeaderParseException, SelectorException, UnableToCreateSigHeaderException}
 import run.cosy.http.headers.Rfc8941.Serialise.given
@@ -14,39 +15,15 @@ import java.util.Locale
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-
-/* helper functions */
-object Selector:
-	/** @return the collated cleaned up values of the headers with the same name */
-	def collate(values: Seq[HttpHeader], name: String): Try[String] =
-		values match
-		case Nil => Failure(UnableToCreateSigHeaderException(s"""No header '$name' in request"""))
-		case nonNil => Success(
-			nonNil.map( //remove obsolete line folding and trim
-				_.value.split('\n').map(_.trim).mkString(" ")
-			).mkString(", ")
-		)
-	def filterHeaders(msg: HttpMessage, lowercaseName: String): Seq[HttpHeader] =
-		msg.headers.filter(_.lowercaseName() == lowercaseName)
-end Selector
-
 /** Selectors that work on headers but take no parameters. */
 trait AkkaBasicHeaderSelector[HM <: HttpMessage]
-	extends run.cosy.http.headers.MessageSelector[HM]:
-/**
-	 * default for non-rfc 8941 headers.
-	 * */
-	override def signingString(msg: HM,  params: Rfc8941.Params): Try[String] =
-		import Selector.collate
-		if params.isEmpty then
-			collate(filterHeaders(msg),lowercaseName).map(headerName + _)
-		else
-			Failure(SelectorException(s"selector $lowercaseName does not take parameters. Received "+params))
+	extends BasicMessageSelector[HM] with AkkaHeaderSelector[HM]:
 
-	/** the lowercase name followed by colon and 1 space */
-	final def headerName: String = s""""$lowercaseName": """
-	/** Each Selector works on particular headers */
-	protected def filterHeaders(msg: HM): Seq[HttpHeader]
+	override def lowercaseHeaderName: String = lowercaseName
+	override protected
+	def signingStringValue(msg: HM): Try[String] =
+		filterHeaders(msg).map(SelectorOps.collate)
+
 end AkkaBasicHeaderSelector
 
 /**
@@ -57,57 +34,38 @@ trait TypedAkkaSelector[HM <: HttpMessage, HdrType <: HttpHeader : scala.reflect
 	extends AkkaBasicHeaderSelector[HM]:
 	override val lowercaseName: String = akkaCompanion.lowercaseName
 	def akkaCompanion: ModeledCompanion[HdrType]
-	override protected
-	def filterHeaders(msg: HM): Seq[HttpHeader] = msg.headers[HdrType]
+	override
+	def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
+		val headerValues: Seq[String] = msg.headers[HdrType].map(_.value())
+		headerValues match
+		case Seq() => Failure(UnableToCreateSigHeaderException(
+			s"No headers »$lowercaseHeaderName« in http message"))
+		case head::tail => Success(NonEmptyList(head,tail))
+
+
+trait AkkaHeaderSelector[HM <: HttpMessage] extends HeaderSelector[HM]:
+	override
+	def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
+		val headersValues: Seq[String] = msg.headers
+			.filter(_.lowercaseName() == lowercaseHeaderName)
+			.map(_.value())
+		headersValues match
+		case Seq() => Failure(UnableToCreateSigHeaderException(
+			s"No headers »$lowercaseHeaderName« in http message"))
+		case head::tail => Success(NonEmptyList(head,tail))
+end AkkaHeaderSelector
+
+
 
 /** for all headers for which Akka HTTP does not provide a built-in parser */
-trait UntypedAkkaSelector[HM <: HttpMessage] extends AkkaBasicHeaderSelector[HM]:
-	override protected
-	def filterHeaders(msg: HM): Seq[HttpHeader] = Selector.filterHeaders(msg,lowercaseName)
-end UntypedAkkaSelector
+trait UntypedAkkaSelector[HM <: HttpMessage]
+	extends AkkaBasicHeaderSelector[HM] with AkkaHeaderSelector[HM]
 
 /** todo: the UntypedAkkaSelector inheritance may not be long term */
-trait AkkaDictSelector[HM <: HttpMessage] extends DictSelector[HM]:
-	override
-	def signingStringFor(msg: HM): Try[String] = sfDictParse(msg).map{dict =>
-		headerName + dict.canon
-	}
-	override
-	def signingStringFor(msg: HM, key: Rfc8941.SfString): Try[String] =
-		for
-			dict <- sfDictParse(msg)
-			value <- dict.get(Rfc8941.Token(key.asciiStr)).toRight(UnableToCreateSigHeaderException(
-				s"could not find $key in header [$dict]")
-			).toTry
-		yield headerName(key) + value.canon
-
-	def sfDictParse(msg: HM): Try[SfDict] =
-		for
-			headers <- filterHeaders(msg) match
-				case Seq() => Failure(
-					UnableToCreateSigHeaderException(s"No headers »$lowercaseName« in http message"))
-				case nonempty => Success(nonempty)
-			str <- Selector.collate(headers,lowercaseName)
-			sfDict <- parse(str)
-		yield
-			sfDict
-
-
-	protected //todo this is a duplicate fnct
-	def filterHeaders(msg: HM): Seq[HttpHeader] =
-		msg.headers.filter(_.lowercaseName() == lowercaseName)
-
-	//note: the reason the token must be surrounded by quotes `"` is because a Token may end with `:`
-	final def headerName(key: Rfc8941.SfString): String = s""""$lowercaseName";key=${key.canon}: """
-	final def headerName: String = s""""$lowercaseName": """
-
-	def parse(hdrStr: String): Try[SfDict] =
-		Rfc8941.Parser.sfDictionary.parseAll(hdrStr) match
-		case Left(err) => Failure(
-			UnableToCreateSigHeaderException(
-				s"parsing problem on header [$hdrStr] caused by $err"))
-		case Right(sfDict) => Success(sfDict)
-end AkkaDictSelector
+trait AkkaDictSelector[HM <: HttpMessage]
+	extends DictSelector[HM] with AkkaHeaderSelector[HM] {
+	override def lowercaseHeaderName: String = lowercaseName
+}
 
 object authorization extends TypedAkkaSelector[HttpRequest, Authorization]:
 	def akkaCompanion = Authorization
@@ -123,11 +81,14 @@ object date extends TypedAkkaSelector[HttpMessage,Date] :
 object etag extends TypedAkkaSelector[HttpResponse, ETag] :
 	def akkaCompanion = ETag
 
-object host extends TypedAkkaSelector[HttpRequest,Host] :
+object host extends TypedAkkaSelector[HttpRequest,Host]:
 	def akkaCompanion = Host
 
-object signature extends AkkaDictSelector[HttpMessage] :
+object signature extends AkkaDictSelector[HttpMessage] {
 	override val lowercaseName: String = "signature"
+
+}
+
 
 
 /** Content-Type is special in Akka, as it is associated with the entity body,
@@ -181,7 +142,7 @@ object `@request-target` extends BasicMessageSelector[HttpRequest] :
 
 	override protected
 	def signingStringValue(req: HttpRequest): Try[String] =
-		Try(req.uri.toRelative.toString()) //tests needed with connnect
+		Try(req.uri.toString()) //tests needed with connnect
 //		req.method match
 //		case HttpMethods.CONNECT => Failure(UnableToCreateSigHeaderException("Akka cannot correctly prcess @request-target on CONNECT requests"))
 //		case _ => Success(s""""$lowercaseName": ${req.uri}""")
@@ -273,6 +234,9 @@ object `@path` extends BasicMessageSelector[HttpRequest]:
 	)
 end `@path`
 
+/**
+ * @see https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-status-code
+ */
 object `@status` extends BasicMessageSelector[HttpResponse]:
 	override
 	def lowercaseName: String = "@status"
@@ -295,6 +259,9 @@ object `@query` extends BasicMessageSelector[HttpRequest]:
 		Try(msg.uri.queryString(ASCII).map("?"+_).getOrElse(""))
 end `@query`
 
+/**
+ * @see https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-query-parameters
+ */
 object `@query-params` extends MessageSelector[HttpRequest]:
 	val nameParam: Rfc8941.Token = Rfc8941.Token("name")
 	val ASCII: Charset = Charset.forName("ASCII").nn
@@ -306,18 +273,14 @@ object `@query-params` extends MessageSelector[HttpRequest]:
 	override
 	def signingString(msg: HttpRequest, params: Rfc8941.Params): Try[String] =
 		params.toSeq match
-		case Seq(nameParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+		case Seq(nameParam -> (value: Rfc8941.SfString)) => Try{
+			val queryStr = msg.uri.query().get(value.asciiStr).getOrElse("")
+			s""""$lowercaseName";name=${value.canon}: $queryStr"""
+		}
 		case _ => Failure(
 			SelectorException(
-				s"selector $lowercaseName only takes ${nameParam.canon} paramters. Received "+params
+				s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received "+params
 			))
-
-	protected
-	def signingStringFor(msg: HttpRequest, key: Rfc8941.SfString): Try[String] =
-		Try{
-			val queryStr = msg.uri.query().get(key.asciiStr).getOrElse("")
-			s""""$lowercaseName";name=${key.canon}: $queryStr"""
-		}
 end `@query-params`
 
 object `@request-response` extends MessageSelector[HttpRequest]:

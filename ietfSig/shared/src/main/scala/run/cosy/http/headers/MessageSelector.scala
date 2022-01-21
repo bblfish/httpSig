@@ -8,8 +8,6 @@ import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 import run.cosy.http.headers.Rfc8941.Serialise.given
 
-
-
 /**
  * Header info specifying properties of a header for Signing Http Messages,
  * and how to create them
@@ -56,6 +54,8 @@ trait HeaderSelector[HM]:
 	def lowercaseHeaderName: String
 	def filterHeaders(msg: HM): Try[NonEmptyList[String]]
 end HeaderSelector
+
+trait BasicMessageHeaderSelector[M] extends BasicMessageSelector[M] with HeaderSelector[M]
 
 trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
 	val keyParam = Rfc8941.Token("key")

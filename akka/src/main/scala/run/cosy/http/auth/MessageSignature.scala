@@ -17,8 +17,10 @@ object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature {
 	override type Request = HttpRequest
 	override type Response = HttpResponse
 	override type HttpHeader = akka.http.scaladsl.model.HttpHeader
-	override val Signature: SignatureMatcher{ type Header = HttpHeader } = run.cosy.http.headers.Signature
-	override val `Signature-Input`: SignatureInputMatcher{ type Header = HttpHeader } = run.cosy.akka.http.headers.`Signature-Input`
+	override protected
+	val Signature: SignatureMatcher{ type Header = HttpHeader } = run.cosy.http.headers.Signature
+	override protected
+	val `Signature-Input`: SignatureInputMatcher{ type Header = HttpHeader } = run.cosy.akka.http.headers.`Signature-Input`
 
 	extension[R <: Message](msg: R) {
 		def addHeaders(headers: Seq[HttpHeader]): R =

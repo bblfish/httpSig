@@ -52,8 +52,8 @@ trait MessageSignature {
 
 	val urlStrRegex = "<(.*)>".r
 	//todo: is this the right place
-	val `Signature-Input`: SignatureInputMatcher {type Header = HttpHeader}
-	val Signature: SignatureMatcher {type Header = HttpHeader}
+	protected val `Signature-Input`: SignatureInputMatcher {type Header = HttpHeader}
+	protected val Signature: SignatureMatcher {type Header = HttpHeader}
 
 	/** extensions needed to abstract across HTTP implementations */
 	extension(msg: Message) {

@@ -3,6 +3,7 @@ package run.cosy.http.auth
 import cats.MonadError
 import cats.effect.kernel.{Clock, MonadCancel}
 import cats.syntax.all.*
+import run.cosy.http.{Http, HttpOps}
 import run.cosy.http.auth.Agent
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.{SelectorOps, *}
@@ -16,21 +17,20 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import Http.*
 
 
-trait SignatureInputMatcher {
-	type Header
-	type H <: Header
-	def unapply(h: Header): Option[SigInputs]
-	def apply(name: Rfc8941.Token, sigInput: SigInput): H
+trait SignatureInputMatcher[H<:Http]{
+	type SI <: Header[H]
+	def unapply(h: Header[H]): Option[SigInputs]
+	def apply(name: Rfc8941.Token, sigInput: SigInput): SI
 }
 
 
-trait SignatureMatcher {
-	type Header
-	type H <: Header
-	def apply(sig: Signatures): H
-	def unapply(h: Header): Option[Signatures]
+trait SignatureMatcher[H<:Http] {
+	type SM <: Header[H]
+	def apply(sig: Signatures): SM
+	def unapply(h: Header[H]): Option[Signatures]
 }
 
 object MessageSignature {
@@ -42,32 +42,22 @@ object MessageSignature {
 /**
  * Adds extensions methods to sign HttpMessage-s - be they requests or responses.
  * */
-trait MessageSignature {
+trait MessageSignature[H <: Http](using ops: HttpOps[H]):
 	import bobcats.Verifier.{Signature, SigningString}
-	type Message = Request | Response
-	type Request
-	type Response
-	type HttpHeader
+	import Http.*
 	import MessageSignature.*
+	import ops.*
 
 	val urlStrRegex = "<(.*)>".r
+
 	//todo: is this the right place
-	protected val `Signature-Input`: SignatureInputMatcher {type Header = HttpHeader}
-	protected val Signature: SignatureMatcher {type Header = HttpHeader}
-
-	/** extensions needed to abstract across HTTP implementations */
-	extension(msg: Message) {
-		def headers: Seq[HttpHeader]
-	}
-
-	extension[R <: Message](msg: R) {
-		def addHeaders(headers: Seq[HttpHeader]): R
-	}
+	protected val Signature: SignatureMatcher[H]
+	protected val `Signature-Input`: SignatureInputMatcher[H]
 
 	/**
 	 * [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
 	 */
-	extension [R <: Message](msg: R)(using selectorDB: SelectorOps[R]) {
+	extension [R <: Message[H]](msg: R)(using selectorDB: SelectorOps[R]) {
 
 		/**
 		 * Generate a function to create a new HttpRequest with the given Signature-Input header.
@@ -202,12 +192,12 @@ trait MessageSignature {
 	}
 
 	/* needed for request-response dependencies */
-	extension (response: Response)(using
-		requestSelDB: SelectorOps[Request],
-		responseSelDB: SelectorOps[Response]
+	extension (response: Response[H])(using
+		requestSelDB: SelectorOps[Request[H]],
+		responseSelDB: SelectorOps[Response[H]]
 	) {
 
-	def signingString(sigInput: SigInput, request: Request): Try[SigningString] =
+	def signingString(sigInput: SigInput, request: Request[H]): Try[SigningString] =
 		import Rfc8941.Serialise.{*, given}
 
 		@tailrec
@@ -236,4 +226,4 @@ trait MessageSignature {
 
 	}
 
-}
+end MessageSignature

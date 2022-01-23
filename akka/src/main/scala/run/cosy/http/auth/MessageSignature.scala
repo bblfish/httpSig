@@ -1,8 +1,10 @@
 package run.cosy.http.auth
 
-import akka.http.scaladsl.model.{HttpRequest,HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.util.FastFuture
 import cats.Applicative
+import run.cosy.akka.http.AkkaTp
+import run.cosy.http.Http.{Header, Message}
 import run.cosy.http.headers.SelectorOps
 
 import scala.concurrent.Future
@@ -11,25 +13,15 @@ import scala.util.Try
 
 
 // selector needs to be filled in
-object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature {
+object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature[AkkaTp.type] {
+	type H = AkkaTp.type
 	import AkkaHttpMessageSignature.*
 //	override type Message = HttpMessage
-	override type Request = HttpRequest
-	override type Response = HttpResponse
-	override type HttpHeader = akka.http.scaladsl.model.HttpHeader
-	override protected
-	val Signature: SignatureMatcher{ type Header = HttpHeader } = run.cosy.http.headers.Signature
-	override protected
-	val `Signature-Input`: SignatureInputMatcher{ type Header = HttpHeader } = run.cosy.akka.http.headers.`Signature-Input`
 
-	extension[R <: Message](msg: R) {
-		def addHeaders(headers: Seq[HttpHeader]): R =
-			//don't know how to get rid of the asInstanceOf
-			msg.withHeaders(msg.headers ++ headers).asInstanceOf[R]
-	}
+	override protected
+	val Signature: SignatureMatcher[AkkaTp.type] = run.cosy.http.headers.Signature
+	override protected
+	val `Signature-Input`: SignatureInputMatcher[AkkaTp.type] = run.cosy.akka.http.headers.`Signature-Input`
 
-	extension(msg: Message) {
-		def headers: Seq[HttpHeader] = msg.headers
-	}
 
 }

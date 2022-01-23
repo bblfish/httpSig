@@ -2,7 +2,9 @@ package run.cosy.http.headers
 
 import akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
 import akka.http.scaladsl.model.{HttpHeader, ParsingException}
+import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
+import run.cosy.http.Http.Header
 import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SignatureMatcher}
 import run.cosy.http.headers
 import run.cosy.http.headers.Rfc8941.{Bytes, IList, PItem, SfDict}
@@ -29,12 +31,11 @@ final case class Signature(sig: Signatures)
 
 object Signature
 	extends BetterCustomHeaderCompanion[Signature]
-		with SignatureMatcher:
-	override type Header = run.cosy.http.auth.AkkaHttpMessageSignature.HttpHeader
-	override type H = run.cosy.http.headers.Signature
+		with SignatureMatcher[AkkaTp.type]:
+	override type SM = run.cosy.http.headers.Signature
 	override val name = "Signature"
-	def apply(sig: Signatures): H = new run.cosy.http.headers.Signature(sig)
-	def unapply(h:  Header): Option[Signatures] =
+	def apply(sig: Signatures): SM = new run.cosy.http.headers.Signature(sig)
+	def unapply(h:  HttpHeader): Option[Signatures] =
 		h match
 		case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName => parse(h.value).toOption
 		case _ => None

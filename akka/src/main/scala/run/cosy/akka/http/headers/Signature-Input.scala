@@ -3,6 +3,7 @@ package run.cosy.akka.http.headers
 import _root_.akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
 import _root_.akka.http.scaladsl.model.{HttpHeader, ParsingException, Uri}
 import cats.parse.Parser
+import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
 import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SignatureInputMatcher}
@@ -36,9 +37,8 @@ end `Signature-Input`
 
 object `Signature-Input`
 	extends BetterCustomHeaderCompanion[`Signature-Input`]
-		with SignatureInputMatcher:
-	type Header = HttpHeader
-	type H = `Signature-Input`
+		with SignatureInputMatcher[AkkaTp.type]:
+	type SI = `Signature-Input`
 	override val name = "Signature-Input"
 
 	def apply(name: Rfc8941.Token, sigInput: SigInput): `Signature-Input` =

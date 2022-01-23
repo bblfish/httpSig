@@ -53,15 +53,13 @@ lazy val akkaSig = project
 		scalacOptions := scala3Options,
 		libraryDependencies ++= Seq(
 			akka.http.value, akka.stream.value, akka.typed.value,
-			java.nimbusDS,
-			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
-			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
+			java.nimbusDS
 		),
 		libraryDependencies ++= Seq(
 			munit.value % Test,
 			cats.munitEffect.value % Test
 		) ++ java.bouncy
-	).dependsOn(ietfSigHttp.jvm)
+	).dependsOn(ietfSigHttp.jvm % "compile->compile;test->test")
 
 lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 	.in(file("ietfSig"))
@@ -72,7 +70,9 @@ lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 		libraryDependencies ++= Seq(
 			cats.bobcats.value,
 			munit.value % Test,
-			cats.munitEffect.value % Test
+			cats.munitEffect.value % Test,
+			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
+			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
 		)
 	)
 	.jsSettings(

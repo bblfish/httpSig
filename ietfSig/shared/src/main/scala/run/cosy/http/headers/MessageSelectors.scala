@@ -37,7 +37,7 @@ trait MessageSelectors[H <: Http] {
 	given requestSelectorOps: SelectorOps[Request[H]] = SelectorOps[Request[H]](
 		authorization,  host,
 		`@request-target`, `@method`, `@path`, `@query`, `@query-params`,
-		`@request-response`,
+		`@request-response`, `@authority`,
 		//all the below are good for responses too
 		digest, `content-length`, `content-type`, signature, date, `cache-control`
 	)

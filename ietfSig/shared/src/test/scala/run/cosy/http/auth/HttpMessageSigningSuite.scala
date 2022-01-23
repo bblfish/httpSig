@@ -26,7 +26,10 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
-trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffectSuite {
+trait HttpMessageSigningSuite[H <: Http](using
+	ops: HttpOps[H],
+	sigSuite: SigningSuiteHelpers
+) extends CatsEffectSuite:
 
 	import Http.*
 	import ops.*
@@ -472,7 +475,7 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 		  |Cache-Control: must-revalidate""".stripMargin
 
 
-	test("§2.3 Creating the Signature Input String") {
+	test("§2.3 Creating the Signature Input String (spec 04)") {
 		/**
 		 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]] * */
 		val expectedSigInStr =
@@ -506,7 +509,37 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 		assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
 	}
 
+	test("§2.3 Creating the Signature Input String (spec 07)") {
+		val expectedSigInStr =
+			""""@method": GET
+			  |"@path": /foo
+			  |"@authority": example.org
+			  |"cache-control": max-age=60, must-revalidate
+			  |"x-empty-header": \
+			  |
+			  |"x-example": Example header with some whitespace.
+			  |"@signature-params": ("@method" "@path" "@authority" \
+			  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
+			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
 
+		val siginStr =
+			"""("@method" "@path" "@authority" \
+			  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
+			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
+
+		val sigInIlist = IList(
+			`@method`.sf, `@path`.sf, `@authority`.sf,
+			`cache-control`.sf, `x-empty-header`.sf, `x-example`.sf
+		)(
+			Token("created") -> SfInt(1618884475),
+			Token("keyid") -> sf"test-key-rsa-pss"
+		)
+		assert(SigInput.valid(sigInIlist))
+		val rfcSigInreq: Request[H] = toRequest(`§2.3_Request`)
+		val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
+		val Some(sigin) = SigInput(siginStr): @unchecked
+		assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
+	}
 
 	val `§3.2_Request`: HttpMessage =
 		"""GET /foo HTTP/1.1
@@ -525,7 +558,15 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 		  |  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
 		  |  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
 		  |  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
-		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".stripMargin
+		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single
+
+	test("§3.2 Verifying a Signature") {
+		val req: Request[H] = toRequest(`§3.2_Request`)
+		assertIO(
+			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-rsa-pss")
+		)
+	}
 
 
 	val `§4.3_Request`: HttpMessage = // the example could also be a response
@@ -603,57 +644,6 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 		  |{"hello": "world"}""".rfc8792single
 
 
-//
-//	test("§2.3 Creating the Signature Input String") {
-//		import run.cosy.http.auth.AkkaHttpMessageSignature.signingString
-//		/**
-//		 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]] * */
-//		val rfcSigInreq = HttpRequest(
-//			method = HttpMethods.GET,
-//			uri = Uri("/foo"),
-//			headers = Seq(
-//				Host("example.org"),
-//				Date(DateTime(2021, 04, 20, 02, 07, 55)),
-//				RawHeader("X-Example",
-//					"""Example header
-//					  |   with some whitespace.  """.stripMargin),
-//				`Cache-Control`(CacheDirectives.`max-age`(60)),
-//				RawHeader("X-Empty-Header", ""),
-//				`Cache-Control`(CacheDirectives.`must-revalidate`)
-//			),
-//			entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
-//		)
-//		val expectedSigInStr =
-//			""""@request-target": /foo
-//			  |"host": example.org
-//			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
-//			  |"cache-control": max-age=60, must-revalidate
-//			  |"x-empty-header": \
-//			  |
-//			  |"x-example": Example header with some whitespace.
-//			  |"@signature-params": ("@request-target" "host" "date" "cache-control" \
-//			  |  "x-empty-header" "x-example");created=1618884475;\
-//			  |  keyid="test-key-rsa-pss"""".rfc8792single
-//
-//		val siginStr =
-//			"""("@request-target" "host" "date" "cache-control" \
-//			  |  "x-empty-header" "x-example");created=1618884475;\
-//			  |  keyid="test-key-rsa-pss"""".rfc8792single
-//
-//		val sigInIlist = IList(
-//			`@request-target`.sf, host.sf, date.sf, `cache-control`.sf,
-//			`x-empty-header`.sf, `x-example`.sf
-//		)(
-//			Token("created") -> SfInt(1618884475),
-//			Token("keyid") -> sf"test-key-rsa-pss"
-//		)
-//		assert(SigInput.valid(sigInIlist))
-//
-//		val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
-//		val Some(sigin) = SigInput(siginStr): @unchecked
-//		assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
-//	}
-//
 
 //	//
 //	//	//
@@ -911,9 +901,9 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 //	//			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
 //	//		)
 //	//	}
-}
+end HttpMessageSigningSuite
 
-//object AkkaHttpMessageSigningSuite {
+class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 //	//	java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
 //	//
 //	//	lazy val testKeyRSApub = {
@@ -941,28 +931,28 @@ trait HttpMessageSigningSuite[H <: Http](using ops: HttpOps[H]) extends CatsEffe
 //	//		SigningData(testKeyPSSpriv, `rsa-pss-sha512`())
 //	//	def `test-key-rsa-sigdata`: SigningData = SigningData(testKeyRSAPriv, sha256rsaSig())
 //
-//	import run.cosy.http.auth.MessageSignature as MS
-//
-//	/**
-//	 * emulate fetching the signature verification info for the keyids given in the Spec
-//	 * */
-//	def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
-//		keyid.asciiStr match
-//		case "test-key-rsa-pss" =>
-//			//todo: this is not the keyid as the hash spec is missing, rename in bobcats
-//			for {
-//				keyspec <- IO.fromTry(BouncyJavaPEMUtils.getPublicKeyFromPEM(`test-key-rsa-pss`.publicKey, `test-key-rsa-pss`.keyAlg))
-//				verifierFn <- bobcats.Verifier[IO].build(keyspec, AsymmetricKeyAlg.`rsa-pss-sha512`)
-//			} yield {
-//				(signingStr: SigningString, signature: SignatureBytes) =>
-//					verifierFn(signingStr, signature).flatMap(bool =>
-//						if bool then IO.pure(PureKeyId(keyid.asciiStr))
-//						else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
-//					)
-//			}
-//		//		case "test-key-rsa" =>
-//		//		FastFuture.successful(keyidVerifier(keyid, testKeyRSApub, sha256rsaSig()))
-//		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
+	import run.cosy.http.auth.MessageSignature as MS
+	import bobcats.SigningHttpMessages.`test-key-rsa-pss`
+	/**
+	 * emulate fetching the signature verification info for the keyids given in the Spec
+	 * */
+	def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+		keyid.asciiStr match
+		case "test-key-rsa-pss" =>
+			//todo: this is not the keyid as the hash spec is missing, rename in bobcats
+			for {
+				keyspec <- IO.fromTry(pemutils.getPublicKeyFromPEM(`test-key-rsa-pss`.publicKey, `test-key-rsa-pss`.keyAlg))
+				verifierFn <- bobcats.Verifier[IO].build(keyspec, AsymmetricKeyAlg.`rsa-pss-sha512`)
+			} yield {
+				(signingStr: SigningString, signature: SignatureBytes) =>
+					verifierFn(signingStr, signature).flatMap(bool =>
+						if bool then IO.pure(PureKeyId(keyid.asciiStr))
+						else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
+					)
+			}
+		//		case "test-key-rsa" =>
+		//		FastFuture.successful(keyidVerifier(keyid, testKeyRSApub, sha256rsaSig()))
+		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
 //
 //
 //	//	/** one always has to create a new signature on each verification if in multi-threaded environement */

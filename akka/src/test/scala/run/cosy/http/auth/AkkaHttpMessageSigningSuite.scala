@@ -1,5 +1,6 @@
 package run.cosy.http.auth
 
+import scala.util.Success
 import akka.http.scaladsl.model.HttpMethods.*
 import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.{ContentTypes, DateTime, HttpEntity, HttpMethods, HttpRequest, HttpResponse, MediaTypes, StatusCodes, Uri}
@@ -14,7 +15,11 @@ import run.cosy.http.Http.{Message, Request, Response}
 import run.cosy.akka.http.headers.AkkaMessageSelectors
 import run.cosy.akka.http.headers.AkkaDictSelector
 import run.cosy.http.utils.StringUtils.*
+import run.cosy.akka.http.headers.`Signature-Input`
+import run.cosy.http.headers.Signature
 
+given pem: bobcats.util.PEMUtils = bobcats.util.BouncyJavaPEMUtils
+given helper: SigningSuiteHelpers = new SigningSuiteHelpers
 
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 	type A = AkkaTp.type
@@ -25,7 +30,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 	/**
 	 * todo: with Akka it is possible to automatically convert a String to an HttpMessage,
 	 *   but it requires more work, a different test suite potentially, etc... That will
-	 *   be needed for large test suistes though. See
+	 *   be needed for large test suites though. See
 	 *    1. akka.http.impl.engine.parsing.RequestParserSpec
 	 *    1. akka.http.impl.engine.parsing.ResponseParserSpec
 	 **/
@@ -112,6 +117,20 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 			),
 			entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
 		)
+		case `§3.2_Request` =>
+			val Success(sigIn) = run.cosy.akka.http.headers.`Signature-Input`
+				.parse("""sig1=("@method" "@path" "@authority" \
+							|  "cache-control" "x-empty-header" "x-example");created=1618884475\
+							|  ;keyid="test-key-rsa-pss"""".rfc8792single):  @unchecked
+			val Success(sig) = run.cosy.http.headers.Signature
+				.parse("""sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
+							|  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
+							|  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
+							|  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
+							|  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
+							|  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single):  @unchecked
+				val req: Request[A] = toRequest(`§2.3_Request`)
+				req.withHeaders(req.headers ++ Seq(`Signature-Input`(sigIn),Signature(sig)))
 		case _ => throw new Exception("no translation available for request "+request)
 
 	@throws[Exception]

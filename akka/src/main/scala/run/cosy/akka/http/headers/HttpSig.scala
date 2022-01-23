@@ -1,6 +1,7 @@
-package run.cosy.http.headers
+package run.cosy.akka.http.headers
 
 import _root_.akka.http.scaladsl.model.headers.{GenericHttpCredentials, HttpCredentials}
+import run.cosy.http.headers.{HttpSig, Rfc8941}
 
 import scala.util.Try
 

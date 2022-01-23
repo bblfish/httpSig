@@ -19,7 +19,7 @@ object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature[Akka
 //	override type Message = HttpMessage
 
 	override protected
-	val Signature: SignatureMatcher[AkkaTp.type] = run.cosy.http.headers.Signature
+	val Signature: SignatureMatcher[AkkaTp.type] = run.cosy.akka.http.headers.Signature
 	override protected
 	val `Signature-Input`: SignatureInputMatcher[AkkaTp.type] = run.cosy.akka.http.headers.`Signature-Input`
 

@@ -5,18 +5,15 @@ import akka.http.scaladsl.model.HttpMethods.*
 import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.{ContentTypes, DateTime, HttpEntity, HttpMethods, HttpRequest, HttpResponse, MediaTypes, StatusCodes, Uri}
 import run.cosy.akka.http.AkkaTp
-import run.cosy.akka.http.headers.`Signature-Input`
-import run.cosy.http.headers.Rfc8941.{IList, Param, SfInt, SfString, Token}
+import run.cosy.akka.http.headers.{AkkaDictSelector, AkkaMessageSelectors, Signature, UntypedAkkaSelector, `Signature-Input`}
 import run.cosy.http.headers.{DictSelector, Rfc8941, SigInput, SigInputs, Signatures}
-import run.cosy.akka.http.headers.UntypedAkkaSelector
 import run.cosy.http.auth.HttpMessageSigningSuite
 import run.cosy.http.Http
 import run.cosy.http.Http.{Message, Request, Response}
-import run.cosy.akka.http.headers.AkkaMessageSelectors
-import run.cosy.akka.http.headers.AkkaDictSelector
 import run.cosy.http.utils.StringUtils.*
 import run.cosy.akka.http.headers.`Signature-Input`
-import run.cosy.http.headers.Signature
+import run.cosy.http.headers.Rfc8941.*
+
 
 given pem: bobcats.util.PEMUtils = bobcats.util.BouncyJavaPEMUtils
 given helper: SigningSuiteHelpers = new SigningSuiteHelpers
@@ -93,7 +90,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 					`@authority`.sf, `content-type`.sf)(
 					Param("created", SfInt(1618884475)), Param("keyid", SfString("test-key-rsa-pss"))
 				)).get)),
-				run.cosy.http.headers.Signature(Signatures(Token("sig1"),
+				run.cosy.akka.http.headers.Signature(Signatures(Token("sig1"),
 					"""KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu5rif3g7ckTbbX7C4\
 					  |  Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79gBeqvHNUO4bhI27p\
 					  |  4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7OjkfsHAm/enxf1fA\
@@ -122,13 +119,13 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 				.parse("""sig1=("@method" "@path" "@authority" \
 							|  "cache-control" "x-empty-header" "x-example");created=1618884475\
 							|  ;keyid="test-key-rsa-pss"""".rfc8792single):  @unchecked
-			val Success(sig) = run.cosy.http.headers.Signature
-				.parse("""sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
-							|  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
-							|  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
-							|  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
-							|  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
-							|  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single):  @unchecked
+			val Success(sig) = Signature.parse(
+				"""sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
+					|  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
+					|  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
+					|  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
+					|  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
+					|  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single):  @unchecked
 				val req: Request[A] = toRequest(`§2.3_Request`)
 				req.withHeaders(req.headers ++ Seq(`Signature-Input`(sigIn),Signature(sig)))
 		case _ => throw new Exception("no translation available for request "+request)

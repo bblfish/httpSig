@@ -2,7 +2,7 @@ package run.cosy.http.headers
 
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpMessage, Uri}
-import run.cosy.akka.http.headers.`Signature-Input`
+import run.cosy.akka.http.headers.{Signature, `Signature-Input`}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 import run.cosy.http.headers.Rfc8941.{SfDict, SfInt, Token, IList as IL}

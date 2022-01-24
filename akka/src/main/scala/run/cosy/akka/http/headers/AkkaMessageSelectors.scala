@@ -76,6 +76,10 @@ class AkkaMessageSelectors(
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "digest"
 		}
+	override lazy val forwarded: HeaderSelector[Message[A]] =
+		new UntypedAkkaSelector[Message[A]] {
+			override val lowercaseName: String = "forwarded"
+		}
 	override lazy val `@request-target`: BasicMessageSelector[Request[A]] =
 		new BasicMessageSelector[Request[A]] {
 			override val lowercaseName: String = "@request-target"

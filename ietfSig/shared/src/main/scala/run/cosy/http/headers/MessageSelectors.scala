@@ -20,6 +20,7 @@ trait MessageSelectors[H <: Http] {
 	lazy val `content-type`: HeaderSelector[Message[H]]
 	lazy val `content-length`: HeaderSelector[Message[H]]
 	lazy val digest: HeaderSelector[Message[H]]
+	lazy val forwarded: HeaderSelector[Message[H]]
 
 	lazy val `@request-target`: MessageSelector[Request[H]]
 	lazy val `@method`: MessageSelector[Request[H]]
@@ -35,7 +36,7 @@ trait MessageSelectors[H <: Http] {
 
 	/** Note: @target-uri and @scheme can only be set by application code as a choice needs to be made */
 	given requestSelectorOps: SelectorOps[Request[H]] = SelectorOps[Request[H]](
-		authorization,  host,
+		authorization,  host, forwarded,
 		`@request-target`, `@method`, `@path`, `@query`, `@query-params`,
 		`@request-response`, `@authority`,
 		//all the below are good for responses too

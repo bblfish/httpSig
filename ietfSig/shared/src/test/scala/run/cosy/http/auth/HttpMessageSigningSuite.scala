@@ -1,5 +1,6 @@
 package run.cosy.http.auth
 
+import bobcats.AsymmetricKeyAlg.Signature
 import cats.effect.Async
 import run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
@@ -568,20 +569,35 @@ trait HttpMessageSigningSuite[H <: Http](using
 		)
 	}
 
-
 	val `§4.3_Request`: HttpMessage = // the example could also be a response
-		"""Forwarded: for=192.0.2.123
+		"""GET /foo HTTP/1.1
+		  |Host: example.org
+		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
+		  |X-Example: Example header
+		  |        with some whitespace.
+		  |X-Empty-Header:
+		  |Cache-Control: max-age=60
+		  |Cache-Control: must-revalidate
 		  |Signature-Input: sig1=("@method" "@path" "@authority" \
-		  |    "cache-control" "x-empty-header" "x-example")\
-		  |    ;created=1618884475;keyid="test-key-rsa-pss"
-		  |Signature: sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo\
-		  |    1RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCi\
-		  |    HzC87qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW8\
-		  |    4jS8gyarxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53\
-		  |    r58RmpZ+J9eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCV\
-		  |    Rj05NrxABNFv3r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".stripMargin
+		  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
+		  |  ;keyid="test-key-rsa-pss"
+		  |Forwarded: for=192.0.2.123
+		  |Signature: sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
+		  |  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
+		  |  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
+		  |  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
+		  |  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
+		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".stripMargin
+
 	val `§4.3_Enhanced`: HttpMessage =
-		"""Forwarded: for=192.0.2.123
+		"""GET /foo HTTP/1.1
+		  |Host: example.org
+		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
+		  |X-Example: Example header
+		  |        with some whitespace.
+		  |X-Empty-Header:
+		  |Cache-Control: max-age=60
+		  |Cache-Control: must-revalidate
 		  |Signature-Input: sig1=("@method" "@path" "@authority" \
 		  |    "cache-control" "x-empty-header" "x-example")\
 		  |    ;created=1618884475;keyid="test-key-rsa-pss", \
@@ -599,6 +615,20 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |    Sg03iUa0sju1yj6rcKbMABBuzhUz4G0u1hZkIGbQprCnk/FOsqZHpwaWvY8P3hm\
 		  |    cDHkNaavcokmq+3EBDCQTzgwLqfDmV0vLCXtDda6CNO2Zyum/pMGboCnQn/VkQ+\
 		  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single
+
+	test("§4.3 Multiple Signatures") {
+		val req: Request[H] = toRequest(`§4.3_Enhanced`)
+		assertIO(
+			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-rsa-pss")
+		) *>
+		assertIO(
+			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
+			PureKeyId("test-key-rsa")
+		)
+	}
+
+
 	val B2_Request: HttpMessage =
 		"""POST /foo?param=value&pet=dog HTTP/1.1
 		  |Host: example.com
@@ -652,44 +682,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 //	//
 //	//	import TestMessageSigningRFCFn.*
 //	//
-//	//	test("do the keys parse without throwing an exception?") {
-//	//		testKeyRSApub
-//	//		testKeyRSAPriv
-//	//		testKeyPSSpub
-//	//		testKeyPSSpriv
-//	//	}
-//	//
-//	//	test("4.3 Multiple Signatures - spec test") {
-//	//		import java.util.Base64
-//	//
-//	//		// let's test the [[https://github.com/httpwg/http-extensions/issues/1493#issuecomment-827103670 fix to version 04. of the spec]]
-//	//		val sigInputStr: String =
-//	//			""""signature";key="sig1": \
-//	//			  |  :YlizxWySaL8RiCQOWpl/8TBLlinl/O9K5n+WCYladKkRfmZ4wdo42ikCrepkIoPd\
-//	//			  |  csPIx5wYc53Kpq6PLmv3fRk/+BtFSJNdrfClMEg4kX8utYuMQhBHSLiEiDRjNSTWX\
-//	//			  |  Wk8hwutEGijbna3FvBVzy1oa5tT08w/ffN7d/6dup1FWVt90KhK1Cx3RkQveMxAKC\
-//	//			  |  3HH6Q26lAgJ54MyLqLrLXcjQKWhjWzkMkVjho4JLy87GTU6k4eIQxB4xDHbavbJKE\
-//	//			  |  jS0Vlg2pqmcUkGVdL4zQ3NOOttIlKC1HL1SodXNd7UBM0C0R1GGqEi4Lsm9UKWuQP\
-//	//			  |  vPFTW7qIgvjAthv/lA==:
-//	//			  |"x-forwarded-for": 192.0.2.123
-//	//			  |"@signature-params": ("signature";key="sig1" "x-forwarded-for")\
-//	//			  |  ;created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256"""".rfc8792single
-//	//		val proxySig: String =
-//	//			"""FSqkfwt17TLKqjjWrW9vf6a/r3329amAO3e7ByjkT60jjFTq4xdO74\
-//	//			  |    JTHrpz6DMSlQOKmhIiz8mq7T5SYOjfUZrKXpbP6jUFTStUa4HvNNvjhZc1jiHk9\
-//	//			  |    IhGGPPeOdRcTrzjDxSS+2l7G3nSpJ4t2LjtLnEPa1FIldgnJqwIa0SCiEPWFmnJ\
-//	//			  |    fTdc4VW2ngvYhuKUKFz/Jyx0GfmKQ4lAWxQwVtqRSURTscdY3VvxR+GpydqF8gQ\
-//	//			  |    U8iYslRHlRxBh+29cADAHVnT5j1iBkVdAfLS59xCYLnUc3UG7UfxU6kU1QgJ+2n\
-//	//			  |    A5NNQsxXeREcCFTe2FnjOy2atxG8bm+O8ZcA==""".rfc8792single
-//	//
-//	//		val sigBytes = Base64.getDecoder.decode(proxySig)
-//	//
-//	//		val javaSig = sha256rsaSig()
-//	//		javaSig.initVerify(testKeyRSApub)
-//	//		javaSig.update(sigInputStr.getBytes(StandardCharsets.US_ASCII))
-//	//		assert(javaSig.verify(sigBytes.toArray))
-//	//	}
-//	//
+
 //	//
 //	//	import run.cosy.http.headers.Rfc8941.Serialise.given
 //	//
@@ -933,25 +926,37 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 //
 	import run.cosy.http.auth.MessageSignature as MS
 	import bobcats.SigningHttpMessages.`test-key-rsa-pss`
+	import bobcats.util.PEMUtils.PKCS8_PEM
+	def verifierFor(
+		spec: Try[SPKIKeySpec[AsymmetricKeyAlg]],
+		sig: Signature,
+		keyId: SfString
+	): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+		for keyspec <- IO.fromTry(spec)
+			 verifierFn <- bobcats.Verifier[IO].build(keyspec, sig)
+		yield (signingStr: SigningString, signature: SignatureBytes) =>
+			verifierFn(signingStr, signature).flatMap(bool =>
+				if bool then IO.pure(PureKeyId(keyId.asciiStr))
+				else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
+			)
+
+	def keySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
+
+	lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
+		keySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+
+	lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
+		keySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+
 	/**
 	 * emulate fetching the signature verification info for the keyids given in the Spec
 	 * */
 	def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
 		keyid.asciiStr match
 		case "test-key-rsa-pss" =>
-			//todo: this is not the keyid as the hash spec is missing, rename in bobcats
-			for {
-				keyspec <- IO.fromTry(pemutils.getPublicKeyFromPEM(`test-key-rsa-pss`.publicKey, `test-key-rsa-pss`.keyAlg))
-				verifierFn <- bobcats.Verifier[IO].build(keyspec, AsymmetricKeyAlg.`rsa-pss-sha512`)
-			} yield {
-				(signingStr: SigningString, signature: SignatureBytes) =>
-					verifierFn(signingStr, signature).flatMap(bool =>
-						if bool then IO.pure(PureKeyId(keyid.asciiStr))
-						else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
-					)
-			}
-		//		case "test-key-rsa" =>
-		//		FastFuture.successful(keyidVerifier(keyid, testKeyRSApub, sha256rsaSig()))
+			verifierFor(rsaPSSPubKey, AsymmetricKeyAlg.`rsa-pss-sha512`, keyid)
+		case "test-key-rsa" =>
+			verifierFor(rsaPubKey, AsymmetricKeyAlg.`rsa-v1_5-sha256`, keyid)
 		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
 //
 //

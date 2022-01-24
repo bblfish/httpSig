@@ -128,6 +128,34 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 					|  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single):  @unchecked
 				val req: Request[A] = toRequest(`§2.3_Request`)
 				req.withHeaders(req.headers ++ Seq(`Signature-Input`(sigIn),Signature(sig)))
+		case `§4.3_Request` =>
+			val forwardedHdr	= RawHeader("Forwarded","for=192.0.2.123")
+			val req: Request[A] = toRequest(`§3.2_Request`)
+			req.withHeaders(req.headers ++ Seq(forwardedHdr))
+		case `§4.3_Enhanced` =>
+			// here we try raw headers
+			val forwardedHdr	= RawHeader("Forwarded","for=192.0.2.123")
+			val sigIn = RawHeader("Signature-Input",
+				"""sig1=("@method" "@path" "@authority" \
+				  |    "cache-control" "x-empty-header" "x-example")\
+				  |    ;created=1618884475;keyid="test-key-rsa-pss", \
+				  |  proxy_sig=("signature";key="sig1" "forwarded")\
+				  |    ;created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256"""".rfc8792single)
+			val sig = RawHeader("Signature",
+				"""sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo\
+				  |    1RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCi\
+				  |    HzC87qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW8\
+				  |    4jS8gyarxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53\
+				  |    r58RmpZ+J9eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCV\
+				  |    Rj05NrxABNFv3r5S9IXf2fYJK+eyW4AiGVMvMcOg==:, \
+				  |  proxy_sig=:cjGvZwbsq9JwexP9TIvdLiivxqLINwp/ybAc19KOSQuLvtmMt3EnZx\
+				  |    NiE+797dXK2cjPPUFqoZxO8WWx1SnKhAU9SiXBr99NTXRmA1qGBjqus/1Yxwr8k\
+				  |    eB8xzFt4inv3J3zP0k6TlLkRJstkVnNjuhRIUA/ZQCo8jDYAl4zWJJjppy6Gd1X\
+				  |    Sg03iUa0sju1yj6rcKbMABBuzhUz4G0u1hZkIGbQprCnk/FOsqZHpwaWvY8P3hm\
+				  |    cDHkNaavcokmq+3EBDCQTzgwLqfDmV0vLCXtDda6CNO2Zyum/pMGboCnQn/VkQ+\
+				  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single)
+			val req: Request[A] = toRequest(`§2.3_Request`)
+			req.withHeaders(req.headers ++ Seq(forwardedHdr,sigIn,sig))
 		case _ => throw new Exception("no translation available for request "+request)
 
 	@throws[Exception]

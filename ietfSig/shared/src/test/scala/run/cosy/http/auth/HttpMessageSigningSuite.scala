@@ -671,7 +671,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
 		yield
 			// we cannot verify the signature by comparing it with the one in the spec
-			// as rsa-pss singatures change from one moment to the next. We can only verify
+			// as each request for an rsa-pss signature returns a different string. We can only verify
 			// that the generate signature is valid
 			IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
 				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
@@ -710,8 +710,8 @@ trait HttpMessageSigningSuite[H <: Http](using
 			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
 		yield
 			// we cannot verify the signature by comparing it with the one in the spec
-		// as rsa-pss singatures change from one moment to the next. We can only verify
-		// that the generate signature is valid
+			// as each request for an rsa-pss signature returns a different string. We can only verify
+			// that the generate signature is valid
 			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
 			) *> assertIO(
 				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
@@ -756,7 +756,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
 		yield
 			// we cannot verify the signature by comparing it with the one in the spec
-			// as rsa-pss singatures change from one moment to the next. We can only verify
+			// as each request for an rsa-pss signature returns a different string. We can only verify
 			// that the generate signature is valid
 			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
 			) *> assertIO(
@@ -768,6 +768,37 @@ trait HttpMessageSigningSuite[H <: Http](using
 			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 			PureKeyId("test-key-rsa-pss")
 		)
+	}
+
+	test("B.2.4 Signing a Response using ecdsa-p256-sha256") {
+		val req: Request[H] = toRequest(B2_test_request)
+		val siginputStr = """("content-type" "digest" "content-length")\
+								  |  ;created=1618884475;keyid="test-key-ecc-p256"""".stripMargin.rfc8792single
+		val Some(sigInput) = SigInput(siginputStr) : @unchecked
+		val reqSignedFromSpec = req.addHeader("Signature-Input","sig1="+siginputStr)
+			.addHeader("Signature",
+				"""sig1=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn\
+				  |  6fPOtBx48/WffYLO0n1RHHf9scvNGAgGq52Q==:""".rfc8792single)
+		val aio = for
+			fn <- sigSuite.ecc_256_Signer
+			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+		yield
+			// we cannot verify the signature by comparing it with the one in the spec
+			// as each request for an ecc signature returns a different string. We can only verify
+			// that the generate signature is valid
+			IO( assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+				PureKeyId("test-key-ecc-p256")
+			)
+		//but we also verify that the signature constructed from the spec is valid
+		aio.flatten *> assertIO(
+			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-ecc-p256")
+		)
+	}
+
+	test("Signing a Request using hmac-sha256") {
+		//todo! Symmetric key signature
 	}
 
 	val B3_Request: HttpMessage =
@@ -798,69 +829,6 @@ trait HttpMessageSigningSuite[H <: Http](using
 
 
 
-//	//	test("B.2.3. Full Coverage") {
-//	//		//1. build and test Input String
-//	//		val sigParametersExpected =
-//	//			"""("@request-target" "host" "date" "content-type" \
-//	//			  |  "digest" "content-length");created=1618884475\
-//	//			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-//	//		val Some(sigIn) = SigInput[HttpMessage](IList(
-//	//			`@request-target`.sf, host.sf, date.sf, `content-type`.sf, digest.sf, `content-length`.sf)(
-//	//			Token("created") -> SfInt(1618884475),
-//	//			Token("keyid") -> sf"test-key-rsa-pss"))
-//	//		assertEquals(sigIn.canon, sigParametersExpected)
-//	//
-//	//		val sigInputStrExpected =
-//	//			""""@request-target": post /foo?param=value&pet=dog
-//	//			  |"host": example.com
-//	//			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
-//	//			  |"content-type": application/json
-//	//			  |"digest": SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
-//	//			  |"content-length": 18
-//	//			  |"@signature-params": ("@request-target" "host" "date" "content-type" \
-//	//			  |  "digest" "content-length");created=1618884475\
-//	//			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-//	//		assertEquals(rfcAppdxB2Req.signingString(sigIn), Success(sigInputStrExpected))
-//	//
-//	//		//2. build and test signature
-//	//		val signatureStr =
-//	//			"""sig1=:QNPZtqAGWN1YMtsLJ1oyQMLg9TuIwjsIBESTo1/YXUsG+6Sl1uKUdT\
-//	//			  |  e9xswwrc3Ui3gUd4/tLv48NGih2TRDc1AWbEQDuy6pjroxSPtFjquubqzbszxit1arPNh\
-//	//			  |  ONnyR/8yuIh3bOXfc/NYJ3KLNaWR6MKrGinCYKTNwrX/0V67EMdSgd5HHnW5xHFgKfRCj\
-//	//			  |  rG3ncV+jbaeSPJ8e96RZgr8slcdwmqXdiwiIBCQDKRIQ3U2muJWvxyjV/IYhCTwAXJaUz\
-//	//			  |  sQPKzR5QWelXEVdHyv4WIB2lKaYh7mAsz0/ANxFYRRSp2Joms0OAnIAFX9kKCSp4p15/Q\
-//	//			  |  8L9vSIGNpQtw==:""".rfc8792single
-//	//		val Success(sig1) = Signature.parse(signatureStr)
-//	//		assertEquals(sig1.sigmap.canon, signatureStr)
-//	//
-//	//		//3. build complete request header and test signature on it
-//	//		val specReq = rfcAppdxB2Req.addHeader(
-//	//			`Signature-Input`(SigInputs(Token("sig1"), sigIn)))
-//	//			.addHeader(Signature(sig1))
-//	//		val verifiedKeyId = Await.ready(
-//	//			specReq.signatureAuthN(keyidFetcher)(cred("sig1")),
-//	//			2.seconds
-//	//		)
-//	//		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//	//		//		assertEquals(
-//	//		//			verifiedKeyId.value,
-//	//		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
-//	//		//		)
-//	//
-//	//		//4. create our own signature and test that.
-//	//		//   note: RSASSA returns different signatures at different times. So we run it again
-//	//		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
-//	//
-//	//		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-//	//			.flatMap(_ (`test-key-rsa-pss-sigdata`))
-//	//
-//	//		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
-//	//		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
-//	//		assertEquals(
-//	//			keyIdReady.value,
-//	//			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
-//	//		)
-//	//	}
 end HttpMessageSigningSuite
 
 class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
@@ -892,10 +860,23 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 	lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]]	=
 		privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
 
+	lazy val ecc_256_PubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]]	=
+		publicKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+
+	lazy val ecc_256_PrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]]	=
+		privateKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+
+
 	lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
 		for
 			spec <- IO.fromTry(rsaPSSPrivKey)
 			fio <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`rsa-pss-sha512`)
+		yield fio
+
+	lazy val ecc_256_Signer: IO[ByteVector => IO[ByteVector]] =
+		for
+			spec <- IO.fromTry(ecc_256_PrivKey)
+			fio <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`ecdsa-p256-sha256`)
 		yield fio
 
 	/**
@@ -907,6 +888,8 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 			verifierFor(rsaPSSPubKey, AsymmetricKeyAlg.`rsa-pss-sha512`, keyid)
 		case "test-key-rsa" =>
 			verifierFor(rsaPubKey, AsymmetricKeyAlg.`rsa-v1_5-sha256`, keyid)
+		case "test-key-ecc-p256" =>
+			verifierFor(ecc_256_PubKey, AsymmetricKeyAlg.`ecdsa-p256-sha256`, keyid)
 		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
 
 end SigningSuiteHelpers

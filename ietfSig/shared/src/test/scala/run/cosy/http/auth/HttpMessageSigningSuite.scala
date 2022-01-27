@@ -652,6 +652,10 @@ trait HttpMessageSigningSuite[H <: Http](using
 		val Some(sigInput) = SigInput(
 			"""();created=1618884475\
 			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single) : @unchecked
+		assertEquals(req.signingString(sigInput).toAscii, Success(
+			""""@signature-params": ();created=1618884475\
+			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
+		))
 		val reqSignedFromSpec = req.addHeader("Signature-Input",
 				"""sig1=();created=1618884475\
 				  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
@@ -669,13 +673,12 @@ trait HttpMessageSigningSuite[H <: Http](using
 			// we cannot verify the signature by comparing it with the one in the spec
 			// as rsa-pss singatures change from one moment to the next. We can only verify
 			// that the generate signature is valid
-			assertEquals(signedReq.headerValue("Signature") != None, true)
-			assertIO(
+			IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
 				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 				PureKeyId("test-key-rsa-pss")
 			)
 		//but we also verify that the signature constructed from the spec is valid
-		aio *> assertIO(
+		aio.flatten *> assertIO(
 			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 			PureKeyId("test-key-rsa-pss")
 		)
@@ -685,10 +688,16 @@ trait HttpMessageSigningSuite[H <: Http](using
 		val req: Request[H] = toRequest(B2_test_request)
 		val Some(sigInput) = SigInput(
 			"""("@authority" "content-type")\
-			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single) : @unchecked
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single): @unchecked
+		assertEquals(req.signingString(sigInput).toAscii, Success(
+			""""@authority": example.com
+			  |"content-type": application/json
+			  |"@signature-params": ("@authority" "content-type")\
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
+		))
 		val reqSignedFromSpec = req.addHeader("Signature-Input",
 			"""sig1=("@authority" "content-type")\
-			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".stripMargin.rfc8792single
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
 		).addHeader("Signature",
 			"""sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81gh\
 			  |  JS3PcH+m1asiMp8yvccnO/RfaexnqanVB3C72WRNZN7skPTJmUVmoIeqZncdP2mlf\
@@ -703,13 +712,59 @@ trait HttpMessageSigningSuite[H <: Http](using
 			// we cannot verify the signature by comparing it with the one in the spec
 		// as rsa-pss singatures change from one moment to the next. We can only verify
 		// that the generate signature is valid
-			assertEquals(signedReq.headerValue("Signature") != None, true)
-			assertIO(
+			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
+			) *> assertIO(
 				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 				PureKeyId("test-key-rsa-pss")
 			)
 		//but we also verify that the signature constructed from the spec is valid
-		aio *> assertIO(
+		aio.flatten *> assertIO(
+			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-rsa-pss")
+		)
+	}
+
+	test("B.2.3 Full Coverage using rsa-pss-sha512") {
+		val req: Request[H] = toRequest(B2_test_request)
+		val siginputStr = """("date" "@method" "@path" "@query" \
+								  |  "@authority" "content-type" "digest" "content-length")\
+								  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
+		val Some(sigInput) = SigInput(siginputStr) : @unchecked
+		assertEquals(req.signingString(sigInput).toAscii, Success(
+			""""date": Tue, 20 Apr 2021 02:07:56 GMT
+			  |"@method": POST
+			  |"@path": /foo
+			  |"@query": ?param=value&pet=dog
+			  |"@authority": example.com
+			  |"content-type": application/json
+			  |"digest": SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+			  |"content-length": 18
+			  |"@signature-params": ("date" "@method" "@path" "@query" \
+			  |  "@authority" "content-type" "digest" "content-length")\
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
+		))
+		val reqSignedFromSpec = req.addHeader("Signature-Input","sig1="+siginputStr)
+			.addHeader("Signature",
+				"""sig1=:JuJnJMFGD4HMysAGsfOY6N5ZTZUknsQUdClNG51VezDgPUOW03\
+				  |  QMe74vbIdndKwW1BBrHOHR3NzKGYZJ7X3ur23FMCdANe4VmKb3Rc1Q/5YxOO8p7Ko\
+				  |  yfVa4uUcMk5jB9KAn1M1MbgBnqwZkRWsbv8ocCqrnD85Kavr73lx51k1/gU8w673W\
+				  |  T/oBtxPtAn1eFjUyIKyA+XD7kYph82I+ahvm0pSgDPagu917SlqUjeaQaNnlZzO03\
+				  |  Iy1RZ5XpgbNeDLCqSLuZFVID80EohC2CQ1cL5svjslrlCNstd2JCLmhjL7xV3NYXe\
+				  |  rLim4bqUQGRgDwNJRnqobpS6C1NBns/Q==:""".rfc8792single)
+		val aio = for
+			fn <- sigSuite.rsaPSSSigner
+			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+		yield
+			// we cannot verify the signature by comparing it with the one in the spec
+			// as rsa-pss singatures change from one moment to the next. We can only verify
+			// that the generate signature is valid
+			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
+			) *> assertIO(
+				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+				PureKeyId("test-key-rsa-pss")
+			)
+		//but we also verify that the signature constructed from the spec is valid
+		aio.flatten *> assertIO(
 			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 			PureKeyId("test-key-rsa-pss")
 		)

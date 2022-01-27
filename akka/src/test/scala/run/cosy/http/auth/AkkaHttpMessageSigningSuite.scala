@@ -161,7 +161,8 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 			uri = Uri("/foo?param=value&pet=dog"),
 			headers = Seq(
 				Host("example.com"),
-				Date(DateTime(2021, 04, 20, 02, 07, 55)),
+				//note: changed minute because of bug https://github.com/httpwg/http-extensions/issues/1901
+				Date(DateTime(2021, 04, 20, 02, 07, 56)),
 				RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=")
 			)).withEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
 		case _ => throw new Exception("no translation available for request "+request)
@@ -176,6 +177,11 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 		).withEntity(ContentTypes.`application/json`,
 			"""{"busy": true, "message": "Your call is very important to us"}"""
 		)
+		case B2_test_response => HttpResponse(StatusCodes.OK,
+			headers = Seq(
+				Date(DateTime(2021, 04, 20, 02, 07, 56)),
+				RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=")
+			)).withEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
 		case _ => throw new Exception("no translation available for response "+response)
 
 	val rfcAppdxB2Req = HttpRequest(method = HttpMethods.POST,

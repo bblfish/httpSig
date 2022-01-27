@@ -18,8 +18,11 @@ trait HttpOps[H<:Http]:
 
 	extension[R <: Message[H]](msg: R) {
 		def addHeaders(headers: Seq[Header[H]]): R
+		def addHeader(name: String, value: String): R
 		//this is used in tests
 		def removeHeader(name: String): R
+		//used in tests: return the Optional Value
+		def headerValue(name: String): Option[String]
 	}
 end HttpOps
 

@@ -42,7 +42,8 @@ object SigInputs:
 /**
  * A SigInput is a valid Signature-Input build on an Rfc8941 Internal List.
  * restricted to those this server can understand.
- * For example:
+ * For example in the following header the SigInput is the structure following
+ * the attribute of the `sig1` dictionary entry
  * <pre>
  *  Signature-Input: sig1=("@method" "@target-uri" "host" "date" \
  *      "cache-control" "x-empty-header" "x-example");created=1618884475\

@@ -156,6 +156,14 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 				  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single)
 			val req: Request[A] = toRequest(`§2.3_Request`)
 			req.withHeaders(req.headers ++ Seq(forwardedHdr,sigIn,sig))
+		case B2_test_request => HttpRequest(
+			method = HttpMethods.POST,
+			uri = Uri("/foo?param=value&pet=dog"),
+			headers = Seq(
+				Host("example.com"),
+				Date(DateTime(2021, 04, 20, 02, 07, 55)),
+				RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=")
+			)).withEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
 		case _ => throw new Exception("no translation available for request "+request)
 
 	@throws[Exception]

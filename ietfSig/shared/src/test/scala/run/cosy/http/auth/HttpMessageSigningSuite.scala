@@ -1,6 +1,7 @@
 package run.cosy.http.auth
 
 import bobcats.AsymmetricKeyAlg.Signature
+import bobcats.PKCS8KeySpec
 import cats.effect.Async
 import run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
@@ -569,7 +570,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 		)
 	}
 
-	val `§4.3_Request`: HttpMessage = // the example could also be a response
+	val `§4.3_Request`: HttpMessage =
 		"""GET /foo HTTP/1.1
 		  |Host: example.org
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
@@ -621,15 +622,13 @@ trait HttpMessageSigningSuite[H <: Http](using
 		assertIO(
 			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 			PureKeyId("test-key-rsa-pss")
-		) *>
-		assertIO(
+		) *> assertIO(
 			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
 			PureKeyId("test-key-rsa")
 		)
 	}
 
-
-	val B2_Request: HttpMessage =
+	val B2_test_request: HttpMessage =
 		"""POST /foo?param=value&pet=dog HTTP/1.1
 		  |Host: example.com
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
@@ -638,7 +637,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |Content-Length: 18
 		  |
 		  |{"hello": "world"}""".stripMargin
-	val B2_Response: HttpMessage =
+	val B2_test_response: HttpMessage =
 		"""HTTP/1.1 200 OK
 		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
 		  |Content-Type: application/json
@@ -647,6 +646,75 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |
 		  |{"hello": "world"}
 		  |""".stripMargin
+
+	test("B.2.1 Minimal Signature Using rsa-pss-sha512") {
+		val req: Request[H] = toRequest(B2_test_request)
+		val Some(sigInput) = SigInput(
+			"""();created=1618884475\
+			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single) : @unchecked
+		val reqSignedFromSpec = req.addHeader("Signature-Input",
+				"""sig1=();created=1618884475\
+				  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
+			).addHeader("Signature",
+				"""sig1=:HWP69ZNiom9Obu1KIdqPPcu/C1a5ZUMBbqS/xwJECV8bhIQVmE\
+				  |  AAAzz8LQPvtP1iFSxxluDO1KE9b8L+O64LEOvhwYdDctV5+E39Jy1eJiD7nYREBgx\
+				  |  TpdUfzTO+Trath0vZdTylFlxK4H3l3s/cuFhnOCxmFYgEa+cw+StBRgY1JtafSFwN\
+				  |  cZgLxVwialuH5VnqJS4JN8PHD91XLfkjMscTo4jmVMpFd3iLVe0hqVFl7MDt6TMkw\
+				  |  IyVFnEZ7B/VIQofdShO+C/7MuupCSLVjQz5xA+Zs6Hw+W9ESD/6BuGs6LF1TcKLxW\
+				  |  +5K+2zvDY/Cia34HNpRW5io7Iv9/b7iQ==:""".rfc8792single)
+		val aio = for
+			fn <- sigSuite.rsaPSSSigner
+			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+		yield
+			// we cannot verify the signature by comparing it with the one in the spec
+			// as rsa-pss singatures change from one moment to the next. We can only verify
+			// that the generate signature is valid
+			assertEquals(signedReq.headerValue("Signature") != None, true)
+			assertIO(
+				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+				PureKeyId("test-key-rsa-pss")
+			)
+		//but we also verify that the signature constructed from the spec is valid
+		aio *> assertIO(
+			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-rsa-pss")
+		)
+	}
+
+	test("B.2.2 Selective Covered Components using rsa-pss-sha512") {
+		val req: Request[H] = toRequest(B2_test_request)
+		val Some(sigInput) = SigInput(
+			"""("@authority" "content-type")\
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single) : @unchecked
+		val reqSignedFromSpec = req.addHeader("Signature-Input",
+			"""sig1=("@authority" "content-type")\
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".stripMargin.rfc8792single
+		).addHeader("Signature",
+			"""sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81gh\
+			  |  JS3PcH+m1asiMp8yvccnO/RfaexnqanVB3C72WRNZN7skPTJmUVmoIeqZncdP2mlf\
+			  |  xlLP6UbkrgYsk91NS6nwkKC6RRgLhBFqzP42oq8D2336OiQPDAo/04SxZt4Wx9nDG\
+			  |  uy2SfZJUhsJqZyEWRk4204x7YEB3VxDAAlVgGt8ewilWbIKKTOKp3ymUeQIwptqYw\
+			  |  v0l8mN404PPzRBTpB7+HpClyK4CNp+SVv46+6sHMfJU4taz10s/NoYRmYCGXyadzY\
+			  |  YDj0BYnFdERB6NblI/AOWFGl5Axhhmjg==:""".rfc8792single)
+		val aio = for
+			fn <- sigSuite.rsaPSSSigner
+			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+		yield
+			// we cannot verify the signature by comparing it with the one in the spec
+		// as rsa-pss singatures change from one moment to the next. We can only verify
+		// that the generate signature is valid
+			assertEquals(signedReq.headerValue("Signature") != None, true)
+			assertIO(
+				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+				PureKeyId("test-key-rsa-pss")
+			)
+		//but we also verify that the signature constructed from the spec is valid
+		aio *> assertIO(
+			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+			PureKeyId("test-key-rsa-pss")
+		)
+	}
+
 	val B3_Request: HttpMessage =
 		"""POST /foo?Param=value&pet=Dog HTTP/1.1
 		  |Host: example.com
@@ -675,162 +743,6 @@ trait HttpMessageSigningSuite[H <: Http](using
 
 
 
-//	//
-//	//	//
-//	//	// signature tests
-//	//	//
-//	//
-//	//	import TestMessageSigningRFCFn.*
-//	//
-
-//	//
-//	//	import run.cosy.http.headers.Rfc8941.Serialise.given
-//	//
-//	//	import scala.concurrent.duration.given
-//	//
-//	test("Appendix B.2.1. Minimal Signature Header using rsa-pss-sha512") {
-//		import run.cosy.http.auth.AkkaHttpMessageSignature.{signatureAuthN, signingString}
-//		import run.cosy.http.headers.Rfc8941.Serialise.given
-//
-//		//1. build and test Input String
-//		val sigInputStrExpected =
-//			""""@signature-params": ();created=1618884475;keyid="test-key-rsa-pss"\
-//			  |  ;alg="rsa-pss-sha512"""".rfc8792single
-//		val Some(sigIn) = SigInput(IList()(
-//			Token("created") -> SfInt(1618884475),
-//			Token("keyid") -> sf"test-key-rsa-pss",
-//			Token("alg") -> sf"rsa-pss-sha512"
-//		)): @unchecked
-//		assertEquals(rfcAppdxB2Req.signingString(sigIn).toAscii, Success(sigInputStrExpected))
-//
-//		//2. build and test signature
-//		val signatureStr =
-//			"""sig1=:HWP69ZNiom9Obu1KIdqPPcu/C1a5ZUMBbqS/xwJECV8bhIQVmE\
-//			  |  AAAzz8LQPvtP1iFSxxluDO1KE9b8L+O64LEOvhwYdDctV5+E39Jy1eJiD7nYREBgx\
-//			  |  TpdUfzTO+Trath0vZdTylFlxK4H3l3s/cuFhnOCxmFYgEa+cw+StBRgY1JtafSFwN\
-//			  |  cZgLxVwialuH5VnqJS4JN8PHD91XLfkjMscTo4jmVMpFd3iLVe0hqVFl7MDt6TMkw\
-//			  |  IyVFnEZ7B/VIQofdShO+C/7MuupCSLVjQz5xA+Zs6Hw+W9ESD/6BuGs6LF1TcKLxW\
-//			  |  +5K+2zvDY/Cia34HNpRW5io7Iv9/b7iQ==:""".rfc8792single
-//		val sigs: Try[Signatures] = run.cosy.http.headers.Signature.parse(signatureStr)
-//		assertEquals(sigs.get.sigmap.canon, signatureStr)
-//
-//		//3. build complete request header and test signature on it
-//		val specReq = rfcAppdxB2Req.addHeader(
-//			`Signature-Input`(run.cosy.http.headers.SigInputs(Token("sig1"), sigIn)))
-//			.addHeader(Signature(sigs.get))
-//
-//		import run.cosy.http.auth.AkkaHttpMessageSignature.given
-//		import run.cosy.http.auth.AkkaHttpMessageSigningSuite.{cred, keyidFetcher}
-//
-//		import concurrent.duration.Duration
-//		val verifiedKeyId: IO[Keyidentifier] =
-//			specReq.signatureAuthN[IO, Keyidentifier](keyidFetcher)(cred("sig1"))
-//		assertIO(verifiedKeyId, PureKeyId("test-key-rsa-pss"))
-//		//		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//		//		//		assertEquals(
-//		//		//			verifiedKeyId.value,
-//		//		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss")))
-//		//		//		)
-//		//
-//		//		//4. create our own signature and test that.
-//		//		//   note: RSASSA returns different signatures at different times. So we run it again
-//		//		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
-//		//
-//		//		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-//		//			.flatMap(_ (`test-key-rsa-pss-sigdata`))
-//		//
-//		//		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
-//		//		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
-//		//		assertEquals(
-//		//			keyIdReady.value,
-//		//			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
-//		//		)
-//	}
-//	//
-//	//	test("B.2.2 Header Coverage - Spec Test") {
-//	//		import java.util.Base64
-//	//		val sigInputStr =
-//	//			""""host": example.com
-//	//			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
-//	//			  |"content-type": application/json
-//	//			  |"@signature-params": ("host" "date" "content-type");created=1618884475;keyid="test-key-rsa-pss"""".stripMargin
-//	//		val signature = "NtIKWuXjr4SBEXj97gbick4O95ff378I0CZOa2VnIeEXZ1itzAdqTp" +
-//	//			"SvG91XYrq5CfxCmk8zz1Zg7ZGYD+ngJyVn805r73rh2eFCPO+ZXDs45Is/Ex8srzGC9sf" +
-//	//			"VZfqeEfApRFFe5yXDmANVUwzFWCEnGM6+SJVmWl1/jyEn45qA6Hw+ZDHbrbp6qvD4N0S9" +
-//	//			"2jlPyVVEh/SmCwnkeNiBgnbt+E0K5wCFNHPbo4X1Tj406W+bTtnKzaoKxBWKW8aIQ7rg9" +
-//	//			"2zqE1oqBRjqtRi5/Q6P5ZYYGGINKzNyV3UjZtxeZNnNJ+MAnWS0mofFqcZHVgSU/1wUzP" +
-//	//			"7MhzOKLca1Yg=="
-//	//		println(signature)
-//	//		val sigBytes = Base64.getDecoder.decode(signature)
-//	//
-//	//		val javaSig = `rsa-pss-sha512`()
-//	//		javaSig.initVerify(testKeyPSSpub)
-//	//		javaSig.update(sigInputStr.getBytes(StandardCharsets.US_ASCII))
-//	//		//todo:		assert(javaSig.verify(sigBytes.toArray))
-//	//	}
-//	//
-//	//	test("B.2.2. Header Coverage") {
-//	//		//1. build and test Input String
-//	//		val sigParametersExpected =
-//	//			"""("host" "date" "content-type");created=1618884475\
-//	//			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-//	//		val Some(sigIn) = SigInput[HttpMessage](IList(host.sf, date.sf, `content-type`.sf)(
-//	//			Token("created") -> SfInt(1618884475),
-//	//			Token("keyid") -> sf"test-key-rsa-pss"))
-//	//		assertEquals(sigIn.canon, sigParametersExpected)
-//	//
-//	//		val sigInputStrExpected =
-//	//			""""host": example.com
-//	//			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
-//	//			  |"content-type": application/json
-//	//			  |"@signature-params": ("host" "date" "content-type");created=1618884475\
-//	//			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
-//	//		assertEquals(rfcAppdxB2Req.signingString(sigIn), Success(sigInputStrExpected))
-//	//
-//	//		//2. build and test signature
-//	//		val signatureStr =
-//	//			"""sig1=:NtIKWuXjr4SBEXj97gbick4O95ff378I0CZOa2VnIeEXZ1itzAdqTp\
-//	//			  |  SvG91XYrq5CfxCmk8zz1Zg7ZGYD+ngJyVn805r73rh2eFCPO+ZXDs45Is/Ex8srzGC9sf\
-//	//			  |  VZfqeEfApRFFe5yXDmANVUwzFWCEnGM6+SJVmWl1/jyEn45qA6Hw+ZDHbrbp6qvD4N0S9\
-//	//			  |  2jlPyVVEh/SmCwnkeNiBgnbt+E0K5wCFNHPbo4X1Tj406W+bTtnKzaoKxBWKW8aIQ7rg9\
-//	//			  |  2zqE1oqBRjqtRi5/Q6P5ZYYGGINKzNyV3UjZtxeZNnNJ+MAnWS0mofFqcZHVgSU/1wUzP\
-//	//			  |  7MhzOKLca1Yg==:""".rfc8792single
-//	//		val Success(sig1) = Signature.parse(signatureStr)
-//	//		assertEquals(sig1.sigmap.canon, signatureStr)
-//	//
-//	//		//3. build complete request header and test signature on it
-//	//		val specReq: HttpRequest = rfcAppdxB2Req.addHeader(
-//	//			`Signature-Input`(SigInputs(Token("sig1"), sigIn)))
-//	//			.addHeader(Signature(sig1))
-//	//		//verify that the new req still has the same signing string as expected
-//	//		assertEquals(specReq.signingString(sigIn), Success(sigInputStrExpected))
-//	//
-//	//		//		println(specReq.documented)
-//	//		val verifiedKeyId = Await.ready(
-//	//			specReq.signatureAuthN(keyidFetcher)(cred("sig1")),
-//	//			2.seconds
-//	//		)
-//	//		// todo: this does not work. Is it the crypto algorith that is wrong or the example in the spec?
-//	//		//		assertEquals(
-//	//		//			verifiedKeyId.value,
-//	//		//			Some(Success(run.cosy.http.auth.KeyidAgent("test-key-rsa-pss",testKeyPSSpub)))
-//	//		//		)
-//	//
-//	//		//4. create our own signature and test that.
-//	//		//   note: RSASSA returns different signatures at different times. So we run it again
-//	//		//   Assuming rsa-pss-sha512 is the same as PS512 used by JWT
-//	//
-//	//		val newReq = rfcAppdxB2Req.withSigInput(Token("sig1"), sigIn)
-//	//			.flatMap(_ (`test-key-rsa-pss-sigdata`))
-//	//
-//	//		val futureKeyId = newReq.get.signatureAuthN(keyidFetcher)(cred("sig1"))
-//	//		val keyIdReady = Await.ready(futureKeyId, 2.seconds)
-//	//		assertEquals(
-//	//			keyIdReady.value,
-//	//			Some(Success(run.cosy.http.auth.KeyidSubj("test-key-rsa-pss", testKeyPSSpub)))
-//	//		)
-//	//	}
-//	//
 //	//	test("B.2.3. Full Coverage") {
 //	//		//1. build and test Input String
 //	//		val sigParametersExpected =
@@ -897,33 +809,6 @@ trait HttpMessageSigningSuite[H <: Http](using
 end HttpMessageSigningSuite
 
 class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
-//	//	java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
-//	//
-//	//	lazy val testKeyRSApub = {
-//	//		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider)
-//	//		import java.math.BigInteger
-//	//		import java.security.spec.RSAPublicKeySpec
-//	//		val pkcs1PublicKey = org.bouncycastle.asn1.pkcs.RSAPublicKey.getInstance(testKeyRSApubStr.base64Decode.unsafeArray).nn
-//	//		val modulus = pkcs1PublicKey.getModulus.nn
-//	//		val publicExponent = pkcs1PublicKey.getPublicExponent.nn
-//	//		val keySpec = new RSAPublicKeySpec(modulus, publicExponent)
-//	//		KeyFactory.getInstance("RSA").nn.generatePublic(keySpec).nn
-//	//	}
-//	//	lazy val testKeyRSAPriv = {
-//	//		KeyFactory.getInstance("RSA").nn
-//	//			.generatePrivate(new PKCS8EncodedKeySpec(testKeyRSAprivStr.base64Decode.unsafeArray))
-//	//	}
-//	//	lazy val testKeyPSSpub = KeyFactory.getInstance("RSA").nn
-//	//		.generatePublic(new X509EncodedKeySpec(testKeyPSSPubStr.base64Decode.unsafeArray))
-//	//	lazy val testKeyPSSpriv = KeyFactory.getInstance("RSASSA-PSS").nn
-//	//		.generatePrivate(new PKCS8EncodedKeySpec(testKeyPSSPrivStr.base64Decode.unsafeArray)).nn
-//	//
-//	//	/** Sigdata should always be new too in multithreaded environements, as it uses stateful signatures. */
-//	//	def `test-key-rsa-pss-sigdata`: SigningData = bobcats.PKCS8KeySpec(
-//	//		scodec.bits.ByteVector.fromBase64Descriptive(testKeyPSSpriv), )
-//	//		SigningData(testKeyPSSpriv, `rsa-pss-sha512`())
-//	//	def `test-key-rsa-sigdata`: SigningData = SigningData(testKeyRSAPriv, sha256rsaSig())
-//
 	import run.cosy.http.auth.MessageSignature as MS
 	import bobcats.SigningHttpMessages.`test-key-rsa-pss`
 	import bobcats.util.PEMUtils.PKCS8_PEM
@@ -940,13 +825,23 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 				else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
 			)
 
-	def keySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
+	def publicKeySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
+	def privateKeySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
 
 	lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-		keySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+		publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
 
 	lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-		keySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+		publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+
+	lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]]	=
+		privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+
+	lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
+		for
+			spec <- IO.fromTry(rsaPSSPrivKey)
+			fio <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`rsa-pss-sha512`)
+		yield fio
 
 	/**
 	 * emulate fetching the signature verification info for the keyids given in the Spec
@@ -958,25 +853,6 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 		case "test-key-rsa" =>
 			verifierFor(rsaPubKey, AsymmetricKeyAlg.`rsa-v1_5-sha256`, keyid)
 		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
-//
-//
-//	//	/** one always has to create a new signature on each verification if in multi-threaded environement */
-//	//	def `rsa-pss-sha512`(): JSignature =
-//	//		//	   also tried see [[https://tools.ietf.org/html/rfc7518 JSON Web Algorithms (JWA) RFC]]
-//	//		//		com.nimbusds.jose.crypto.impl.RSASSA.getSignerAndVerifier(JWSAlgorithm.PS512, new BouncyCastleProvider() )
-//	//		val rsapss = JSignature.getInstance("RSASSA-PSS")
-//	//		import java.security.spec.{MGF1ParameterSpec, PSSParameterSpec}
-//	//		val pssSpec = new PSSParameterSpec(
-//	//			"SHA-512", "MGF1", MGF1ParameterSpec.SHA512, 512 / 8, 1)
-//	//		println("PSSParameterSpec=" + pssSpec)
-//	//		rsapss.setParameter(pssSpec)
-//	//		rsapss
-//	//	//todo: remove dependence on JW2JCA
-//	//	def sha256rsaSig(): JSignature = JW2JCA.getSignerAndVerifier("SHA256withRSA").get
-//	//	/** we are using [[https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md HttpSig]]
-//	//	 * extension to verify Signing HTTP Messages */
-//
-//	def cred(signame: String) = HttpSig(Rfc8941.Token(signame))
-//
-//
-//}
+
+end SigningSuiteHelpers
+

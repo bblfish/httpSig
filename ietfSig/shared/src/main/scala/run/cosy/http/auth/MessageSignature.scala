@@ -36,7 +36,7 @@ trait SignatureMatcher[H<:Http] {
 object MessageSignature {
 	import bobcats.Verifier.{Signature, SigningString}
 	type SignatureVerifier[F[_], A] = (SigningString, Signature) => F[A]
-	type Signer[F[_]] = SigningString => F[Signature]
+	type SigningF[F[_]] = SigningString => F[Signature]
 }
 
 /**
@@ -72,7 +72,7 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
 		 *         in the request
 		 */
 		def withSigInput[F[_]](
-			name: Rfc8941.Token, sigInput: SigInput, signerF: Signer[F]
+			name: Rfc8941.Token, sigInput: SigInput, signerF: SigningF[F]
 		)(using meF: MonadError[F, Throwable]): F[R] =
 			for toSignBytes <- meF.fromTry(signingString(sigInput))
 				 (signature: ByteVector) <- signerF(toSignBytes)

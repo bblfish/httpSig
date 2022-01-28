@@ -165,6 +165,24 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 				Date(DateTime(2021, 04, 20, 02, 07, 56)),
 				RawHeader("Digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=")
 			)).withEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
+		case B3_ProxyEnhanced_Request => HttpRequest(
+			method = HttpMethods.POST,
+			uri = Uri("/foo?Param=value&pet=Dog"),
+			headers = Seq(
+				Host("service.internal.example"),
+				//note: changed minute because of bug https://github.com/httpwg/http-extensions/issues/1901
+				Date(DateTime(2021, 04, 20, 02, 07, 55)),
+				RawHeader("Client-Cert",
+					""":MIIBqDCCAU6gAwIBAgIBBzAKBggqhkjOPQQDAjA6MRswGQYDVQQKD\
+					  |  BJMZXQncyBBdXRoZW50aWNhdGUxGzAZBgNVBAMMEkxBIEludGVybWVkaWF0ZSBDQT\
+					  |  AeFw0yMDAxMTQyMjU1MzNaFw0yMTAxMjMyMjU1MzNaMA0xCzAJBgNVBAMMAkJDMFk\
+					  |  wEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8YnXXfaUgmnMtOXU/IncWalRhebrXmck\
+					  |  C8vdgJ1p5Be5F/3YC8OthxM4+k1M6aEAEFcGzkJiNy6J84y7uzo9M6NyMHAwCQYDV\
+					  |  R0TBAIwADAfBgNVHSMEGDAWgBRm3WjLa38lbEYCuiCPct0ZaSED2DAOBgNVHQ8BAf\
+					  |  8EBAMCBsAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHQYDVR0RAQH/BBMwEYEPYmRjQGV\
+					  |  4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIBHda/r1vaL6G3VliL4/Di6YK0Q6\
+					  |  bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:""".rfc8792single)
+			)).withEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
 		case _ => throw new Exception("no translation available for request "+request)
 
 	@throws[Exception]

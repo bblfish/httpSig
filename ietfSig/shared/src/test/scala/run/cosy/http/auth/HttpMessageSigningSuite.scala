@@ -827,6 +827,57 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |
 		  |{"hello": "world"}""".rfc8792single
 
+	test("B.3. TLS-Terminating Proxy") {
+		val req: Request[H] = toRequest(B3_ProxyEnhanced_Request)
+		val siginputStr = """("@path" "@query" "@method" "@authority" \
+								  |  "client-cert");created=1618884475;keyid="test-key-ecc-p256"""".rfc8792single
+		val Some(sigInput) = SigInput(siginputStr) : @unchecked
+		val sigStr = req.signingString(sigInput)
+//  the current 07 spec wrongly has it that the @query line does not start with `?`
+//  see https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
+//		assertEquals(sigStr.toAscii,
+//			Success(""""@path": /foo
+//			  |"@query": ?Param=value&pet=Dog
+//			  |"@method": POST
+//			  |"@authority": service.internal.example
+//			  |"client-cert": :MIIBqDCCAU6gAwIBAgIBBzAKBggqhkjOPQQDAjA6MRswGQYDVQQ\
+//			  |  KDBJMZXQncyBBdXRoZW50aWNhdGUxGzAZBgNVBAMMEkxBIEludGVybWVkaWF0ZSBD\
+//			  |  QTAeFw0yMDAxMTQyMjU1MzNaFw0yMTAxMjMyMjU1MzNaMA0xCzAJBgNVBAMMAkJDM\
+//			  |  FkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8YnXXfaUgmnMtOXU/IncWalRhebrXm\
+//			  |  ckC8vdgJ1p5Be5F/3YC8OthxM4+k1M6aEAEFcGzkJiNy6J84y7uzo9M6NyMHAwCQY\
+//			  |  DVR0TBAIwADAfBgNVHSMEGDAWgBRm3WjLa38lbEYCuiCPct0ZaSED2DAOBgNVHQ8B\
+//			  |  Af8EBAMCBsAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHQYDVR0RAQH/BBMwEYEPYmRjQ\
+//			  |  GV4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIBHda/r1vaL6G3VliL4/Di6YK0\
+//			  |  Q6bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:
+//			  |"@signature-params": ("@path" "@query" "@method" "@authority" \
+//			  |  "client-cert");created=1618884475;keyid="test-key-ecc-p256"""".rfc8792single))
+		val reqSignedFromSpec = req.addHeader("Signature-Input","ttrp="+siginputStr)
+			.addHeader("Signature",
+				"""ttrp=:5gudRjXaHrAYbEaQUOoY9TuvqWOdPcspkp7YyKCB0XhyAG9cB7\
+				  |  15hucPPanEK0OVyiNLJqcoq2Yn1DPWQcnbog==:""".stripMargin.rfc8792single)
+		val aio = for
+			fn <- sigSuite.ecc_256_Signer
+			signedReq <- req.withSigInput(Rfc8941.Token("ttrp"), sigInput, fn)
+		yield
+			// we cannot verify the signature by comparing it with the one in the spec
+		   // as each request for an ecc signature returns a different string. We can only verify
+		   // that the generate signature is valid
+			IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("ttrp"))),
+				PureKeyId("test-key-ecc-p256")
+			)
+
+		aio.flatten
+		//but we also verify that the signature constructed from the spec is valid
+		//todo: this won't work because the 07 spec creates the wrong signing string
+		//see above and https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
+//			*> assertIO(
+//			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("ttrp"))),
+//			PureKeyId("test-key-ecc-p256")
+//		)
+
+	}
+
 
 
 end HttpMessageSigningSuite

@@ -72,6 +72,11 @@ class AkkaMessageSelectors(
 				else
 					Failure(SelectorException(s"selector $lowercaseName does not take parameters. Received " + params))
 		}
+	override	lazy val `client-cert`: HeaderSelector[Message[A]] =
+		new UntypedAkkaSelector[Message[A]] {
+			override val lowercaseName: String = "client-cert"
+		}
+
 	override lazy val digest: HeaderSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "digest"

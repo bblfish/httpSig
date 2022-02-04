@@ -16,7 +16,7 @@ object Dependencies {
 	}
 	//https://http4s.org/v1.0/client/
 	object http4s {
-		val Ver = "1.0.0-M30"
+		val Ver = "1.0.0-M31"
 
 		lazy val core = http4s("http4s-core")
 		lazy val client = http4s("http4s-client")

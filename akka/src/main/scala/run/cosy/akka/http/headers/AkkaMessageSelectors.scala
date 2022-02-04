@@ -21,23 +21,23 @@ class AkkaMessageSelectors(
 	import Http.*
 	type A = AkkaTp.type
 
-	override lazy val authorization: HeaderSelector[Request[A]] =
+	override lazy val authorization: MessageSelector[Request[A]] =
 		new TypedAkkaSelector[Request[A], Authorization] {
 			def akkaCompanion = Authorization
 		}
-	override lazy val `cache-control`: HeaderSelector[Message[A]] =
+	override lazy val `cache-control`: MessageSelector[Message[A]] =
 		new TypedAkkaSelector[Message[A], `Cache-Control`] {
 			def akkaCompanion = `Cache-Control`
 		}
-	override lazy val date: HeaderSelector[Message[A]] =
+	override lazy val date: MessageSelector[Message[A]] =
 		new TypedAkkaSelector[Message[A], Date] {
 			def akkaCompanion = Date
 		}
-	override lazy val etag: HeaderSelector[Response[A]] =
+	override lazy val etag: MessageSelector[Response[A]] =
 		new TypedAkkaSelector[Response[A], ETag] {
 			def akkaCompanion = ETag
 		}
-	override lazy val host: HeaderSelector[Request[A]] =
+	override lazy val host: MessageSelector[Request[A]] =
 		new TypedAkkaSelector[Request[A], Host] {
 			def akkaCompanion = Host
 		}
@@ -46,7 +46,7 @@ class AkkaMessageSelectors(
 			override val lowercaseName: String = "signature"
 		}
 	override lazy
-	val `content-type`: HeaderSelector[Message[A]] =
+	val `content-type`: MessageSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "content-type"
 			override def signingString(msg: Message[A], params: Rfc8941.Params): Try[String] =
@@ -59,7 +59,7 @@ class AkkaMessageSelectors(
 					Failure(SelectorException(s"selector $lowercaseName does not take parameters. Received " + params))
 		}
 	override lazy
-	val `content-length`: HeaderSelector[Message[A]] =
+	val `content-length`: MessageSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "content-length"
 			override
@@ -72,16 +72,16 @@ class AkkaMessageSelectors(
 				else
 					Failure(SelectorException(s"selector $lowercaseName does not take parameters. Received " + params))
 		}
-	override	lazy val `client-cert`: HeaderSelector[Message[A]] =
+	override	lazy val `client-cert`: MessageSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "client-cert"
 		}
 
-	override lazy val digest: HeaderSelector[Message[A]] =
+	override lazy val digest: MessageSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "digest"
 		}
-	override lazy val forwarded: HeaderSelector[Message[A]] =
+	override lazy val forwarded: MessageSelector[Message[A]] =
 		new UntypedAkkaSelector[Message[A]] {
 			override val lowercaseName: String = "forwarded"
 		}

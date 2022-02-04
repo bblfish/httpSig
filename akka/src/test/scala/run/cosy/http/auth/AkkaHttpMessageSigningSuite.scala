@@ -13,6 +13,8 @@ import run.cosy.http.Http.{Message, Request, Response}
 import run.cosy.http.utils.StringUtils.*
 import run.cosy.akka.http.headers.`Signature-Input`
 import run.cosy.http.headers.Rfc8941.*
+import run.cosy.http.headers.MessageSelector
+
 
 
 given pem: bobcats.util.PEMUtils = bobcats.util.BouncyJavaPEMUtils
@@ -64,7 +66,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 		case `§2.2.x_Request_Absolute` =>
 			HttpRequest(HttpMethods.GET, Uri("https://www.example.com/path?param=value"))
 		case `§2.2.6_Request_rel` =>
-			HttpRequest(HttpMethods.POST, Uri("/a/b"),
+			HttpRequest(HttpMethods.POST, Uri("/a/b/"),
 				Seq(Host("www.example.com")))
 		case `§2.2.6_Request_Options` =>
 			HttpRequest(HttpMethods.OPTIONS, Uri("*"), headers = Seq(Host("server.example.com")))
@@ -212,20 +214,29 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 		entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
 	)
 
-	val `x-example`: HeaderSelector[Request[A]] = new UntypedAkkaSelector[Request[A]] {
+	val `x-example`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]] {
 		override val lowercaseName: String = "x-example"
 	}
-	val `x-empty-header`:  HeaderSelector[Request[A]] = new UntypedAkkaSelector[Request[A]] {
+	val `x-empty-header`:  MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]] {
 		override val lowercaseName: String = "x-empty-header"
 	}
-	val `x-ows-header`: HeaderSelector[Request[A]] =  new UntypedAkkaSelector[Request[A]]{
+	val `x-ows-header`: MessageSelector[Request[A]] =  new UntypedAkkaSelector[Request[A]]{
 		override val lowercaseName: String = "x-ows-header"
 	}
-	val `x-obs-fold-header`: HeaderSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]{
+	val `x-obs-fold-header`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]{
 		override val lowercaseName: String = "x-obs-fold-header"
 	}
 	val `x-dictionary`: DictSelector[Message[A]] = new AkkaDictSelector[Message[A]] {
 		override val lowercaseName: String = "x-dictionary"
+	}
+
+	test("§2.2.6. Request Target for CONNECT (does not work for Akka)".fail) {
+		//this does not work for AKKA because akka returns //www.example.com:80
+		val reqCONNECT = toRequest(`§2.2.6_CONNECT`)
+		assertEquals(
+			`@request-target`.signingString(reqCONNECT),
+			`request-target`("www.example.com:80")
+		)
 	}
 
 end AkkaHttpMessageSigningSuite

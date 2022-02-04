@@ -98,9 +98,7 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 		),
 		libraryDependencies ++= Seq(
 			munit.value % Test,
-			cats.munitEffect.value % Test,
-			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
-			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
+			cats.munitEffect.value % Test
 		)
 	)
 	.jsSettings(
@@ -109,9 +107,13 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 	)
 	.jvmSettings(
 		scalacOptions := scala3Options,
-		libraryDependencies ++= java.bouncy
+		libraryDependencies ++= java.bouncy,
+		libraryDependencies ++= Seq(
+			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
+			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
+		)
 	)
-	.dependsOn(ietfSigHttp, testUtils % Test)
+	.dependsOn(ietfSigHttp % "compile->compile;test->test", testUtils % Test)
 
 lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
 	.in(file("test"))

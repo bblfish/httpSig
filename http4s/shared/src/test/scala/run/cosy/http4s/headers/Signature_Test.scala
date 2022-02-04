@@ -37,7 +37,7 @@ class Signature_Test extends munit.FunSuite :
 		if ex.illegalSpace then assert(found.isEmpty)
 		else
 			val expected: Option[Signatures] = Signatures(sig1.ex(0).Signature)
-			assertEquals(found, expected.map(Signature.apply))
+			assertEquals(found, expected.map(s => new Signature(s)))
 	}
 
 	for (ex1,ex2) <- Seq(`§3.2`("sig1"), `§3.2`("sig1", 3, 1), `§3.2`("sig1", 4, 0, 7))
@@ -53,14 +53,13 @@ class Signature_Test extends munit.FunSuite :
 			val expected1: Option[Signatures] = Signatures(sigs.ex(0).Signature)
 			val expected2: Option[Signatures] = Signatures(sigs.ex(1).Signature)
 			val combinedExpected = expected1.get.append(expected2.get)
-			assertEquals(found, Some(Signature(combinedExpected)))
+			assertEquals(found, Some(new Signature(combinedExpected)))
 			Headers(Raw(ci"Signature-Input",SigInpEx.`§3.2`("sig1").SigInputParamsTxt),
 				Raw(ci"Signature",ex1.SigString + ", "+ ex2.SigString),
 				Raw(ci"Signature-Input",SigInpEx.`§4.1`("sig2").SigInputParamsTxt)
 			).get[Signature] match
-				case Some(sig) => assertEquals(sig,Signature(combinedExpected))
+				case Some(sig) => assertEquals(sig,new Signature(combinedExpected))
 				case None => fail("Signature header missing")
 	}
-
 
 end Signature_Test

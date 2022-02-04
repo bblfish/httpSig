@@ -1,27 +1,27 @@
 package run.cosy.http.headers
 
 import run.cosy.http.Http
+import run.cosy.http.headers.MessageSelector
 
 
 // implementations will need to specify default hosts and ports
 trait MessageSelectors[H <: Http] {
 	import Http.*
 	val securedConnection: Boolean
-	type HeaderSelector[H] = MessageSelector[H] //& run.cosy.http.headers.HeaderSelector[H]
 
-	lazy val authorization: HeaderSelector[Request[H]]
-	lazy val `cache-control`: HeaderSelector[Message[H]]
-	lazy val date: HeaderSelector[Message[H]]
+	lazy val authorization: MessageSelector[Request[H]]
+	lazy val `cache-control`: MessageSelector[Message[H]]
+	lazy val date: MessageSelector[Message[H]]
 
-	lazy val etag: HeaderSelector[Response[H]]
-	lazy val host: HeaderSelector[Request[H]]
+	lazy val etag: MessageSelector[Response[H]]
+	lazy val host: MessageSelector[Request[H]]
 	lazy val signature: DictSelector[Message[H]]
 
-	lazy val `content-type`: HeaderSelector[Message[H]]
-	lazy val `content-length`: HeaderSelector[Message[H]]
-	lazy val digest: HeaderSelector[Message[H]]
-	lazy val forwarded: HeaderSelector[Message[H]]
-	lazy val `client-cert`: HeaderSelector[Message[H]]
+	lazy val `content-type`: MessageSelector[Message[H]]
+	lazy val `content-length`: MessageSelector[Message[H]]
+	lazy val digest: MessageSelector[Message[H]]
+	lazy val forwarded: MessageSelector[Message[H]]
+	lazy val `client-cert`: MessageSelector[Message[H]]
 
 	lazy val `@request-target`: MessageSelector[Request[H]]
 	lazy val `@method`: MessageSelector[Request[H]]

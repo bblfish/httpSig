@@ -28,13 +28,12 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
-trait HttpMessageSigningSuite[H <: Http](using
-	ops: HttpOps[H],
-	sigSuite: SigningSuiteHelpers
-) extends CatsEffectSuite:
+trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
+
+	given ops: HttpOps[H]
+	given sigSuite: SigningSuiteHelpers
 
 	import Http.*
-	import ops.*
 
 	type HttpMessage = String
 	val selectorsSecure: MessageSelectors[H]
@@ -44,10 +43,10 @@ trait HttpMessageSigningSuite[H <: Http](using
 	import messageSignature.{*, given}
 	import selectorsSecure.*
 	// special headers used in the spec that we won't find elsewhere
-	val `x-example`: HeaderSelector[Request[H]]
-	val `x-empty-header`: HeaderSelector[Request[H]]
-	val `x-ows-header`: HeaderSelector[Request[H]]
-	val `x-obs-fold-header`: HeaderSelector[Request[H]]
+	val `x-example`: MessageSelector[Request[H]]
+	val `x-empty-header`: MessageSelector[Request[H]]
+	val `x-ows-header`: MessageSelector[Request[H]]
+	val `x-obs-fold-header`: MessageSelector[Request[H]]
 	val `x-dictionary`: DictSelector[Message[H]]
 
 	given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
@@ -79,14 +78,17 @@ trait HttpMessageSigningSuite[H <: Http](using
 	val `§2.1.2_HeaderField`: HttpMessage =
 	"""GET /xyz HTTP/1.1
 	  |Host: www.example.com
-	  |Date: Tue, 07 Jun 2014 20:51:35 GMT
-	  |X-OWS-Header:   Leading and trailing whitespace.
+	  |Date: Sat, 07 Jun 2014 20:51:35 GMT
+	  |X-OWS-Header:   Leading and trailing whitespace.   \
+	  |
 	  |X-Obs-Fold-Header: Obsolete
-	  |    line folding.
-	  |X-Empty-Header:
+	  |    line folding. \
+	  |
+	  |X-Empty-Header: \
+	  |
 	  |Cache-Control: max-age=60
 	  |Cache-Control:    must-revalidate
-	  |X-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".stripMargin
+	  |X-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
 
 	test("§2.1.2 HTTP Field Examples") {
 		import messageSignature.signingString
@@ -106,6 +108,9 @@ trait HttpMessageSigningSuite[H <: Http](using
 			expectedHeader("x-obs-fold-header", "Obsolete line folding."))
 		assertEquals(`x-ows-header`.signingString(rfcCanonReq),
 			expectedHeader("x-ows-header", "Leading and trailing whitespace."))
+		assertEquals(`x-dictionary`.signingString(rfcCanonReq),
+			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
+
 		val il = IList(
 			`cache-control`.sf, date.sf, host.sf, `x-empty-header`.sf, `x-obs-fold-header`.sf,
 			`x-ows-header`.sf, `x-dictionary`.sf)(Token("keyid") -> sf"some-key")
@@ -277,7 +282,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 		val req2 = toRequest(`§2.2.6_Request_rel`)
 		assertEquals(
 			`@request-target`.signingString(req2),
-			`request-target`("/a/b")
+			`request-target`("/a/b/")
 		)
 
 		val req3 = toRequest(`§2.2.3_Request_AbsoluteURI_2`)
@@ -309,14 +314,6 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |""".stripMargin
 
 
-	test("§2.2.6. Request Target for CONNECT (does not work for Akka)".fail) {
-		//this does not work for AKKA because akka returns //www.example.com:80
-		val reqCONNECT = toRequest(`§2.2.6_CONNECT`)
-		assertEquals(
-			`@request-target`.signingString(reqCONNECT),
-			`request-target`("www.example.com:80")
-		)
-	}
 
 
 	test("§2.2.7 Path") {
@@ -348,6 +345,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 			expectedHeader("@query", "?queryString")
 		)
 		//is this correct?
+		//todo: track https://github.com/httpwg/http-extensions/issues/1934#issuecomment-1030229574
 		assertEquals(
 			`@query`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
 			expectedHeader("@query", "")
@@ -599,6 +597,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 		  |X-Empty-Header:
 		  |Cache-Control: max-age=60
 		  |Cache-Control: must-revalidate
+		  |Forwarded: for=192.0.2.123
 		  |Signature-Input: sig1=("@method" "@path" "@authority" \
 		  |    "cache-control" "x-empty-header" "x-example")\
 		  |    ;created=1618884475;keyid="test-key-rsa-pss", \
@@ -631,7 +630,7 @@ trait HttpMessageSigningSuite[H <: Http](using
 	val B2_test_request: HttpMessage =
 		"""POST /foo?param=value&pet=dog HTTP/1.1
 		  |Host: example.com
-		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
+		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
 		  |Content-Type: application/json
 		  |Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 		  |Content-Length: 18
@@ -877,8 +876,6 @@ trait HttpMessageSigningSuite[H <: Http](using
 //		)
 
 	}
-
-
 
 end HttpMessageSigningSuite
 

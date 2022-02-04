@@ -2,14 +2,16 @@ package run.cosy.http4s.headers
 
 import cats.data.NonEmptyList
 import org.http4s.headers.Host
-import org.http4s.{Message, Request, Response}
+import org.http4s.{Message, Request, Response, Query}
 import run.cosy.http.headers.{BasicMessageSelector, DictSelector, HeaderSelector, MessageSelector, Rfc8941, SelectorOps}
 
 import scala.util.{Failure, Success, Try}
 import org.typelevel.ci.{CIString, *}
+import run.cosy.http.Http
 import run.cosy.http.auth.{AttributeMissingException, AuthExc, SelectorException, UnableToCreateSigHeaderException}
 import run.cosy.http.headers.Rfc8941.SfDict
 import run.cosy.http.headers.Rfc8941.Serialise.given
+import run.cosy.http4s.Http4sTp
 
 import java.util.Locale
 
@@ -31,18 +33,16 @@ trait Http4sHeaderSelector[HM <: Message[?]] extends HeaderSelector[HM]:
 	def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
 		for nonEmpty <- msg.headers.get(ciLowercaseName)
 					.toRight(UnableToCreateSigHeaderException(
-						s"No headers »$lowercaseHeaderName« in http message")
+						s"""No headers "$lowercaseHeaderName" in http message""")
 					).toTry
 		yield nonEmpty.map(_.value)
 end Http4sHeaderSelector
 
-trait Http4sDictSelector[HM <: Message[?]]
+trait Http4sDictSelector[HM <: Http.Message[Http4sTp.type]]
 	extends DictSelector[HM] with Http4sHeaderSelector[HM]:
-	override val lowercaseHeaderName: String = lowercaseName
+	override lazy val lowercaseHeaderName: String = lowercaseName
 
 end Http4sDictSelector
-
-
 
 // the simple header selectors
 
@@ -70,9 +70,9 @@ object `content-length` extends BasicHeaderSelector[Message[?]]:
 object digest extends BasicHeaderSelector[Message[?]]:
 	override val lowercaseName: String = "digest"
 
-object signature extends Http4sDictSelector[Message[?]] {
+object signature extends Http4sDictSelector[Http.Message[Http4sTp.type]]:
 	override val lowercaseName: String = "signature"
-}
+
 
 /**
  * `@request-target` refers to the full request target of the HTTP request message, as defined in "HTTP Semantics"
@@ -127,9 +127,14 @@ case class `@target-uri`(securedConnection: Boolean, defaultAuthority: Uri.Autho
 		val uri = msg.uri
 		if uri.scheme.isDefined && uri.authority.isDefined
 		then Success(uri.renderString)
-		else Success(uri.copy(
-			if uri.scheme.isDefined then defaultScheme else uri.scheme,
-			if uri.authority.isDefined then uri.authority else defaultAuthorityOpt
+		else
+			Success(uri.copy(
+			uri.scheme.orElse(defaultScheme),
+			uri.authority.orElse {
+				msg.headers.get[Host]
+					.map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
+					.orElse(defaultAuthorityOpt)
+			}
 		).renderString)
 
 end `@target-uri`
@@ -147,9 +152,13 @@ case class `@authority`(defaultHostHeader: Uri.Authority) extends BasicMessageSe
 	def specialForRequests: Boolean = true
 
 	override protected
-	def signingStringValue(msg: Request[?]): Try[String] = Success(
-		msg.uri.authority.getOrElse(defaultHostHeader).renderString
-	)
+	def signingStringValue(msg: Request[?]): Try[String] =
+		Success(msg.uri.authority.getOrElse(
+			msg.headers.get[Host]
+				.map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
+				.getOrElse(defaultHostHeader)
+		).renderString)
+
 end `@authority`
 
 	/**
@@ -206,9 +215,13 @@ object `@query` extends BasicMessageSelector[Request[?]]:
 
 	override protected
 	def signingStringValue(msg: Request[?]): Try[String] =
+		val q = msg.uri.query
 		Success {
-			val qs = msg.uri.query.renderString
-			if qs == "" then "" else "?"+qs //todo: check this is right
+			if q == Query.empty then ""
+			else if q == Query.blank then "?"
+			else
+				val qs = msg.uri.query.renderString
+				if qs == "" then "?" else "?"+qs //todo: check this is right
 		}
 end `@query`
 

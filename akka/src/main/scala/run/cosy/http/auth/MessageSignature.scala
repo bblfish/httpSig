@@ -27,17 +27,13 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-
 // selector needs to be filled in
-object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature[AkkaTp.type] {
-	type H = AkkaTp.type
-	import AkkaHttpMessageSignature.*
+object AkkaHttpMessageSignature extends run.cosy.http.auth.MessageSignature[AkkaTp.type]:
+   type H = AkkaTp.type
+   import AkkaHttpMessageSignature.*
 //	override type Message = HttpMessage
 
-	override protected
-	val Signature: SignatureMatcher[AkkaTp.type] = run.cosy.akka.http.headers.Signature
-	override protected
-	val `Signature-Input`: SignatureInputMatcher[AkkaTp.type] = run.cosy.akka.http.headers.`Signature-Input`
-
-
-}
+   override protected val Signature: SignatureMatcher[AkkaTp.type] =
+     run.cosy.akka.http.headers.Signature
+   override protected val `Signature-Input`: SignatureInputMatcher[AkkaTp.type] =
+     run.cosy.akka.http.headers.`Signature-Input`

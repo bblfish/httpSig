@@ -31,7 +31,7 @@ object Http4sTp extends Http:
    given httpOps: HttpOps[Http4sTp.type] with
       type H = Http4sTp.type
       extension (msg: Http.Message[H])
-         def headers: Seq[Http.Header[H]] = msg.headers.headers
+        def headers: Seq[Http.Header[H]] = msg.headers.headers
 
       extension [R <: Http.Message[H]](msg: R)
          def addHeaders(headers: Seq[Http.Header[H]]): R =

@@ -1,9 +1,20 @@
-import Dependencies.{cats, _}
+import org.openqa.selenium.WebDriver
+import org.openqa.selenium.chrome.{ChromeDriver, ChromeOptions}
+import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
+import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
+import org.scalajs.jsenv.selenium.SeleniumJSEnv
+import Dependencies._
 
-organization := "cosy.run"
-name := "httpSig"
-version := "0.2-SNAPSHOT"
-scalaVersion := Ver.scala
+import JSEnv._
+
+ThisBuild / organization := "cosy.run"
+ThisBuild / baseVersion  := "0.2-SNAPSHOT"
+ThisBuild / publishGithubUser := "bblfish"
+ThisBuild / publishFullName   := "Henry Story"
+ThisBuild / name := "httpSig"
+ThisBuild / scalaVersion := Ver.scala
+
+enablePlugins(SonatypeCiReleasePlugin)
 
 lazy val commonSettings = Seq(
 	name := "HttpSig Library",

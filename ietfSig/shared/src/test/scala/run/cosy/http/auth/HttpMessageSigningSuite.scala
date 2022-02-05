@@ -22,7 +22,6 @@ import cats.effect.Async
 import run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
-import bobcats.util.BouncyJavaPEMUtils
 import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
 import munit.CatsEffectSuite
 import run.cosy.http.auth.AgentIds.PureKeyId

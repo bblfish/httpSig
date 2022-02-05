@@ -7,14 +7,52 @@ import Dependencies._
 
 import JSEnv._
 
+name := "httpSig"
+
 ThisBuild / organization := "cosy.run"
 ThisBuild / baseVersion  := "0.2-SNAPSHOT"
 ThisBuild / publishGithubUser := "bblfish"
 ThisBuild / publishFullName   := "Henry Story"
-ThisBuild / name := "httpSig"
 ThisBuild / scalaVersion := Ver.scala
 
 enablePlugins(SonatypeCiReleasePlugin)
+ThisBuild / spiewakCiReleaseSnapshots := true
+ThisBuild / spiewakMainBranches := Seq("main")
+
+ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
+ThisBuild / scmInfo := Some(
+	ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git"))
+
+enablePlugins(SonatypeCiReleasePlugin)
+
+replaceCommandAlias("ci", CI.AllCIs.map(_.toString).mkString)
+addCommandAlias("ciJVM", CI.JVM.toString)
+//addCommandAlias("ciNodeJS", CI.NodeJS.toString)
+addCommandAlias("ciFirefox", CI.Firefox.toString)
+addCommandAlias("ciChrome", CI.Chrome.toString)
+
+//addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
+
+lazy val useJSEnv =
+	settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
+
+Global / useJSEnv := Chrome
+
+ThisBuild / Test / jsEnv := {
+	val old = (Test / jsEnv).value
+
+	useJSEnv.value match {
+	case NodeJS => old
+	case Firefox =>
+		val options = new FirefoxOptions()
+		options.setHeadless(true)
+		new SeleniumJSEnv(options)
+	case Chrome =>
+		val options = new ChromeOptions()
+		options.setHeadless(true)
+		new SeleniumJSEnv(options)
+	}
+}
 
 lazy val commonSettings = Seq(
 	name := "HttpSig Library",

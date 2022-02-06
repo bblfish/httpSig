@@ -636,7 +636,8 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		assertIO(
 			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
 			PureKeyId("test-key-rsa-pss")
-		) *> assertIO(
+		) *>
+		assertIO(
 			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
 			PureKeyId("test-key-rsa")
 		)

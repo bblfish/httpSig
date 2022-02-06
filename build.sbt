@@ -36,7 +36,7 @@ addCommandAlias("ciChrome", CI.Chrome.toString)
 lazy val useJSEnv =
 	settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
 
-Global / useJSEnv := Chrome
+Global / useJSEnv := NodeJS
 
 ThisBuild / Test / jsEnv := {
 	val old = (Test / jsEnv).value
@@ -62,36 +62,22 @@ lazy val commonSettings = Seq(
 	scalaVersion := Ver.scala,
 	updateOptions := updateOptions.value.withCachedResolution(true) //to speed up dependency resolution
 )
+
 lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
-	.crossType(CrossType.Full)
 	.in(file("rfc8941"))
 	.settings(commonSettings: _*)
-//	.enablePlugins(ScalaJSBundlerPlugin)
 	.settings(
 		name := "rfc8941",
 		description := "RFC8941 (Structured Field Values) parser",
-//		scalacOptions := scala3Options,
 		libraryDependencies += cats.parse.value,
-		libraryDependencies += munit.value % Test
-		//		// useYarn := true, // makes scalajs-bundler use yarn instead of npm
-		// Test / requireJsDomEnv := true,
-		// scalaJSUseMainModuleInitializer := true,
-		// scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)), // configure Scala.js to emit a JavaScript module instead of a top-level script
-		// ESModule cannot be used because we are using ScalaJSBundlerPlugin
-		// scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-
-		//		fastOptJS / webpackConfigFile := Some(baseDirectory.value / "webpack.config.dev.js"),
-
-		// https://github.com/rdfjs/N3.js/
-		// do I also need to run `npm install n3` ?
-		//		Compile / npmDependencies += NPM.n3,
-		//		Test / npmDependencies += NPM.n3,
+		libraryDependencies += tests.munit.value % Test
 	).jsSettings(
 		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
 		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	).jvmSettings(
 		scalacOptions := scala3Options
 	)
+
 // we only use Java akka here (doing akka-js would be a whole project by itself)
 lazy val akkaSig = project
 	.in(file("akka"))
@@ -101,14 +87,43 @@ lazy val akkaSig = project
 		description := "Signing HTTP Messages parser for Akka headers",
 		scalacOptions := scala3Options,
 		libraryDependencies ++= Seq(
-			akka.http.value, akka.stream.value, akka.typed.value,
-			java.nimbusDS
+			akka.http.value, akka.stream.value, akka.typed.value
+//			java.nimbusDS
 		),
 		libraryDependencies ++= Seq(
-			munit.value % Test,
-			cats.munitEffect.value % Test
+//			munit.value % Test
+//			cats.munitEffect.value % Test
 		) ++ java.bouncy
-	).dependsOn(ietfSigHttp.jvm % "compile->compile;test->test")
+	).dependsOn(ietfSigHttp.jvm, ietfSigHttpTests.jvm % Test)
+
+
+lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
+	.in(file("ietfSigTests"))
+	.settings(commonSettings: _*)
+	.settings(
+		name := "ietfSigTests",
+		description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
+		libraryDependencies ++= Seq(
+//			cats.bobcats.value,
+//			tests.munit.value,
+			tests.munitEffect.value,
+			cats.bobcats.value classifier( "tests" ), // bobcats test examples,
+			cats.bobcats.value classifier( "tests-sources" ) // bobcats test examples
+//			tests.scalaCheck.value,
+//			tests.laws.value
+		)
+	)
+	.jsSettings(
+		scalacOptions ++= scala3jsOptions //++= is really important. Do NOT use `:=` - that will block testing
+		//		libraryDependencies += meta.scalaCheck.value % Test,
+		//		libraryDependencies += cats.munitEffect.value % Test
+//		Compile / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
+	)
+	.jvmSettings(
+		scalacOptions := scala3Options,
+		libraryDependencies ++= java.bouncy
+	)
+	.dependsOn(ietfSigHttp)
 
 lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 	.in(file("ietfSig"))
@@ -116,17 +131,11 @@ lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 	.settings(
 		name := "ietfSig",
 		description := "generic implementation of IETF `Signing Http Messages`",
-		libraryDependencies ++= Seq(
-			cats.bobcats.value,
-			munit.value % Test,
-			cats.munitEffect.value % Test,
-			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
-			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
-		)
+		libraryDependencies += cats.bobcats.value
 	)
 	.jsSettings(
-		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
-		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
+		scalacOptions ++= scala3jsOptions //++= is really important. Do NOT use `:=` - that will block testing
+//		Compile / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	)
 	.jvmSettings(
 		scalacOptions := scala3Options,
@@ -146,23 +155,30 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 			http4s.theDsl.value
 		),
 		libraryDependencies ++= Seq(
-			munit.value % Test,
-			cats.munitEffect.value % Test
+//			munit.value % Test,
+//			meta.scalaCheck.value,
+//			cats.munitEffect.value % Test
 		)
 	)
 	.jsSettings(
 		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
-		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
+		libraryDependencies ++= Seq(
+			cats.bobcats.value % Test,
+			tests.scalaCheck.value % Test,
+			tests.discipline.value % Test,
+			tests.laws.value % Test
+		)
+//		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	)
 	.jvmSettings(
 		scalacOptions := scala3Options,
 		libraryDependencies ++= java.bouncy,
 		libraryDependencies ++= Seq(
-			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
-			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
+//			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
+//			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
 		)
 	)
-	.dependsOn(ietfSigHttp % "compile->compile;test->test", testUtils % Test)
+	.dependsOn(ietfSigHttp, ietfSigHttpTests % Test, testUtils % Test)
 
 lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
 	.in(file("test"))

@@ -42,15 +42,16 @@ sealed abstract class CI(
 object CI {
 	case object JVM
 		extends CI(
-			rootProject = "http4sSigJVM",
+			rootProject = "http4sSigJS",
 			jsEnv = None,
 			testCommands = List("test"),
 			mimaReport = false, // TODO
 			suffixCommands = List())
 
+// current version of bobcats does not support nodeJS crypto
 //	case object NodeJS
 //		extends CI(
-//			rootProject = "rootJS",
+//			rootProject = "http4sSigJS",
 //			jsEnv = Some(JSEnv.NodeJS),
 //			testCommands = List("test"),
 //			mimaReport = false,

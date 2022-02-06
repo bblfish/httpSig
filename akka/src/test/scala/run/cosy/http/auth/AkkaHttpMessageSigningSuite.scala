@@ -31,13 +31,11 @@ import run.cosy.akka.http.headers.`Signature-Input`
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.MessageSelector
 
-
-
-given pem: bobcats.util.PEMUtils = bobcats.util.BouncyJavaPEMUtils
-given helper: SigningSuiteHelpers = new SigningSuiteHelpers
-
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 	type A = AkkaTp.type
+	given pem: bobcats.util.PEMUtils = bobcats.util.BouncyJavaPEMUtils
+	given ops: run.cosy.http.HttpOps[A] = run.cosy.akka.http.AkkaTp.httpOps
+	given sigSuite: run.cosy.http.auth.SigningSuiteHelpers = new SigningSuiteHelpers
 	val selectorsSecure= AkkaMessageSelectors(true,Uri.Host("bblfish.net"),443)
 	val selectorsInSecure= AkkaMessageSelectors(false,Uri.Host("bblfish.net"),80)
 	val messageSignature: run.cosy.http.auth.MessageSignature[A] = AkkaHttpMessageSignature

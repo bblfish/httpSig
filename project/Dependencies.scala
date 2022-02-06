@@ -2,14 +2,23 @@ import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt.{Def, _}
 
 object Dependencies {
-	val scalajsDom = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
-	val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
-	// https://github.com/scalameta/munit
-	val munit = Def.setting("org.scalameta" %%% "munit" % "1.0.0-M1")
-	val utest = Def.setting("com.lihaoyi" %%% "utest" % "0.7.10")
-	val modelJS = Def.setting("net.bblfish.rdf" %%% "rdf-model-js" % "0.1a-SNAPSHOT")
+	lazy val scalajsDom = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
+	lazy val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
+
+	object tests {
+		//	val utest = Def.setting("com.lihaoyi" %%% "utest" % "0.7.10")
+		// https://github.com/scalameta/munit
+		lazy val munit = Def.setting("org.scalameta" %%% "munit" % "0.7.29")
+		// https://github.com/typelevel/munit-cats-effect
+		lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
+
+		lazy val discipline = Def.setting("org.typelevel" %%% "discipline-munit" % "1.0.9")
+		lazy val laws = Def.setting("org.typelevel" %%% "cats-laws" % "2.7.0")
+		lazy val scalaCheck = Def.setting("org.scalameta" %%% "munit-scalacheck" % "0.7.29")
+	}
+	lazy val modelJS = Def.setting("net.bblfish.rdf" %%% "rdf-model-js" % "0.1a-SNAPSHOT")
 	//needed for modelJS
-	val sonatypeSNAPSHOT: MavenRepository = "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+	lazy val sonatypeSNAPSHOT: MavenRepository = "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 	object Ver {
 		val scala = "3.1.0"
 
@@ -29,12 +38,12 @@ object Dependencies {
 		def apply(packg: String): Def.Initialize[sbt.ModuleID] =
 			Def.setting("org.http4s" %%% packg % Ver)
 	}
+
 	object cats {
-		// https://github.com/typelevel/munit-cats-effect
-		lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
 		// https://search.maven.org/artifact/org.typelevel/cats-parse_3/0.3.6/jar
+		// https://search.maven.org/artifact/org.typelevel/cats-parse_3
 		lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.6")
-		val bobcats = Def.setting("com.armanbilge" %%% "bobcats" % "0.1-4ffd678-SNAPSHOT")
+		lazy val bobcats = Def.setting("com.armanbilge" %%% "bobcats" % "0.1-4ffd678-SNAPSHOT")
 	}
 	object akka {
 		lazy val typed = akka("akka-actor-typed", CoreVersion)
@@ -42,7 +51,7 @@ object Dependencies {
 		lazy val http = akka("akka-http", HttpVersion)
 		val CoreVersion = "2.6.17"
 		val HttpVersion = "10.2.7"
-		def apply(id: String, version: String) =
+		def apply(id: String, version: String): Def.Initialize[ModuleID] =
 			Def.setting("com.typesafe.akka" %% id % version cross CrossVersion.for3Use2_13)
 	}
 	object java {
@@ -51,7 +60,7 @@ object Dependencies {
 		 *
 		 * @see https://connect2id.com/products/nimbus-jose-jwt/examples/jwk-conversion
 		 */
-		val nimbusDS = "com.nimbusds" % "nimbus-jose-jwt" % "9.15.2"
+		lazy val nimbusDS = "com.nimbusds" % "nimbus-jose-jwt" % "9.15.2"
 		/**
 		 * BouncyCastle (for parsing PEM encoded objects at present in test)
 		 * MIT style License
@@ -59,7 +68,7 @@ object Dependencies {
 		 * @see https://www.bouncycastle.org/latest_releases.html
 		 * @see https://repo1.maven.org/maven2/org/bouncycastle/bcprov-jdk15to18/
 		 */
-		val bouncy = Seq(
+		lazy val bouncy = Seq(
 			//"org.bouncycastle" % "bcprov-jdk15to18" % bouncyVersion,
 			//"org.bouncycastle" % "bctls-jdk15to18" % bouncyVersion,
 			"org.bouncycastle" % "bcpkix-jdk15to18" % "1.69" % Test

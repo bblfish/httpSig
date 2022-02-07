@@ -90,10 +90,7 @@ lazy val akkaSig = project
 			akka.http.value, akka.stream.value, akka.typed.value
 //			java.nimbusDS
 		),
-		libraryDependencies ++= Seq(
-//			munit.value % Test
-//			cats.munitEffect.value % Test
-		) ++ java.bouncy
+		libraryDependencies ++= java.bouncy
 	).dependsOn(ietfSigHttp.jvm, ietfSigHttpTests.jvm % Test)
 
 
@@ -104,20 +101,13 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
 		name := "ietfSigTests",
 		description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
 		libraryDependencies ++= Seq(
-//			cats.bobcats.value,
-//			tests.munit.value,
 			tests.munitEffect.value,
 			cats.bobcats.value classifier( "tests" ), // bobcats test examples,
 			cats.bobcats.value classifier( "tests-sources" ) // bobcats test examples
-//			tests.scalaCheck.value,
-//			tests.laws.value
 		)
 	)
 	.jsSettings(
 		scalacOptions ++= scala3jsOptions //++= is really important. Do NOT use `:=` - that will block testing
-		//		libraryDependencies += meta.scalaCheck.value % Test,
-		//		libraryDependencies += cats.munitEffect.value % Test
-//		Compile / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	)
 	.jvmSettings(
 		scalacOptions := scala3Options,
@@ -135,7 +125,6 @@ lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
 	)
 	.jsSettings(
 		scalacOptions ++= scala3jsOptions //++= is really important. Do NOT use `:=` - that will block testing
-//		Compile / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
 	)
 	.jvmSettings(
 		scalacOptions := scala3Options,
@@ -153,13 +142,7 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 		libraryDependencies ++= Seq(
 			http4s.client.value,
 			http4s.theDsl.value
-		),
-		libraryDependencies ++= Seq(
-//			munit.value % Test,
-//			meta.scalaCheck.value,
-//			cats.munitEffect.value % Test
-		)
-	)
+	))
 	.jsSettings(
 		scalacOptions ++= scala3jsOptions, //++= is really important. Do NOT use `:=` - that will block testing
 		libraryDependencies ++= Seq(
@@ -167,16 +150,10 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
 			tests.scalaCheck.value % Test,
 			tests.discipline.value % Test,
 			tests.laws.value % Test
-		)
-//		Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) } //required for munit to run
-	)
+	))
 	.jvmSettings(
 		scalacOptions := scala3Options,
 		libraryDependencies ++= java.bouncy,
-		libraryDependencies ++= Seq(
-//			cats.bobcats.value % Test classifier( "tests" ), // bobcats test examples,
-//			cats.bobcats.value % Test classifier( "tests-sources" ) // bobcats test examples
-		)
 	)
 	.dependsOn(ietfSigHttp, ietfSigHttpTests % Test, testUtils % Test)
 

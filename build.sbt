@@ -9,29 +9,30 @@ import JSEnv._
 
 name := "httpSig"
 
-ThisBuild / organization := "cosy.run"
-ThisBuild / baseVersion  := "0.2-SNAPSHOT"
-ThisBuild / publishGithubUser := "bblfish"
-ThisBuild / publishFullName   := "Henry Story"
-ThisBuild / scalaVersion := Ver.scala
+ThisBuild / tlBaseVersion  := "0.2"
+ThisBuild / tlUntaggedAreSnapshots := true
 
-enablePlugins(SonatypeCiReleasePlugin)
-ThisBuild / spiewakCiReleaseSnapshots := true
-ThisBuild / spiewakMainBranches := Seq("main")
+ThisBuild / organization := "net.bblfish"
+ThisBuild / organizationName := "Henry Story"
+ThisBuild / startYear := Some(2021)
+ThisBuild / developers := List(
+	tlGitHubDev("bblfish", "Henry Story")
+)
+enablePlugins(TypelevelCiReleasePlugin)
+ThisBuild / tlCiReleaseBranches := Seq("main")
+ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
+
+ThisBuild / crossScalaVersions := Seq("3.1.0")
 
 ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
 ThisBuild / scmInfo := Some(
 	ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git"))
 
-enablePlugins(SonatypeCiReleasePlugin)
-
-replaceCommandAlias("ci", CI.AllCIs.map(_.toString).mkString)
-addCommandAlias("ciJVM", CI.JVM.toString)
-//addCommandAlias("ciNodeJS", CI.NodeJS.toString)
+tlReplaceCommandAlias("ciJS", CI.AllCIs.map(_.toString).mkString)
 addCommandAlias("ciFirefox", CI.Firefox.toString)
 addCommandAlias("ciChrome", CI.Chrome.toString)
 
-//addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
+addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
 
 lazy val useJSEnv =
 	settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
@@ -56,10 +57,8 @@ ThisBuild / Test / jsEnv := {
 
 lazy val commonSettings = Seq(
 	name := "HttpSig Library",
-	version := "0.2-SNAPSHOT",
 	description := "Solid App",
 	startYear := Some(2021),
-	scalaVersion := Ver.scala,
 	updateOptions := updateOptions.value.withCachedResolution(true) //to speed up dependency resolution
 )
 

@@ -32,6 +32,5 @@ package bobcats
  * limitations under the License.
  */
 
-object BuildInfo {
-	def runtime(): String = "Browser"
-}
+object BuildInfo:
+   def runtime(): String = "Browser"

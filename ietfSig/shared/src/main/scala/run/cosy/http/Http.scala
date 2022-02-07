@@ -30,7 +30,7 @@ trait HttpOps[H <: Http]:
 
    /** extensions needed to abstract across HTTP implementations for our purposes */
    extension (msg: Message[H])
-      def headers: Seq[Header[H]]
+     def headers: Seq[Header[H]]
 
    extension [R <: Message[H]](msg: R)
       def addHeaders(headers: Seq[Header[H]]): R

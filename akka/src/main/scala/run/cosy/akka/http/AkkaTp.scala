@@ -30,7 +30,7 @@ object AkkaTp extends Http:
       type A = AkkaTp.type
 
       extension (msg: Http.Message[A])
-         def headers: Seq[Http.Header[A]] = msg.headers
+        def headers: Seq[Http.Header[A]] = msg.headers
 
       extension [R <: Http.Message[A]](msg: R)
          def addHeaders(headers: Seq[Http.Header[A]]): R =

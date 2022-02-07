@@ -45,53 +45,61 @@ import scala.util.{Failure, Success, Try}
 
 trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 
-	given ops: HttpOps[H]
-	given sigSuite: SigningSuiteHelpers
+   given ops: HttpOps[H]
+   given sigSuite: SigningSuiteHelpers
 
-	import Http.*
+   import Http.*
 
-	type HttpMessage = String
-	val selectorsSecure: MessageSelectors[H]
-	val selectorsInSecure: MessageSelectors[H]
-	val messageSignature: run.cosy.http.auth.MessageSignature[H]
+   type HttpMessage = String
+   val selectorsSecure: MessageSelectors[H]
+   val selectorsInSecure: MessageSelectors[H]
+   val messageSignature: run.cosy.http.auth.MessageSignature[H]
 
-	import messageSignature.{*, given}
-	import selectorsSecure.*
-	// special headers used in the spec that we won't find elsewhere
-	val `x-example`: MessageSelector[Request[H]]
-	val `x-empty-header`: MessageSelector[Request[H]]
-	val `x-ows-header`: MessageSelector[Request[H]]
-	val `x-obs-fold-header`: MessageSelector[Request[H]]
-	val `x-dictionary`: DictSelector[Message[H]]
+   import messageSignature.{*, given}
+   import selectorsSecure.*
+   // special headers used in the spec that we won't find elsewhere
+   val `x-example`: MessageSelector[Request[H]]
+   val `x-empty-header`: MessageSelector[Request[H]]
+   val `x-ows-header`: MessageSelector[Request[H]]
+   val `x-obs-fold-header`: MessageSelector[Request[H]]
+   val `x-dictionary`: DictSelector[Message[H]]
 
-	given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
-	given clock: Clock = Clock.fixed(java.time.Instant.ofEpochSecond(16188845000), java.time.ZoneOffset.UTC).nn
+   given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
+   given clock: Clock =
+     Clock.fixed(java.time.Instant.ofEpochSecond(16188845000L), java.time.ZoneOffset.UTC).nn
 
-	def expectedKeyedHeader(name: String, key: String, value: String) = Success("\"" + name + "\";key=\"" + key + "\": " + value)
-	def expectedNameHeader(name: String, nameVal: String, value: String) = Success("\"" + name + "\";name=\"" + nameVal + "\": " + value)
-	def `request-target`(value: String): Success[String] = expectedHeader("@request-target", value)
-	def expectedHeader(name: String, value: String) = Success("\"" + name + "\": " + value)
+   def expectedKeyedHeader(name: String, key: String, value: String) =
+     Success("\"" + name + "\";key=\"" + key + "\": " + value)
+   def expectedNameHeader(name: String, nameVal: String, value: String) =
+     Success("\"" + name + "\";name=\"" + nameVal + "\": " + value)
+   def `request-target`(value: String): Success[String] = expectedHeader("@request-target", value)
+   def expectedHeader(name: String, value: String)      = Success("\"" + name + "\": " + value)
 
-	given specialRequestSelectorOps: run.cosy.http.headers.SelectorOps[Request[H]] =
-		selectorsSecure.requestSelectorOps.append(
-			`x-example`, `x-empty-header`, `x-ows-header`, `x-obs-fold-header`, `x-dictionary`,
-		)
-	given specialResponseSelectorOps: run.cosy.http.headers.SelectorOps[Response[H]] =
-		selectorsSecure.responseSelectorOps.append(`x-dictionary`)
+   given specialRequestSelectorOps: run.cosy.http.headers.SelectorOps[Request[H]] =
+     selectorsSecure.requestSelectorOps.append(
+       `x-example`,
+       `x-empty-header`,
+       `x-ows-header`,
+       `x-obs-fold-header`,
+       `x-dictionary`
+     )
+   given specialResponseSelectorOps: run.cosy.http.headers.SelectorOps[Response[H]] =
+     selectorsSecure.responseSelectorOps.append(`x-dictionary`)
 
-	@throws[Exception]
-	def toRequest(request: HttpMessage): Request[H]
-	@throws[Exception]
-	def toResponse(response: HttpMessage): Response[H]
+   @throws[Exception]
+   def toRequest(request: HttpMessage): Request[H]
+   @throws[Exception]
+   def toResponse(response: HttpMessage): Response[H]
 
-	//helper method
-	extension (bytes: Try[ByteVector])
-		def toAscii: Try[String] = bytes.flatMap(_.decodeAscii.toTry)
+   // helper method
+   extension (bytes: Try[ByteVector])
+     def toAscii: Try[String] = bytes.flatMap(_.decodeAscii.toTry)
 
-	/** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html */
-	// the example in the spec does not have the `GET`. Added here for coherence
-	val `§2.1.2_HeaderField`: HttpMessage =
-	"""GET /xyz HTTP/1.1
+   /** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html
+     */
+   // the example in the spec does not have the `GET`. Added here for coherence
+   val `§2.1.2_HeaderField`: HttpMessage =
+     """GET /xyz HTTP/1.1
 	  |Host: www.example.com
 	  |Date: Sat, 07 Jun 2014 20:51:35 GMT
 	  |X-OWS-Header:   Leading and trailing whitespace.   \
@@ -105,33 +113,48 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 	  |Cache-Control:    must-revalidate
 	  |X-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
 
-	test("§2.1.2 HTTP Field Examples") {
-		import messageSignature.signingString
-		val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
-		assertEquals(
-			`cache-control`.signingString(rfcCanonReq),
-			expectedHeader("cache-control", "max-age=60, must-revalidate"))
-		//note: It is Saturday, not Tuesday: either that is an error in the spec, or example of header with wrong date
-		//   we fixed it here, because it is difficult to get broken dates past akka
-		assertEquals(`date`.signingString(rfcCanonReq),
-			expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT"))
-		assertEquals(`host`.signingString(rfcCanonReq),
-			expectedHeader("host", "www.example.com"))
-		assertEquals(`x-empty-header`.signingString(rfcCanonReq),
-			expectedHeader("x-empty-header", ""))
-		assertEquals(`x-obs-fold-header`.signingString(rfcCanonReq),
-			expectedHeader("x-obs-fold-header", "Obsolete line folding."))
-		assertEquals(`x-ows-header`.signingString(rfcCanonReq),
-			expectedHeader("x-ows-header", "Leading and trailing whitespace."))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq),
-			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
+   test("§2.1.2 HTTP Field Examples") {
+     import messageSignature.signingString
+     val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
+     assertEquals(
+       `cache-control`.signingString(rfcCanonReq),
+       expectedHeader("cache-control", "max-age=60, must-revalidate")
+     )
+     // note: It is Saturday, not Tuesday: either that is an error in the spec, or example of header with wrong date
+     //   we fixed it here, because it is difficult to get broken dates past akka
+     assertEquals(
+       `date`.signingString(rfcCanonReq),
+       expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT")
+     )
+     assertEquals(`host`.signingString(rfcCanonReq), expectedHeader("host", "www.example.com"))
+     assertEquals(`x-empty-header`.signingString(rfcCanonReq), expectedHeader("x-empty-header", ""))
+     assertEquals(
+       `x-obs-fold-header`.signingString(rfcCanonReq),
+       expectedHeader("x-obs-fold-header", "Obsolete line folding.")
+     )
+     assertEquals(
+       `x-ows-header`.signingString(rfcCanonReq),
+       expectedHeader("x-ows-header", "Leading and trailing whitespace.")
+     )
+     assertEquals(
+       `x-dictionary`.signingString(rfcCanonReq),
+       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+     )
 
-		val il = IList(
-			`cache-control`.sf, date.sf, host.sf, `x-empty-header`.sf, `x-obs-fold-header`.sf,
-			`x-ows-header`.sf, `x-dictionary`.sf)(Token("keyid") -> sf"some-key")
-		val Some(signatureInput) = SigInput(il): @unchecked
-		assertEquals(rfcCanonReq.signingString(signatureInput).toAscii, Success(
-			""""cache-control": max-age=60, must-revalidate
+     val il = IList(
+       `cache-control`.sf,
+       date.sf,
+       host.sf,
+       `x-empty-header`.sf,
+       `x-obs-fold-header`.sf,
+       `x-ows-header`.sf,
+       `x-dictionary`.sf
+     )(Token("keyid") -> sf"some-key")
+     val Some(signatureInput) = SigInput(il): @unchecked
+     assertEquals(
+       rfcCanonReq.signingString(signatureInput).toAscii,
+       Success(
+         """"cache-control": max-age=60, must-revalidate
 			  |"date": Sat, 07 Jun 2014 20:51:35 GMT
 			  |"host": www.example.com
 			  |"x-empty-header": \
@@ -141,271 +164,301 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |"x-dictionary": a=1, b=2;x=1;y=2, c=(a b c)
 			  |"@signature-params": ("cache-control" "date" "host" "x-empty-header" \
 			  |"x-obs-fold-header" "x-ows-header" "x-dictionary");keyid="some-key"""".rfc8792single
-		))
-		//should fail because there is a header we don't know how to interpret
-		val il2 = IList(
-			`cache-control`.sf, date.sf, host.sf, `x-empty-header`.sf, sf"x-not-implemented",
-			`x-obs-fold-header`.sf, `x-ows-header`.sf, `x-dictionary`.sf)(Token("keyid") -> sf"some-key")
-		val Some(signatureInputFail) = SigInput(il2): @unchecked
-		rfcCanonReq.signingString(signatureInputFail) match
-		case Failure(InvalidSigException(msg)) if msg.contains("x-not-implemented") => assert(true)
-		case x => fail("this should have failed because header x-not-implemented is not supported")
+       )
+     )
+     // should fail because there is a header we don't know how to interpret
+     val il2 = IList(
+       `cache-control`.sf,
+       date.sf,
+       host.sf,
+       `x-empty-header`.sf,
+       sf"x-not-implemented",
+       `x-obs-fold-header`.sf,
+       `x-ows-header`.sf,
+       `x-dictionary`.sf
+     )(Token("keyid") -> sf"some-key")
+     val Some(signatureInputFail) = SigInput(il2): @unchecked
+     rfcCanonReq.signingString(signatureInputFail) match
+        case Failure(InvalidSigException(msg)) if msg.contains("x-not-implemented") => assert(true)
+        case x => fail("this should have failed because header x-not-implemented is not supported")
 
-		//fail because one of the headers is missing
-		rfcCanonReq.removeHeader("X-Empty-Header").signingString(signatureInput) match
-		case Failure(UnableToCreateSigHeaderException(msg)) if msg.contains("x-empty-header") => assert(true)
-		case x => fail("not failing in the right way? received:" + x.toString)
+        // fail because one of the headers is missing
+     rfcCanonReq.removeHeader("X-Empty-Header").signingString(signatureInput) match
+        case Failure(UnableToCreateSigHeaderException(msg)) if msg.contains("x-empty-header") =>
+          assert(true)
+        case x => fail("not failing in the right way? received:" + x.toString)
 
-		//fail because keyid is not specified (note: this is no longer required in the spec,..., check)
-		val ilNoKeyId = IList(date.sf, host.sf)()
-		val Some(signatureInputNoKeyId) = SigInput(ilNoKeyId): @unchecked
-		assert(rfcCanonReq.signingString(signatureInputNoKeyId).isSuccess)
-	}
+        // fail because keyid is not specified (note: this is no longer required in the spec,..., check)
+     val ilNoKeyId                   = IList(date.sf, host.sf)()
+     val Some(signatureInputNoKeyId) = SigInput(ilNoKeyId): @unchecked
+     assert(rfcCanonReq.signingString(signatureInputNoKeyId).isSuccess)
+   }
 
-	test("§2.1.3 Dictionary Structured Field Members") {
-		val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
-		assertEquals(`x-dictionary`.signingStringFor(rfcCanonReq),
-			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq),
-			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Rfc8941.Params()),
-			expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)"))
-		assertEquals(`x-dictionary`.signingStringFor(rfcCanonReq, SfString("a")),
-			expectedKeyedHeader("x-dictionary", "a", "1"))
-		assertEquals(`x-dictionary`.signingString(rfcCanonReq, Rfc8941.Params(`x-dictionary`.keyParam -> SfString("a"))),
-			expectedKeyedHeader("x-dictionary", "a", "1"))
-		assertEquals(`x-dictionary`.signingStringFor(rfcCanonReq, SfString("b")),
-			expectedKeyedHeader("x-dictionary", "b", "2;x=1;y=2"))
-		assertEquals(`x-dictionary`.signingStringFor(rfcCanonReq, SfString("c")),
-			expectedKeyedHeader("x-dictionary", "c", "(a b c)"))
-	}
+   test("§2.1.3 Dictionary Structured Field Members") {
+     val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
+     assertEquals(
+       `x-dictionary`.signingStringFor(rfcCanonReq),
+       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+     )
+     assertEquals(
+       `x-dictionary`.signingString(rfcCanonReq),
+       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+     )
+     assertEquals(
+       `x-dictionary`.signingString(rfcCanonReq, Rfc8941.Params()),
+       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+     )
+     assertEquals(
+       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("a")),
+       expectedKeyedHeader("x-dictionary", "a", "1")
+     )
+     assertEquals(
+       `x-dictionary`.signingString(
+         rfcCanonReq,
+         Rfc8941.Params(`x-dictionary`.keyParam -> SfString("a"))
+       ),
+       expectedKeyedHeader("x-dictionary", "a", "1")
+     )
+     assertEquals(
+       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("b")),
+       expectedKeyedHeader("x-dictionary", "b", "2;x=1;y=2")
+     )
+     assertEquals(
+       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("c")),
+       expectedKeyedHeader("x-dictionary", "c", "(a b c)")
+     )
+   }
 
-	test("§2.2.1 Signature Parameters") {
-		val si: Option[SigInput] = SigInput(IList(`@target-uri`.sf, `@authority`.sf, date.sf, `cache-control`.sf,
-			`x-empty-header`.sf, `x-example`.sf)(
-			Token("keyid") -> SfString("test-key-rsa-pss"),
-			Token("alg") -> SfString("rsa-pss-sha512"),
-			Token("created") -> SfInt(1618884475),
-			Token("expires") -> SfInt(1618884775)
-		))
-		si match
-		case Some(si) =>
-			val sig = `@signature-params`.signingString(si)
-			assertEquals(sig,
-				""""@signature-params": ("@target-uri" "@authority" "date" "cache-control" "x-empty-header" \
+   test("§2.2.1 Signature Parameters") {
+     val si: Option[SigInput] = SigInput(IList(
+       `@target-uri`.sf,
+       `@authority`.sf,
+       date.sf,
+       `cache-control`.sf,
+       `x-empty-header`.sf,
+       `x-example`.sf
+     )(
+       Token("keyid")   -> SfString("test-key-rsa-pss"),
+       Token("alg")     -> SfString("rsa-pss-sha512"),
+       Token("created") -> SfInt(1618884475),
+       Token("expires") -> SfInt(1618884775)
+     ))
+     si match
+        case Some(si) =>
+          val sig = `@signature-params`.signingString(si)
+          assertEquals(
+            sig,
+            """"@signature-params": ("@target-uri" "@authority" "date" "cache-control" "x-empty-header" \
 				  |  "x-example");keyid="test-key-rsa-pss";alg="rsa-pss-sha512";\
-				  |  created=1618884475;expires=1618884775""".rfc8792single)
-		case None => fail("SigInput is not available")
-	}
+				  |  created=1618884475;expires=1618884775""".rfc8792single
+          )
+        case None => fail("SigInput is not available")
+   }
 
-	val `§2.2.x_Request`: HttpMessage =
-		"""POST /path?param=value HTTP/1.1
-		  |Host: www.example.com""".stripMargin
+   val `§2.2.x_Request`: HttpMessage =
+     """POST /path?param=value HTTP/1.1
+       |Host: www.example.com""".stripMargin
 
-	test("§2.2.2 Method") {
-		val `req_2.2.2`: Request[H] = toRequest(`§2.1.2_HeaderField`)
-		assertEquals(
-			`@method`.signingString(`req_2.2.2`),
-			expectedHeader("@method", "GET")
-		)
-		val `req_2.2.x` = toRequest(`§2.2.x_Request`)
-		assertEquals(
-			`@method`.signingString(`req_2.2.x`),
-			expectedHeader("@method", "POST")
-		)
-	}
+   test("§2.2.2 Method") {
+     val `req_2.2.2`: Request[H] = toRequest(`§2.1.2_HeaderField`)
+     assertEquals(
+       `@method`.signingString(`req_2.2.2`),
+       expectedHeader("@method", "GET")
+     )
+     val `req_2.2.x` = toRequest(`§2.2.x_Request`)
+     assertEquals(
+       `@method`.signingString(`req_2.2.x`),
+       expectedHeader("@method", "POST")
+     )
+   }
 
-	val `§2.2.3_Request_AbsoluteURI`: HttpMessage =
-		"""GET http://www.example.com HTTP/1.1""".stripMargin
-	val `§2.2.3_Request_AbsoluteURI_2`: HttpMessage =
-		"""GET http://www.example.com/a HTTP/1.1""".stripMargin
+   val `§2.2.3_Request_AbsoluteURI`: HttpMessage =
+     """GET http://www.example.com HTTP/1.1""".stripMargin
+   val `§2.2.3_Request_AbsoluteURI_2`: HttpMessage =
+     """GET http://www.example.com/a HTTP/1.1""".stripMargin
 
+   test("§2.2.3 Target URI") {
+     assertEquals(
+       `@target-uri`.signingString(toRequest(`§2.2.x_Request`)),
+       expectedHeader("@target-uri", "https://www.example.com/path?param=value")
+     )
 
-	test("§2.2.3 Target URI") {
-		assertEquals(
-			`@target-uri`.signingString(toRequest(`§2.2.x_Request`)),
-			expectedHeader("@target-uri", "https://www.example.com/path?param=value")
-		)
+     assertEquals(
+       `@target-uri`.signingString(toRequest(`§2.2.x_Request`).removeHeader("Host")),
+       expectedHeader("@target-uri", "https://bblfish.net/path?param=value")
+     )
 
-		assertEquals(
-			`@target-uri`.signingString(toRequest(`§2.2.x_Request`).removeHeader("Host")),
-			expectedHeader("@target-uri", "https://bblfish.net/path?param=value")
-		)
+     assertEquals(
+       `@target-uri`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI`)),
+       // todo: should this really end in a slash??
+       expectedHeader(`@target-uri`.lowercaseName, "http://www.example.com")
+     )
 
-		assertEquals(
-			`@target-uri`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI`)),
-			//todo: should this really end in a slash??
-			expectedHeader(`@target-uri`.lowercaseName, "http://www.example.com")
-		)
+     assertEquals(
+       `@target-uri`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
+       expectedHeader(`@target-uri`.lowercaseName, "http://www.example.com/a")
+     )
+   }
 
-		assertEquals(
-			`@target-uri`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
-			expectedHeader(`@target-uri`.lowercaseName, "http://www.example.com/a")
-		)
-	}
+   test("§2.2.4 Authority") {
+     val `req_2.2.4` = toRequest(`§2.2.x_Request`)
+     assertEquals(
+       `@authority`.signingString(`req_2.2.4`),
+       expectedHeader("@authority", "www.example.com")
+     )
+     assertEquals(
+       `@authority`.signingString(`req_2.2.4`.removeHeader("Host")),
+       expectedHeader("@authority", "bblfish.net")
+     )
+   }
 
-	test("§2.2.4 Authority") {
-		val `req_2.2.4` = toRequest(`§2.2.x_Request`)
-		assertEquals(
-			`@authority`.signingString(`req_2.2.4`),
-			expectedHeader("@authority", "www.example.com")
-		)
-		assertEquals(
-			`@authority`.signingString(`req_2.2.4`.removeHeader("Host")),
-			expectedHeader("@authority", "bblfish.net")
-		)
-	}
+   test("§2.2.5 Scheme") {
+     val `req_2.2.5` = toRequest(`§2.2.x_Request`)
+     assertEquals(
+       `@scheme`.signingString(`req_2.2.5`),
+       expectedHeader("@scheme", "https")
+     )
+     assertEquals(
+       selectorsInSecure.`@scheme`.signingString(`req_2.2.5`),
+       expectedHeader("@scheme", "http")
+     )
+   }
 
-	test("§2.2.5 Scheme") {
-		val `req_2.2.5` = toRequest(`§2.2.x_Request`)
-		assertEquals(
-			`@scheme`.signingString(`req_2.2.5`),
-			expectedHeader("@scheme", "https")
-		)
-		assertEquals(
-			selectorsInSecure.`@scheme`.signingString(`req_2.2.5`),
-			expectedHeader("@scheme","http")
-		)
-	}
+   val `§2.2.x_Request_Absolute`: HttpMessage =
+     """POST https://www.example.com/path?param=value HTTP/1.1
+       |Host: www.example.com""".stripMargin
 
-	val `§2.2.x_Request_Absolute`: HttpMessage =
-		"""POST https://www.example.com/path?param=value HTTP/1.1
-		  |Host: www.example.com""".stripMargin
+   val `§2.2.6_Request_AbsoluteURI`: HttpMessage =
+     """GET http://www.example.com/a/b/ HTTP/1.1""".stripMargin
 
-	val `§2.2.6_Request_AbsoluteURI`: HttpMessage =
-		"""GET http://www.example.com/a/b/ HTTP/1.1""".stripMargin
+   val `§2.2.6_Request_rel`: HttpMessage =
+     """POST /a/b/ HTTP/1.1
+       |Host: www.example.com""".stripMargin
 
-	val `§2.2.6_Request_rel`: HttpMessage =
-		"""POST /a/b/ HTTP/1.1
-		  |Host: www.example.com""".stripMargin
+   val `§2.2.6_Request_Options`: HttpMessage =
+     """OPTIONS * HTTP/1.1
+       |Host: server.example.com""".stripMargin
 
-	val `§2.2.6_Request_Options`: HttpMessage =
-		"""OPTIONS * HTTP/1.1
-		  |Host: server.example.com""".stripMargin
+   test("§2.2.6. Request Target") {
+     val `req_2.2.6` = toRequest(`§2.2.x_Request`)
+     assertEquals(
+       `@request-target`.signingString(`req_2.2.6`),
+       `request-target`("/path?param=value")
+     )
+     val reqGETAbsoluteURI = toRequest(`§2.2.x_Request_Absolute`)
+     assertEquals(
+       `@request-target`.signingString(reqGETAbsoluteURI),
+       `request-target`("https://www.example.com/path?param=value")
+     )
+     val req2 = toRequest(`§2.2.6_Request_rel`)
+     assertEquals(
+       `@request-target`.signingString(req2),
+       `request-target`("/a/b/")
+     )
 
-	test("§2.2.6. Request Target") {
-		val `req_2.2.6` = toRequest(`§2.2.x_Request`)
-		assertEquals(
-			`@request-target`.signingString(`req_2.2.6`),
-			`request-target`("/path?param=value")
-		)
-		val reqGETAbsoluteURI = toRequest(`§2.2.x_Request_Absolute`)
-		assertEquals(
-			`@request-target`.signingString(reqGETAbsoluteURI),
-			`request-target`("https://www.example.com/path?param=value")
-		)
-		val req2 = toRequest(`§2.2.6_Request_rel`)
-		assertEquals(
-			`@request-target`.signingString(req2),
-			`request-target`("/a/b/")
-		)
+     val req3 = toRequest(`§2.2.3_Request_AbsoluteURI_2`)
+     assertEquals(
+       `@request-target`.signingString(req3),
+       `request-target`("http://www.example.com/a")
+     )
 
-		val req3 = toRequest(`§2.2.3_Request_AbsoluteURI_2`)
-		assertEquals(
-			`@request-target`.signingString(req3),
-			`request-target`("http://www.example.com/a")
-		)
+     assertEquals(
+       `@request-target`.signingString(toRequest(`§2.2.6_Request_AbsoluteURI`)),
+       `request-target`("http://www.example.com/a/b/")
+     )
+     // CONNECT: Not sure if this is allowed by Akka. It is not possible to create an HttpRequest with it
+     //		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
+     //			Seq(Host("www.example.com")))
+     //		assertEquals(
+     //			`@request-target`.signingString(req5),
+     //			`request-target`("connect /")
+     //		)
+     val req6 = toRequest(`§2.2.6_Request_Options`)
+     assertEquals(
+       `@request-target`.signingString(req6),
+       `request-target`("*")
+     )
+   }
+   val `§2.2.6_CONNECT`: HttpMessage =
+     """CONNECT www.example.com:80 HTTP/1.1
+       |Host: www.example.com
+       |""".stripMargin
 
-		assertEquals(
-			`@request-target`.signingString(toRequest(`§2.2.6_Request_AbsoluteURI`)),
-			`request-target`("http://www.example.com/a/b/")
-		)
-		//CONNECT: Not sure if this is allowed by Akka. It is not possible to create an HttpRequest with it
-		//		val req5 = HttpRequest(CONNECT, Uri("server.example.com:80",Uri.ParsingMode.Relaxed),
-		//			Seq(Host("www.example.com")))
-		//		assertEquals(
-		//			`@request-target`.signingString(req5),
-		//			`request-target`("connect /")
-		//		)
-		val req6 = toRequest(`§2.2.6_Request_Options`)
-		assertEquals(
-			`@request-target`.signingString(req6),
-			`request-target`("*")
-		)
-	}
-	val `§2.2.6_CONNECT`: HttpMessage =
-		"""CONNECT www.example.com:80 HTTP/1.1
-		  |Host: www.example.com
-		  |""".stripMargin
+   test("§2.2.7 Path") {
+     assertEquals(
+       `@path`.signingString(toRequest(`§2.2.x_Request`)),
+       expectedHeader("@path", "/path")
+     )
+   }
 
+   val `§2.2.8_Request_1`: HttpMessage =
+     """POST /path?param=value&foo=bar&baz=batman HTTP/1.1
+       |Host: www.example.com""".stripMargin
+   val `§2.2.8_Request_2`: HttpMessage =
+     """POST /path?queryString HTTP/1.1
+       |Host: www.example.com""".stripMargin
+   val `§2.2.8_Request_3`: HttpMessage =
+     """GET /path? HTTP/1.1
+       |Host: www.example.com""".stripMargin
 
+   test("§2.2.8 Query") {
+     val `req_2.2.8` = toRequest(`§2.2.8_Request_1`)
+     assertEquals(
+       `@query`.signingString(`req_2.2.8`),
+       expectedHeader("@query", "?param=value&foo=bar&baz=batman")
+     )
+     val `req_2.2.8a` = toRequest(`§2.2.8_Request_2`)
+     assertEquals(
+       `@query`.signingString(`req_2.2.8a`),
+       expectedHeader("@query", "?queryString")
+     )
+     // is this correct?
+     // todo: track https://github.com/httpwg/http-extensions/issues/1934#issuecomment-1030229574
+     assertEquals(
+       `@query`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
+       expectedHeader("@query", "")
+     )
+     // is this correct?
+     assertEquals(
+       `@query`.signingString(toRequest(`§2.2.8_Request_3`)),
+       expectedHeader("@query", "?")
+     )
 
+   }
 
-	test("§2.2.7 Path") {
-		assertEquals(
-			`@path`.signingString(toRequest(`§2.2.x_Request`)),
-			expectedHeader("@path", "/path")
-		)
-	}
+   val `§2.2.9_Request`: HttpMessage =
+     """POST /path?param=value&foo=bar&baz=batman&qux= HTTP/1.1
+       |Host: www.example.com""".stripMargin
 
-	val `§2.2.8_Request_1`: HttpMessage =
-		"""POST /path?param=value&foo=bar&baz=batman HTTP/1.1
-		  |Host: www.example.com""".stripMargin
-	val `§2.2.8_Request_2`: HttpMessage =
-		"""POST /path?queryString HTTP/1.1
-		  |Host: www.example.com""".stripMargin
-	val `§2.2.8_Request_3`: HttpMessage =
-		"""GET /path? HTTP/1.1
-		  |Host: www.example.com""".stripMargin
+   test("§2.2.9 Query Parameters") {
+     val `req_2.2.9` = toRequest(`§2.2.9_Request`)
+     assertEquals(
+       `@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("baz"))),
+       expectedNameHeader("@query-params", "baz", "batman")
+     )
+     assertEquals(
+       `@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("qux"))),
+       expectedNameHeader("@query-params", "qux", "")
+     )
+     assertEquals(
+       `@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("param"))),
+       expectedNameHeader("@query-params", "param", "value")
+     )
+   }
 
-	test("§2.2.8 Query") {
-		val `req_2.2.8` = toRequest(`§2.2.8_Request_1`)
-		assertEquals(
-			`@query`.signingString(`req_2.2.8`),
-			expectedHeader("@query", "?param=value&foo=bar&baz=batman")
-		)
-		val `req_2.2.8a` = toRequest(`§2.2.8_Request_2`)
-		assertEquals(
-			`@query`.signingString(`req_2.2.8a`),
-			expectedHeader("@query", "?queryString")
-		)
-		//is this correct?
-		//todo: track https://github.com/httpwg/http-extensions/issues/1934#issuecomment-1030229574
-		assertEquals(
-			`@query`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
-			expectedHeader("@query", "")
-		)
-		//is this correct?
-		assertEquals(
-			`@query`.signingString(toRequest(`§2.2.8_Request_3`)),
-			expectedHeader("@query", "?")
-		)
+   val `§2.2.10_Response`: HttpMessage =
+     """HTTP/1.1 200 OK
+       |Date: Fri, 26 Mar 2010 00:05:00 GMT""".stripMargin
 
-	}
+   test("§2.2.10 Status Code") {
+     assertEquals(
+       `@status`.signingString(toResponse(`§2.2.10_Response`)),
+       Success("\"@status\": 200")
+     )
+   }
 
-	val `§2.2.9_Request`: HttpMessage =
-		"""POST /path?param=value&foo=bar&baz=batman&qux= HTTP/1.1
-		  |Host: www.example.com""".stripMargin
-
-	test("§2.2.9 Query Parameters") {
-		val `req_2.2.9` = toRequest(`§2.2.9_Request`)
-		assertEquals(
-			`@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("baz"))),
-			expectedNameHeader("@query-params", "baz", "batman")
-		)
-		assertEquals(
-			`@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("qux"))),
-			expectedNameHeader("@query-params", "qux", "")
-		)
-		assertEquals(
-			`@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("param"))),
-			expectedNameHeader("@query-params", "param", "value")
-		)
-	}
-
-	val `§2.2.10_Response`: HttpMessage =
-		"""HTTP/1.1 200 OK
-		  |Date: Fri, 26 Mar 2010 00:05:00 GMT""".stripMargin
-
-	test("§2.2.10 Status Code") {
-		assertEquals(
-			`@status`.signingString(toResponse(`§2.2.10_Response`)),
-			Success("\"@status\": 200")
-		)
-	}
-
-	val `§2.2.11_Request`: HttpMessage =
-		"""POST /foo?param=value&pet=dog HTTP/1.1
+   val `§2.2.11_Request`: HttpMessage =
+     """POST /foo?param=value&pet=dog HTTP/1.1
 		  |Host: example.com
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
 		  |Content-Type: application/json
@@ -420,16 +473,16 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |  4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:
 		  |
 		  |{"hello": "world"}""".rfc8792single
-	val `§2.2.11_UnsignedResponse`: HttpMessage =
-		"""HTTP/1.1 200 OK
-		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
-		  |Content-Type: application/json
-		  |Content-Length: 62
-		  |
-		  |{"busy": true, "message": "Your call is very important to us"}""".stripMargin
+   val `§2.2.11_UnsignedResponse`: HttpMessage =
+     """HTTP/1.1 200 OK
+       |Date: Tue, 20 Apr 2021 02:07:56 GMT
+       |Content-Type: application/json
+       |Content-Length: 62
+       |
+       |{"busy": true, "message": "Your call is very important to us"}""".stripMargin
 
-	val `§2.2.11_SignedResponse`: HttpMessage =
-		"""HTTP/1.1 200 OK
+   val `§2.2.11_SignedResponse`: HttpMessage =
+     """HTTP/1.1 200 OK
 		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
 		  |Content-Type: application/json
 		  |Content-Length: 62
@@ -441,29 +494,32 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |
 		  |{"busy": true, "message": "Your call is very important to us"}""".rfc8792single
 
-
-	test("§2.2.11 Request-Response Signature Binding") {
-		val `req_2.2.11`: Request[H] = toRequest(`§2.2.11_Request`)
-		assertEquals(
-			`@request-response`.signingString(`req_2.2.11`, Params(Token("key") -> SfString("sig1"))),
-			expectedKeyedHeader("@request-response", "sig1",
-				""":KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu\
+   test("§2.2.11 Request-Response Signature Binding") {
+     val `req_2.2.11`: Request[H] = toRequest(`§2.2.11_Request`)
+     assertEquals(
+       `@request-response`.signingString(`req_2.2.11`, Params(Token("key") -> SfString("sig1"))),
+       expectedKeyedHeader(
+         "@request-response",
+         "sig1",
+         """:KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu\
 				  |  5rif3g7ckTbbX7C4Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79\
 				  |  gBeqvHNUO4bhI27p4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7\
 				  |  OjkfsHAm/enxf1fAwkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+Ef\
 				  |  Fg4NVfqtSJch2WDY7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94\
-				  |  v6qP8pq0sQVq2DLt4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:""".rfc8792single)
-		)
-		val siginput: SigInput = SigInput(
-			"""("content-type" "content-length" "@status" \
+				  |  v6qP8pq0sQVq2DLt4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==:""".rfc8792single
+       )
+     )
+     val siginput: SigInput = SigInput(
+       """("content-type" "content-length" "@status" \
 			  |  "@request-response";key="sig1");created=1618884475\
-			  |  ;keyid="test-key-ecc-p256"""".rfc8792single).get
+			  |  ;keyid="test-key-ecc-p256"""".rfc8792single
+     ).get
 
-		val `res_2.2.11`: Response[H] = toResponse(`§2.2.11_UnsignedResponse`)
-		assertEquals(
-			`res_2.2.11`.signingString(siginput,`req_2.2.11`).toAscii,
-			Success(
-				""""content-type": application/json
+     val `res_2.2.11`: Response[H] = toResponse(`§2.2.11_UnsignedResponse`)
+     assertEquals(
+       `res_2.2.11`.signingString(siginput, `req_2.2.11`).toAscii,
+       Success(
+         """"content-type": application/json
 				  |"content-length": 62
 				  |"@status": 200
 				  |"@request-response";key="sig1": :KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu\
@@ -475,26 +531,27 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 				  |"@signature-params": ("content-type" "content-length" "@status" \
 				  |  "@request-response";key="sig1");created=1618884475\
 				  |  ;keyid="test-key-ecc-p256"""".rfc8792single
-			)
-		)
-	}
+       )
+     )
+   }
 
-	val `§2.3_Request`: HttpMessage =
-		"""GET /foo HTTP/1.1
-		  |Host: example.org
-		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
-		  |X-Example: Example header
-		  |        with some whitespace.
-		  |X-Empty-Header:
-		  |Cache-Control: max-age=60
-		  |Cache-Control: must-revalidate""".stripMargin
+   val `§2.3_Request`: HttpMessage =
+     """GET /foo HTTP/1.1
+       |Host: example.org
+       |Date: Tue, 20 Apr 2021 02:07:55 GMT
+       |X-Example: Example header
+       |        with some whitespace.
+       |X-Empty-Header:
+       |Cache-Control: max-age=60
+       |Cache-Control: must-revalidate""".stripMargin
 
+   test("§2.3 Creating the Signature Input String (spec 04)") {
 
-	test("§2.3 Creating the Signature Input String (spec 04)") {
-		/**
-		 * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]] * */
-		val expectedSigInStr =
-			""""@request-target": /foo
+     /** [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-04.html#section-2.5 example request in §2.5]]
+       * *
+       */
+     val expectedSigInStr =
+       """"@request-target": /foo
 			  |"host": example.org
 			  |"date": Tue, 20 Apr 2021 02:07:55 GMT
 			  |"cache-control": max-age=60, must-revalidate
@@ -505,28 +562,32 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |  "x-empty-header" "x-example");created=1618884475;\
 			  |  keyid="test-key-rsa-pss"""".rfc8792single
 
-		val siginStr =
-			"""("@request-target" "host" "date" "cache-control" \
+     val siginStr =
+       """("@request-target" "host" "date" "cache-control" \
 			  |  "x-empty-header" "x-example");created=1618884475;\
 			  |  keyid="test-key-rsa-pss"""".rfc8792single
 
-		val sigInIlist = IList(
-			`@request-target`.sf, host.sf, date.sf, `cache-control`.sf,
-			`x-empty-header`.sf, `x-example`.sf
-		)(
-			Token("created") -> SfInt(1618884475),
-			Token("keyid") -> sf"test-key-rsa-pss"
-		)
-		assert(SigInput.valid(sigInIlist))
-		val rfcSigInreq = toRequest(`§2.3_Request`)
-		val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
-		val Some(sigin) = SigInput(siginStr): @unchecked
-		assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
-	}
+     val sigInIlist = IList(
+       `@request-target`.sf,
+       host.sf,
+       date.sf,
+       `cache-control`.sf,
+       `x-empty-header`.sf,
+       `x-example`.sf
+     )(
+       Token("created") -> SfInt(1618884475),
+       Token("keyid")   -> sf"test-key-rsa-pss"
+     )
+     assert(SigInput.valid(sigInIlist))
+     val rfcSigInreq          = toRequest(`§2.3_Request`)
+     val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
+     val Some(sigin)          = SigInput(siginStr): @unchecked
+     assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
+   }
 
-	test("§2.3 Creating the Signature Input String (spec 07)") {
-		val expectedSigInStr =
-			""""@method": GET
+   test("§2.3 Creating the Signature Input String (spec 07)") {
+     val expectedSigInStr =
+       """"@method": GET
 			  |"@path": /foo
 			  |"@authority": example.org
 			  |"cache-control": max-age=60, must-revalidate
@@ -537,27 +598,31 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
 
-		val siginStr =
-			"""("@method" "@path" "@authority" \
+     val siginStr =
+       """("@method" "@path" "@authority" \
 			  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
 			  |  ;keyid="test-key-rsa-pss"""".rfc8792single
 
-		val sigInIlist = IList(
-			`@method`.sf, `@path`.sf, `@authority`.sf,
-			`cache-control`.sf, `x-empty-header`.sf, `x-example`.sf
-		)(
-			Token("created") -> SfInt(1618884475),
-			Token("keyid") -> sf"test-key-rsa-pss"
-		)
-		assert(SigInput.valid(sigInIlist))
-		val rfcSigInreq: Request[H] = toRequest(`§2.3_Request`)
-		val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
-		val Some(sigin) = SigInput(siginStr): @unchecked
-		assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
-	}
+     val sigInIlist = IList(
+       `@method`.sf,
+       `@path`.sf,
+       `@authority`.sf,
+       `cache-control`.sf,
+       `x-empty-header`.sf,
+       `x-example`.sf
+     )(
+       Token("created") -> SfInt(1618884475),
+       Token("keyid")   -> sf"test-key-rsa-pss"
+     )
+     assert(SigInput.valid(sigInIlist))
+     val rfcSigInreq: Request[H] = toRequest(`§2.3_Request`)
+     val Some(sigInHandBuilt)    = SigInput(sigInIlist): @unchecked
+     val Some(sigin)             = SigInput(siginStr): @unchecked
+     assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
+   }
 
-	val `§3.2_Request`: HttpMessage =
-		"""GET /foo HTTP/1.1
+   val `§3.2_Request`: HttpMessage =
+     """GET /foo HTTP/1.1
 		  |Host: example.org
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
 		  |X-Example: Example header
@@ -575,36 +640,36 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
 		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single
 
-	test("§3.2 Verifying a Signature") {
-		val req: Request[H] = toRequest(`§3.2_Request`)
-		assertIO(
-			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-rsa-pss")
-		)
-	}
+   test("§3.2 Verifying a Signature") {
+     val req: Request[H] = toRequest(`§3.2_Request`)
+     assertIO(
+       req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-rsa-pss")
+     )
+   }
 
-	val `§4.3_Request`: HttpMessage =
-		"""GET /foo HTTP/1.1
-		  |Host: example.org
-		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
-		  |X-Example: Example header
-		  |        with some whitespace.
-		  |X-Empty-Header:
-		  |Cache-Control: max-age=60
-		  |Cache-Control: must-revalidate
-		  |Signature-Input: sig1=("@method" "@path" "@authority" \
-		  |  "cache-control" "x-empty-header" "x-example");created=1618884475\
-		  |  ;keyid="test-key-rsa-pss"
-		  |Forwarded: for=192.0.2.123
-		  |Signature: sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
-		  |  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
-		  |  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
-		  |  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
-		  |  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
-		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".stripMargin
+   val `§4.3_Request`: HttpMessage =
+     """GET /foo HTTP/1.1
+       |Host: example.org
+       |Date: Tue, 20 Apr 2021 02:07:55 GMT
+       |X-Example: Example header
+       |        with some whitespace.
+       |X-Empty-Header:
+       |Cache-Control: max-age=60
+       |Cache-Control: must-revalidate
+       |Signature-Input: sig1=("@method" "@path" "@authority" \
+       |  "cache-control" "x-empty-header" "x-example");created=1618884475\
+       |  ;keyid="test-key-rsa-pss"
+       |Forwarded: for=192.0.2.123
+       |Signature: sig1=:P0wLUszWQjoi54udOtydf9IWTfNhy+r53jGFj9XZuP4uKwxyJo1\
+       |  RSHi+oEF1FuX6O29d+lbxwwBao1BAgadijW+7O/PyezlTnqAOVPWx9GlyntiCiHzC8\
+       |  7qmSQjvu1CFyFuWSjdGa3qLYYlNm7pVaJFalQiKWnUaqfT4LyttaXyoyZW84jS8gya\
+       |  rxAiWI97mPXU+OVM64+HVBHmnEsS+lTeIsEQo36T3NFf2CujWARPQg53r58RmpZ+J9\
+       |  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
+       |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".stripMargin
 
-	val `§4.3_Enhanced`: HttpMessage =
-		"""GET /foo HTTP/1.1
+   val `§4.3_Enhanced`: HttpMessage =
+     """GET /foo HTTP/1.1
 		  |Host: example.org
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
 		  |X-Example: Example header
@@ -631,122 +696,139 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |    cDHkNaavcokmq+3EBDCQTzgwLqfDmV0vLCXtDda6CNO2Zyum/pMGboCnQn/VkQ+\
 		  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single
 
-	test("§4.3 Multiple Signatures") {
-		val req: Request[H] = toRequest(`§4.3_Enhanced`)
-		assertIO(
-			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-rsa-pss")
-		) *>
-		assertIO(
-			req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
-			PureKeyId("test-key-rsa")
-		)
-	}
+   test("§4.3 Multiple Signatures") {
+     val req: Request[H] = toRequest(`§4.3_Enhanced`)
+     assertIO(
+       req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-rsa-pss")
+     ) *>
+       assertIO(
+         req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
+         PureKeyId("test-key-rsa")
+       )
+   }
 
-	val B2_test_request: HttpMessage =
-		"""POST /foo?param=value&pet=dog HTTP/1.1
-		  |Host: example.com
-		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
-		  |Content-Type: application/json
-		  |Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
-		  |Content-Length: 18
-		  |
-		  |{"hello": "world"}""".stripMargin
-	val B2_test_response: HttpMessage =
-		"""HTTP/1.1 200 OK
-		  |Date: Tue, 20 Apr 2021 02:07:56 GMT
-		  |Content-Type: application/json
-		  |Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
-		  |Content-Length: 18
-		  |
-		  |{"hello": "world"}
-		  |""".stripMargin
+   val B2_test_request: HttpMessage =
+     """POST /foo?param=value&pet=dog HTTP/1.1
+       |Host: example.com
+       |Date: Tue, 20 Apr 2021 02:07:56 GMT
+       |Content-Type: application/json
+       |Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+       |Content-Length: 18
+       |
+       |{"hello": "world"}""".stripMargin
+   val B2_test_response: HttpMessage =
+     """HTTP/1.1 200 OK
+       |Date: Tue, 20 Apr 2021 02:07:56 GMT
+       |Content-Type: application/json
+       |Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+       |Content-Length: 18
+       |
+       |{"hello": "world"}
+       |""".stripMargin
 
-	test("B.2.1 Minimal Signature Using rsa-pss-sha512") {
-		val req: Request[H] = toRequest(B2_test_request)
-		val Some(sigInput) = SigInput(
-			"""();created=1618884475\
-			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single) : @unchecked
-		assertEquals(req.signingString(sigInput).toAscii, Success(
-			""""@signature-params": ();created=1618884475\
+   test("B.2.1 Minimal Signature Using rsa-pss-sha512") {
+     val req: Request[H] = toRequest(B2_test_request)
+     val Some(sigInput) = SigInput(
+       """();created=1618884475\
 			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
-		))
-		val reqSignedFromSpec = req.addHeader("Signature-Input",
-				"""sig1=();created=1618884475\
+     ): @unchecked
+     assertEquals(
+       req.signingString(sigInput).toAscii,
+       Success(
+         """"@signature-params": ();created=1618884475\
+			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
+       )
+     )
+     val reqSignedFromSpec = req.addHeader(
+       "Signature-Input",
+       """sig1=();created=1618884475\
 				  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
-			).addHeader("Signature",
-				"""sig1=:HWP69ZNiom9Obu1KIdqPPcu/C1a5ZUMBbqS/xwJECV8bhIQVmE\
+     ).addHeader(
+       "Signature",
+       """sig1=:HWP69ZNiom9Obu1KIdqPPcu/C1a5ZUMBbqS/xwJECV8bhIQVmE\
 				  |  AAAzz8LQPvtP1iFSxxluDO1KE9b8L+O64LEOvhwYdDctV5+E39Jy1eJiD7nYREBgx\
 				  |  TpdUfzTO+Trath0vZdTylFlxK4H3l3s/cuFhnOCxmFYgEa+cw+StBRgY1JtafSFwN\
 				  |  cZgLxVwialuH5VnqJS4JN8PHD91XLfkjMscTo4jmVMpFd3iLVe0hqVFl7MDt6TMkw\
 				  |  IyVFnEZ7B/VIQofdShO+C/7MuupCSLVjQz5xA+Zs6Hw+W9ESD/6BuGs6LF1TcKLxW\
-				  |  +5K+2zvDY/Cia34HNpRW5io7Iv9/b7iQ==:""".rfc8792single)
-		val aio = for
-			fn <- sigSuite.rsaPSSSigner
-			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
-		yield
-			// we cannot verify the signature by comparing it with the one in the spec
-			// as each request for an rsa-pss signature returns a different string. We can only verify
-			// that the generate signature is valid
-			IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
-				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-				PureKeyId("test-key-rsa-pss")
-			)
-		//but we also verify that the signature constructed from the spec is valid
-		aio.flatten *> assertIO(
-			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-rsa-pss")
-		)
-	}
+				  |  +5K+2zvDY/Cia34HNpRW5io7Iv9/b7iQ==:""".rfc8792single
+     )
+     val aio =
+       for
+          fn        <- sigSuite.rsaPSSSigner
+          signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+       yield
+       // we cannot verify the signature by comparing it with the one in the spec
+       // as each request for an rsa-pss signature returns a different string. We can only verify
+       // that the generate signature is valid
+       IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+         signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+         PureKeyId("test-key-rsa-pss")
+       )
+     // but we also verify that the signature constructed from the spec is valid
+     aio.flatten *> assertIO(
+       reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-rsa-pss")
+     )
+   }
 
-	test("B.2.2 Selective Covered Components using rsa-pss-sha512") {
-		val req: Request[H] = toRequest(B2_test_request)
-		val Some(sigInput) = SigInput(
-			"""("@authority" "content-type")\
-			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single): @unchecked
-		assertEquals(req.signingString(sigInput).toAscii, Success(
-			""""@authority": example.com
+   test("B.2.2 Selective Covered Components using rsa-pss-sha512") {
+     val req: Request[H] = toRequest(B2_test_request)
+     val Some(sigInput) = SigInput(
+       """("@authority" "content-type")\
+			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
+     ): @unchecked
+     assertEquals(
+       req.signingString(sigInput).toAscii,
+       Success(
+         """"@authority": example.com
 			  |"content-type": application/json
 			  |"@signature-params": ("@authority" "content-type")\
 			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
-		))
-		val reqSignedFromSpec = req.addHeader("Signature-Input",
-			"""sig1=("@authority" "content-type")\
+       )
+     )
+     val reqSignedFromSpec = req.addHeader(
+       "Signature-Input",
+       """sig1=("@authority" "content-type")\
 			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
-		).addHeader("Signature",
-			"""sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81gh\
+     ).addHeader(
+       "Signature",
+       """sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81gh\
 			  |  JS3PcH+m1asiMp8yvccnO/RfaexnqanVB3C72WRNZN7skPTJmUVmoIeqZncdP2mlf\
 			  |  xlLP6UbkrgYsk91NS6nwkKC6RRgLhBFqzP42oq8D2336OiQPDAo/04SxZt4Wx9nDG\
 			  |  uy2SfZJUhsJqZyEWRk4204x7YEB3VxDAAlVgGt8ewilWbIKKTOKp3ymUeQIwptqYw\
 			  |  v0l8mN404PPzRBTpB7+HpClyK4CNp+SVv46+6sHMfJU4taz10s/NoYRmYCGXyadzY\
-			  |  YDj0BYnFdERB6NblI/AOWFGl5Axhhmjg==:""".rfc8792single)
-		val aio = for
-			fn <- sigSuite.rsaPSSSigner
-			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
-		yield
-			// we cannot verify the signature by comparing it with the one in the spec
-			// as each request for an rsa-pss signature returns a different string. We can only verify
-			// that the generate signature is valid
-			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
-			) *> assertIO(
-				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-				PureKeyId("test-key-rsa-pss")
-			)
-		//but we also verify that the signature constructed from the spec is valid
-		aio.flatten *> assertIO(
-			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-rsa-pss")
-		)
-	}
+			  |  YDj0BYnFdERB6NblI/AOWFGl5Axhhmjg==:""".rfc8792single
+     )
+     val aio =
+       for
+          fn        <- sigSuite.rsaPSSSigner
+          signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+       yield
+       // we cannot verify the signature by comparing it with the one in the spec
+       // as each request for an rsa-pss signature returns a different string. We can only verify
+       // that the generate signature is valid
+       IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+         signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+         PureKeyId("test-key-rsa-pss")
+       )
+     // but we also verify that the signature constructed from the spec is valid
+     aio.flatten *> assertIO(
+       reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-rsa-pss")
+     )
+   }
 
-	test("B.2.3 Full Coverage using rsa-pss-sha512") {
-		val req: Request[H] = toRequest(B2_test_request)
-		val siginputStr = """("date" "@method" "@path" "@query" \
+   test("B.2.3 Full Coverage using rsa-pss-sha512") {
+     val req: Request[H] = toRequest(B2_test_request)
+     val siginputStr = """("date" "@method" "@path" "@query" \
 								  |  "@authority" "content-type" "digest" "content-length")\
 								  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
-		val Some(sigInput) = SigInput(siginputStr) : @unchecked
-		assertEquals(req.signingString(sigInput).toAscii, Success(
-			""""date": Tue, 20 Apr 2021 02:07:56 GMT
+     val Some(sigInput) = SigInput(siginputStr): @unchecked
+     assertEquals(
+       req.signingString(sigInput).toAscii,
+       Success(
+         """"date": Tue, 20 Apr 2021 02:07:56 GMT
 			  |"@method": POST
 			  |"@path": /foo
 			  |"@query": ?param=value&pet=dog
@@ -757,75 +839,82 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |"@signature-params": ("date" "@method" "@path" "@query" \
 			  |  "@authority" "content-type" "digest" "content-length")\
 			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
-		))
-		val reqSignedFromSpec = req.addHeader("Signature-Input","sig1="+siginputStr)
-			.addHeader("Signature",
-				"""sig1=:JuJnJMFGD4HMysAGsfOY6N5ZTZUknsQUdClNG51VezDgPUOW03\
+       )
+     )
+     val reqSignedFromSpec = req.addHeader("Signature-Input", "sig1=" + siginputStr)
+       .addHeader(
+         "Signature",
+         """sig1=:JuJnJMFGD4HMysAGsfOY6N5ZTZUknsQUdClNG51VezDgPUOW03\
 				  |  QMe74vbIdndKwW1BBrHOHR3NzKGYZJ7X3ur23FMCdANe4VmKb3Rc1Q/5YxOO8p7Ko\
 				  |  yfVa4uUcMk5jB9KAn1M1MbgBnqwZkRWsbv8ocCqrnD85Kavr73lx51k1/gU8w673W\
 				  |  T/oBtxPtAn1eFjUyIKyA+XD7kYph82I+ahvm0pSgDPagu917SlqUjeaQaNnlZzO03\
 				  |  Iy1RZ5XpgbNeDLCqSLuZFVID80EohC2CQ1cL5svjslrlCNstd2JCLmhjL7xV3NYXe\
-				  |  rLim4bqUQGRgDwNJRnqobpS6C1NBns/Q==:""".rfc8792single)
-		val aio = for
-			fn <- sigSuite.rsaPSSSigner
-			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
-		yield
-			// we cannot verify the signature by comparing it with the one in the spec
-			// as each request for an rsa-pss signature returns a different string. We can only verify
-			// that the generate signature is valid
-			IO(assertEquals(signedReq.headerValue("Signature") != None, true)
-			) *> assertIO(
-				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-				PureKeyId("test-key-rsa-pss")
-			)
-		//but we also verify that the signature constructed from the spec is valid
-		aio.flatten *> assertIO(
-			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-rsa-pss")
-		)
-	}
+				  |  rLim4bqUQGRgDwNJRnqobpS6C1NBns/Q==:""".rfc8792single
+       )
+     val aio =
+       for
+          fn        <- sigSuite.rsaPSSSigner
+          signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+       yield
+       // we cannot verify the signature by comparing it with the one in the spec
+       // as each request for an rsa-pss signature returns a different string. We can only verify
+       // that the generate signature is valid
+       IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+         signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+         PureKeyId("test-key-rsa-pss")
+       )
+     // but we also verify that the signature constructed from the spec is valid
+     aio.flatten *> assertIO(
+       reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-rsa-pss")
+     )
+   }
 
-	test("B.2.4 Signing a Response using ecdsa-p256-sha256") {
-		val req: Request[H] = toRequest(B2_test_request)
-		val siginputStr = """("content-type" "digest" "content-length")\
-								  |  ;created=1618884475;keyid="test-key-ecc-p256"""".stripMargin.rfc8792single
-		val Some(sigInput) = SigInput(siginputStr) : @unchecked
-		val reqSignedFromSpec = req.addHeader("Signature-Input","sig1="+siginputStr)
-			.addHeader("Signature",
-				"""sig1=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn\
-				  |  6fPOtBx48/WffYLO0n1RHHf9scvNGAgGq52Q==:""".rfc8792single)
-		val aio = for
-			fn <- sigSuite.ecc_256_Signer
-			signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
-		yield
-			// we cannot verify the signature by comparing it with the one in the spec
-			// as each request for an ecc signature returns a different string. We can only verify
-			// that the generate signature is valid
-			IO( assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
-				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-				PureKeyId("test-key-ecc-p256")
-			)
-		//but we also verify that the signature constructed from the spec is valid
-		aio.flatten *> assertIO(
-			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-			PureKeyId("test-key-ecc-p256")
-		)
-	}
+   test("B.2.4 Signing a Response using ecdsa-p256-sha256") {
+     val req: Request[H] = toRequest(B2_test_request)
+     val siginputStr =
+       """("content-type" "digest" "content-length")\
+         |  ;created=1618884475;keyid="test-key-ecc-p256"""".stripMargin.rfc8792single
+     val Some(sigInput) = SigInput(siginputStr): @unchecked
+     val reqSignedFromSpec = req.addHeader("Signature-Input", "sig1=" + siginputStr)
+       .addHeader(
+         "Signature",
+         """sig1=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn\
+				  |  6fPOtBx48/WffYLO0n1RHHf9scvNGAgGq52Q==:""".rfc8792single
+       )
+     val aio =
+       for
+          fn        <- sigSuite.ecc_256_Signer
+          signedReq <- req.withSigInput(Rfc8941.Token("sig1"), sigInput, fn)
+       yield
+       // we cannot verify the signature by comparing it with the one in the spec
+       // as each request for an ecc signature returns a different string. We can only verify
+       // that the generate signature is valid
+       IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+         signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+         PureKeyId("test-key-ecc-p256")
+       )
+     // but we also verify that the signature constructed from the spec is valid
+     aio.flatten *> assertIO(
+       reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
+       PureKeyId("test-key-ecc-p256")
+     )
+   }
 
-	test("Signing a Request using hmac-sha256") {
-		//todo! Symmetric key signature
-	}
+   test("Signing a Request using hmac-sha256") {
+     // todo! Symmetric key signature
+   }
 
-	val B3_Request: HttpMessage =
-		"""POST /foo?Param=value&pet=Dog HTTP/1.1
-		  |Host: example.com
-		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
-		  |Content-Type: application/json
-		  |Content-Length: 18
-		  |
-		  |{"hello": "world"}""".stripMargin
-	val B3_ProxyEnhanced_Request: HttpMessage =
-		"""POST /foo?Param=value&pet=Dog HTTP/1.1
+   val B3_Request: HttpMessage =
+     """POST /foo?Param=value&pet=Dog HTTP/1.1
+       |Host: example.com
+       |Date: Tue, 20 Apr 2021 02:07:55 GMT
+       |Content-Type: application/json
+       |Content-Length: 18
+       |
+       |{"hello": "world"}""".stripMargin
+   val B3_ProxyEnhanced_Request: HttpMessage =
+     """POST /foo?Param=value&pet=Dog HTTP/1.1
 		  |Host: service.internal.example
 		  |Date: Tue, 20 Apr 2021 02:07:55 GMT
 		  |Content-Type: application/json
@@ -842,12 +931,12 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |
 		  |{"hello": "world"}""".rfc8792single
 
-	test("B.3. TLS-Terminating Proxy") {
-		val req: Request[H] = toRequest(B3_ProxyEnhanced_Request)
-		val siginputStr = """("@path" "@query" "@method" "@authority" \
+   test("B.3. TLS-Terminating Proxy") {
+     val req: Request[H] = toRequest(B3_ProxyEnhanced_Request)
+     val siginputStr = """("@path" "@query" "@method" "@authority" \
 								  |  "client-cert");created=1618884475;keyid="test-key-ecc-p256"""".rfc8792single
-		val Some(sigInput) = SigInput(siginputStr) : @unchecked
-		val sigStr = req.signingString(sigInput)
+     val Some(sigInput) = SigInput(siginputStr): @unchecked
+     val sigStr         = req.signingString(sigInput)
 //  the current 07 spec wrongly has it that the @query line does not start with `?`
 //  see https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
 //		assertEquals(sigStr.toAscii,
@@ -866,95 +955,98 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 //			  |  Q6bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:
 //			  |"@signature-params": ("@path" "@query" "@method" "@authority" \
 //			  |  "client-cert");created=1618884475;keyid="test-key-ecc-p256"""".rfc8792single))
-		val reqSignedFromSpec = req.addHeader("Signature-Input","ttrp="+siginputStr)
-			.addHeader("Signature",
-				"""ttrp=:5gudRjXaHrAYbEaQUOoY9TuvqWOdPcspkp7YyKCB0XhyAG9cB7\
-				  |  15hucPPanEK0OVyiNLJqcoq2Yn1DPWQcnbog==:""".stripMargin.rfc8792single)
-		val aio = for
-			fn <- sigSuite.ecc_256_Signer
-			signedReq <- req.withSigInput(Rfc8941.Token("ttrp"), sigInput, fn)
-		yield
-			// we cannot verify the signature by comparing it with the one in the spec
-		   // as each request for an ecc signature returns a different string. We can only verify
-		   // that the generate signature is valid
-			IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
-				signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("ttrp"))),
-				PureKeyId("test-key-ecc-p256")
-			)
+     val reqSignedFromSpec = req.addHeader("Signature-Input", "ttrp=" + siginputStr)
+       .addHeader(
+         "Signature",
+         """ttrp=:5gudRjXaHrAYbEaQUOoY9TuvqWOdPcspkp7YyKCB0XhyAG9cB7\
+           |  15hucPPanEK0OVyiNLJqcoq2Yn1DPWQcnbog==:""".stripMargin.rfc8792single
+       )
+     val aio =
+       for
+          fn        <- sigSuite.ecc_256_Signer
+          signedReq <- req.withSigInput(Rfc8941.Token("ttrp"), sigInput, fn)
+       yield
+       // we cannot verify the signature by comparing it with the one in the spec
+       // as each request for an ecc signature returns a different string. We can only verify
+       // that the generate signature is valid
+       IO(assertEquals(signedReq.headerValue("Signature") != None, true)) *> assertIO(
+         signedReq.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("ttrp"))),
+         PureKeyId("test-key-ecc-p256")
+       )
 
-		aio.flatten
-		//but we also verify that the signature constructed from the spec is valid
-		//todo: this won't work because the 07 spec creates the wrong signing string
-		//see above and https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
+     aio.flatten
+     // but we also verify that the signature constructed from the spec is valid
+     // todo: this won't work because the 07 spec creates the wrong signing string
+     // see above and https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
 //			*> assertIO(
 //			reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("ttrp"))),
 //			PureKeyId("test-key-ecc-p256")
 //		)
 
-	}
+   }
 
 end HttpMessageSigningSuite
 
 class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
-	import run.cosy.http.auth.MessageSignature as MS
-	import bobcats.SigningHttpMessages.`test-key-rsa-pss`
-	import bobcats.util.PEMUtils.PKCS8_PEM
-	def verifierFor(
-		spec: Try[SPKIKeySpec[AsymmetricKeyAlg]],
-		sig: Signature,
-		keyId: SfString
-	): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
-		for keyspec <- IO.fromTry(spec)
-			 verifierFn <- bobcats.Verifier[IO].build(keyspec, sig)
-		yield (signingStr: SigningString, signature: SignatureBytes) =>
-			verifierFn(signingStr, signature).flatMap(bool =>
-				if bool then IO.pure(PureKeyId(keyId.asciiStr))
-				else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
-			)
+   import run.cosy.http.auth.MessageSignature as MS
+   import bobcats.SigningHttpMessages.`test-key-rsa-pss`
+   import bobcats.util.PEMUtils.PKCS8_PEM
+   def verifierFor(
+       spec: Try[SPKIKeySpec[AsymmetricKeyAlg]],
+       sig: Signature,
+       keyId: SfString
+   ): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+     for
+        keyspec    <- IO.fromTry(spec)
+        verifierFn <- bobcats.Verifier[IO].build(keyspec, sig)
+     yield (signingStr: SigningString, signature: SignatureBytes) =>
+       verifierFn(signingStr, signature).flatMap(bool =>
+         if bool then IO.pure(PureKeyId(keyId.asciiStr))
+         else IO.fromTry(Failure(new Throwable("could not verify test-key-rsa-pss sig")))
+       )
 
-	def publicKeySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
-	def privateKeySpec(keyinfo: bobcats.TestKeyPair) = pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
+   def publicKeySpec(keyinfo: bobcats.TestKeyPair) =
+     pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
+   def privateKeySpec(keyinfo: bobcats.TestKeyPair) =
+     pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
 
-	lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-		publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+   lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
+     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
 
-	lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-		publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+   lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
+     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
 
-	lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]]	=
-		privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+   lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
+     privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
 
-	lazy val ecc_256_PubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]]	=
-		publicKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+   lazy val ecc_256_PubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
+     publicKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
 
-	lazy val ecc_256_PrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]]	=
-		privateKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+   lazy val ecc_256_PrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
+     privateKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
 
+   lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
+     for
+        spec <- IO.fromTry(rsaPSSPrivKey)
+        fio  <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`rsa-pss-sha512`)
+     yield fio
 
-	lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
-		for
-			spec <- IO.fromTry(rsaPSSPrivKey)
-			fio <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`rsa-pss-sha512`)
-		yield fio
+   lazy val ecc_256_Signer: IO[ByteVector => IO[ByteVector]] =
+     for
+        spec <- IO.fromTry(ecc_256_PrivKey)
+        fio  <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`ecdsa-p256-sha256`)
+     yield fio
 
-	lazy val ecc_256_Signer: IO[ByteVector => IO[ByteVector]] =
-		for
-			spec <- IO.fromTry(ecc_256_PrivKey)
-			fio <- bobcats.Signer[IO].build(spec, bobcats.AsymmetricKeyAlg.`ecdsa-p256-sha256`)
-		yield fio
-
-	/**
-	 * emulate fetching the signature verification info for the keyids given in the Spec
-	 * */
-	def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
-		keyid.asciiStr match
-		case "test-key-rsa-pss" =>
-			verifierFor(rsaPSSPubKey, AsymmetricKeyAlg.`rsa-pss-sha512`, keyid)
-		case "test-key-rsa" =>
-			verifierFor(rsaPubKey, AsymmetricKeyAlg.`rsa-v1_5-sha256`, keyid)
-		case "test-key-ecc-p256" =>
-			verifierFor(ecc_256_PubKey, AsymmetricKeyAlg.`ecdsa-p256-sha256`, keyid)
-		case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
+   /** emulate fetching the signature verification info for the keyids given in the Spec
+     */
+   def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+     keyid.asciiStr match
+        case "test-key-rsa-pss" =>
+          verifierFor(rsaPSSPubKey, AsymmetricKeyAlg.`rsa-pss-sha512`, keyid)
+        case "test-key-rsa" =>
+          verifierFor(rsaPubKey, AsymmetricKeyAlg.`rsa-v1_5-sha256`, keyid)
+        case "test-key-ecc-p256" =>
+          verifierFor(ecc_256_PubKey, AsymmetricKeyAlg.`ecdsa-p256-sha256`, keyid)
+        case x => IO.fromTry(Failure(new Throwable(s"can't get info on sig $x")))
 
 end SigningSuiteHelpers
-

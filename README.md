@@ -2,8 +2,8 @@
 
 This library consists of Scala and Scala-JS components implementing the
 IETF's HTTP-Bis [Signing HTTP Messages](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html)
-spec. This builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
-It can be used in may ways, including authentication protocols such as
+spec. That spec builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
+spec. It can be used in many ways, including authentication protocols such as
 [HttpSig](https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md).
 
 This repository contains the following projects:
@@ -33,6 +33,6 @@ That project is to end in January 2022.
 
 If you wish to have the library run on a specific client or server environment, please
 contact [henry.story@co-operating.systems](mailto:henry.story@co-operating.systems) or leave
-issues in the Issue DataBase.
+issues in the Issue database.
 
 We are looking for further funding opportunities to continue the work.

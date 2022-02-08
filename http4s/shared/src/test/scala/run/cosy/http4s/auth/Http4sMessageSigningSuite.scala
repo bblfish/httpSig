@@ -45,6 +45,7 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
                import org.http4s.Header.ToRaw.{given, *}
                // we can ignore the body here, since that is actually not relevant to signing
                org.http4s.Request(m, p, v, org.http4s.Headers(rawH))
+             case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
    override def toResponse(response: HttpMessage): Response[H] =
@@ -58,6 +59,7 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
                val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
                org.http4s.Response(status, version, org.http4s.Headers(rawH))
+             case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
    private def parseHeaders(nonMethodLines: List[String]) =

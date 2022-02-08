@@ -9,17 +9,21 @@ It can be used in may ways, including authentication protocols such as
 This repository contains the following projects:
 
 * rfc8941: a pure scala implementation
-  of [RFC 8941: Structured Field Values](https://datatracker.ietf.org/doc/html/rfc8941)
-  needed by "Signing HTTP Messages" that compiles to Java and JavaScript.
-* akka: Implementation for the [akka-http](https://akka.io/) Actor Framework of
+  of [RFC 8941: Structured Field Values](https://datatracker.ietf.org/doc/html/rfc8941) 
+  needed by "Signing HTTP Messages" that compiles to Java and JavaScript. This is a core component needed for "Signing Http Messages"
+* akka: Implementation of "Signing HTTP Messages" for the [akka-http](https://akka.io/) Actor Framework of
   of [Signing HTTP Messages](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html)
-* todo: write a [http4s](https://http4s.org) messages signing project for client and (later) servers
+* [http4s](https://http4s.org) implementation of "Signing HTTP Messages" project for Java or JS clients (todo nodejs)
+
+### Released Artifacts
+
+Artifacts are released in the Sonatype [net.bblfish.crypto](https://oss.sonatype.org/content/repositories/snapshots/net/bblfish/crypto/) 
+snapshot repository.
 
 ### TODO
 
 * make it Java friendly (see how [akka](https://akka.io/) achieves that)
 * make it JS friendly (client and server)
-* publish libs to maven
 
 ### Thanks
 

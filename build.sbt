@@ -20,6 +20,7 @@ ThisBuild / developers := List(
 )
 enablePlugins(TypelevelCiReleasePlugin)
 ThisBuild / tlCiReleaseBranches := Seq("main")
+ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
 ThisBuild / crossScalaVersions := Seq("3.1.0")

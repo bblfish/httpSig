@@ -12,7 +12,7 @@ name := "httpSig"
 ThisBuild / tlBaseVersion  := "0.2"
 ThisBuild / tlUntaggedAreSnapshots := true
 
-ThisBuild / organization := "net.bblfish"
+ThisBuild / organization := "net.bblfish.crypto"
 ThisBuild / organizationName := "Henry Story"
 ThisBuild / startYear := Some(2021)
 ThisBuild / developers := List(
@@ -20,7 +20,7 @@ ThisBuild / developers := List(
 )
 enablePlugins(TypelevelCiReleasePlugin)
 ThisBuild / tlCiReleaseBranches := Seq("main")
-ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
+//ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
 ThisBuild / crossScalaVersions := Seq("3.1.0")
 

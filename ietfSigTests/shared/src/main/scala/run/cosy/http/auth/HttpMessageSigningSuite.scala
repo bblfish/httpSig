@@ -1006,7 +1006,7 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
        )
 
    def publicKeySpec(keyinfo: bobcats.TestKeyPair) =
-     pemutils.getPublicKeySpec(keyinfo.publicKey, keyinfo.keyAlg)
+     pemutils.getPublicKeySpec(keyinfo.publicPk8Key, keyinfo.keyAlg)
    def privateKeySpec(keyinfo: bobcats.TestKeyPair) =
      pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
 

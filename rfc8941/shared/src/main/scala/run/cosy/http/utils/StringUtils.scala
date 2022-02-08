@@ -20,7 +20,7 @@ import java.util.Base64
 import scala.annotation.tailrec
 
 object StringUtils:
-   private val singleSlsh = raw"\\\n *".r
+   private val singleSlsh = raw"\\\n[\t ]*".r
 
    extension (str: String)
 

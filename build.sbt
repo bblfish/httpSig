@@ -34,6 +34,8 @@ addCommandAlias("ciChrome", CI.Chrome.toString)
 
 addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
 
+ThisBuild / resolvers += sonatypeSNAPSHOT
+
 lazy val useJSEnv =
 	settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
 

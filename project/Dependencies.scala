@@ -45,7 +45,7 @@ object Dependencies {
     // https://search.maven.org/artifact/org.typelevel/cats-parse_3
     lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.6")
     lazy val bobcats =
-      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-49002fc-20220207T193250Z-SNAPSHOT")
+      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-69106e6-SNAPSHOT")
   }
   object akka {
     lazy val typed  = akka("akka-actor-typed", CoreVersion)

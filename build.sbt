@@ -35,7 +35,7 @@ addCommandAlias("ciFirefox", CI.Firefox.toString)
 addCommandAlias("ciChrome", CI.Chrome.toString)
 
 addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
-
+ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
 lazy val useJSEnv =

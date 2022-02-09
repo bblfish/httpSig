@@ -41,7 +41,7 @@ ThisBuild / resolvers += sonatypeSNAPSHOT
 lazy val useJSEnv =
   settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
 
-Global / useJSEnv := NodeJS
+Global / useJSEnv := Chrome
 
 ThisBuild / Test / jsEnv := {
   val old = (Test / jsEnv).value

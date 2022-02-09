@@ -35,6 +35,7 @@ addCommandAlias("ciFirefox", CI.Firefox.toString)
 addCommandAlias("ciChrome", CI.Chrome.toString)
 
 addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
+
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
@@ -58,6 +59,8 @@ ThisBuild / Test / jsEnv := {
       new SeleniumJSEnv(options)
   }
 }
+
+lazy val root = tlCrossRootProject.aggregate(rfc8941, akkaSig, http4sSig)
 
 lazy val commonSettings = Seq(
   name        := "HttpSig Library",

@@ -56,8 +56,8 @@ object Http:
      H match
         case GetHeader[res] => res
 
-   private type GetMessage[M]  = Http { type Message = M }
-   private type GetRequest[R]  = Http { type Request = R }
-   private type GetResponse[R] = Http { type Response = R }
-   private type GetHeader[R <: Matchable]   = Http { type Header = R }
+   private type GetMessage[M]             = Http { type Message = M }
+   private type GetRequest[R]             = Http { type Request = R }
+   private type GetResponse[R]            = Http { type Response = R }
+   private type GetHeader[R <: Matchable] = Http { type Header = R }
 end Http

@@ -48,7 +48,6 @@ import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.MessageSelector
 import scala.language.implicitConversions
 
-
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
    type A = AkkaTp.type
    given pem: bobcats.util.PEMUtils                       = bobcats.util.BouncyJavaPEMUtils

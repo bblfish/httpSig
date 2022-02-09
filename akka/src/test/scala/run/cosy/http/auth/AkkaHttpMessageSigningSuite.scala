@@ -46,6 +46,8 @@ import run.cosy.http.utils.StringUtils.*
 import run.cosy.akka.http.headers.`Signature-Input`
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.MessageSelector
+import scala.language.implicitConversions
+
 
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
    type A = AkkaTp.type

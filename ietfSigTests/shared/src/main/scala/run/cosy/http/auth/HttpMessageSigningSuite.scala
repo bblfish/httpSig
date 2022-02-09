@@ -29,8 +29,6 @@ import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 import scodec.bits.ByteVector
-//import com.nimbusds.jose.JWSAlgorithm
-//import run.cosy.akka.http.JW2JCA
 import cats.effect.IO
 import run.cosy.http.utils.StringUtils.*
 

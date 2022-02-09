@@ -19,10 +19,10 @@ package run.cosy.http
 import run.cosy.http.Http.Header
 
 trait Http:
-   type Message
+   type Message <: Matchable
    type Request <: Message
    type Response <: Message
-   type Header
+   type Header <: Matchable
 end Http
 
 trait HttpOps[H <: Http]:
@@ -52,12 +52,12 @@ object Http:
      H match
         case GetResponse[res] => res
 
-   type Header[H <: Http] =
+   type Header[H <: Http] <: Matchable =
      H match
         case GetHeader[res] => res
 
    private type GetMessage[M]  = Http { type Message = M }
    private type GetRequest[R]  = Http { type Request = R }
    private type GetResponse[R] = Http { type Response = R }
-   private type GetHeader[R]   = Http { type Header = R }
+   private type GetHeader[R <: Matchable]   = Http { type Header = R }
 end Http

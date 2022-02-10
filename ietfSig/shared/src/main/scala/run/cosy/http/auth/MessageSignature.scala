@@ -25,7 +25,6 @@ import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.{SelectorOps, *}
 import scodec.bits.ByteVector
 
-import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.security.{PrivateKey, PublicKey}
 import java.util.Locale

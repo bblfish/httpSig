@@ -15,63 +15,68 @@
  */
 
 sealed abstract class CI(
-	rootProject: String,
-	jsEnv: Option[JSEnv],
-	testCommands: List[String],
-	mimaReport: Boolean,
-	suffixCommands: List[String]) {
+    rootProject: String,
+    jsEnv: Option[JSEnv],
+    testCommands: List[String],
+    mimaReport: Boolean,
+    suffixCommands: List[String]
+) {
 
-	override val toString: String = {
-		val commands =
-			(List(
-				s"project $rootProject",
-				jsEnv.fold("")(env => s"set Global / useJSEnv := JSEnv.$env"),
-				"headerCheck",
-				"scalafmtSbtCheck",
-				"scalafmtCheck",
-				"clean"
-			) ++ testCommands ++ List(
-				jsEnv.fold("")(_ => s"set Global / useJSEnv := JSEnv.NodeJS"),
-				if (mimaReport) "mimaReportBinaryIssues" else ""
-			)).filter(_.nonEmpty) ++ suffixCommands
+  override val toString: String = {
+    val commands =
+      (List(
+        s"project $rootProject",
+        jsEnv.fold("")(env => s"set Global / useJSEnv := JSEnv.$env"),
+        "headerCheck",
+        "scalafmtSbtCheck",
+        "scalafmtCheck",
+        "clean"
+      ) ++ testCommands ++ List(
+        jsEnv.fold("")(_ => s"set Global / useJSEnv := JSEnv.NodeJS"),
+        if (mimaReport) "mimaReportBinaryIssues" else ""
+      )).filter(_.nonEmpty) ++ suffixCommands
 
-		commands.mkString("; ", "; ", "")
-	}
+    commands.mkString("; ", "; ", "")
+  }
 }
 
 object CI {
-	case object JVM
-		extends CI(
-			rootProject = "http4sSigJS",
-			jsEnv = None,
-			testCommands = List("test"),
-			mimaReport = false, // TODO
-			suffixCommands = List())
+  case object JVM
+      extends CI(
+        rootProject = "rootJVM",
+        jsEnv = None,
+        testCommands = List("test"),
+        mimaReport = false, // TODO
+        suffixCommands = List()
+      )
 
-// current version of bobcats does not support nodeJS crypto
-//	case object NodeJS
-//		extends CI(
-//			rootProject = "http4sSigJS",
-//			jsEnv = Some(JSEnv.NodeJS),
-//			testCommands = List("test"),
-//			mimaReport = false,
-//			suffixCommands = List())
+  // todo: current version of bobcats does not support nodeJS asymetric crypto
+//  case object NodeJS
+//      extends CI(
+//        rootProject = "rootJS",
+//        jsEnv = Some(JSEnv.NodeJS),
+//        testCommands = List("test"),
+//        mimaReport = false,
+//        suffixCommands = List()
+//      )
 
-	case object Firefox
-		extends CI(
-			rootProject = "http4sSigJS",
-			jsEnv = Some(JSEnv.Firefox),
-			testCommands = List("test"),
-			mimaReport = false,
-			suffixCommands = List())
+  case object Firefox
+      extends CI(
+        rootProject = "rootJS",
+        jsEnv = Some(JSEnv.Firefox),
+        testCommands = List("test"),
+        mimaReport = false,
+        suffixCommands = List()
+      )
 
-	case object Chrome
-		extends CI(
-			rootProject = "http4sSigJS",
-			jsEnv = Some(JSEnv.Chrome),
-			testCommands = List("test"),
-			mimaReport = false,
-			suffixCommands = List())
+  case object Chrome
+      extends CI(
+        rootProject = "rootJS",
+        jsEnv = Some(JSEnv.Chrome),
+        testCommands = List("test"),
+        mimaReport = false,
+        suffixCommands = List()
+      )
 
-	val AllCIs: List[CI] = List(JVM, /*NodeJS,*/ Firefox, Chrome)
+  val AllCIs: List[CI] = List(JVM, Firefox, Chrome) // , NodeJS)
 }

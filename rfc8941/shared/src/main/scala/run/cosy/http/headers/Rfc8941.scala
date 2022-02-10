@@ -178,7 +178,7 @@ object Rfc8941:
         def sf(args: Any*): SfString =
            val strings     = sc.parts.iterator
            val expressions = args.iterator
-           var buf         = new StringBuilder(strings.next())
+           val buf         = new StringBuilder(strings.next())
            while strings.hasNext do
               buf.append(expressions.next())
               buf.append(strings.next())

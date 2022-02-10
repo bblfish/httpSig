@@ -16,21 +16,24 @@ ThisBuild / startYear        := Some(2021)
 ThisBuild / developers := List(
   tlGitHubDev("bblfish", "Henry Story")
 )
+
 enablePlugins(TypelevelCiReleasePlugin)
+enablePlugins(TypelevelSonatypePlugin)
+
 ThisBuild / tlCiReleaseBranches := Seq("main")
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
 ThisBuild / crossScalaVersions := Seq("3.1.0")
 
-ThisBuild / githubWorkflowBuildPreamble ++= Seq(
-  WorkflowStep.Use(
-    UseRef.Public("actions", "setup-node", "v2.4.0"),
-    name = Some("Setup NodeJS v14 LTS"),
-    params = Map("node-version" -> "14"),
-    cond = Some("matrix.ci == 'ciJS'")
-  )
-)
+//ThisBuild / githubWorkflowBuildPreamble ++= Seq(
+//  WorkflowStep.Use(
+//    UseRef.Public("actions", "setup-node", "v2.4.0"),
+//    name = Some("Setup NodeJS v14 LTS"),
+//    params = Map("node-version" -> "14"),
+//    cond = Some("matrix.ci == 'ciJS'")
+//  )
+//)
 
 ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
 ThisBuild / scmInfo := Some(

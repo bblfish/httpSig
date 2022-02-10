@@ -5,8 +5,6 @@ import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
 
-import JSEnv.*
-
 name := "httpSig"
 
 ThisBuild / tlBaseVersion          := "0.2"
@@ -51,18 +49,18 @@ ThisBuild / resolvers += sonatypeSNAPSHOT
 lazy val useJSEnv =
   settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
 
-Global / useJSEnv := NodeJS
+Global / useJSEnv := JSEnv.NodeJS
 
 ThisBuild / Test / jsEnv := {
   val old = (Test / jsEnv).value
 
   useJSEnv.value match {
-    case NodeJS => old
-    case Firefox =>
+    case JSEnv.NodeJS => old
+    case JSEnv.Firefox =>
       val options = new FirefoxOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
-    case Chrome =>
+    case JSEnv.Chrome =>
       val options = new ChromeOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
@@ -89,10 +87,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += cats.parse.value,
     libraryDependencies += tests.munit.value % Test
   ).jsSettings(
-    scalacOptions ++= scala3jsOptions, // ++= is really important. Do NOT use `:=` - that will block testing
-    Test / scalaJSLinkerConfig ~= {
-      _.withModuleKind(ModuleKind.CommonJSModule)
-    } // required for munit to run
+    scalacOptions ++= scala3jsOptions // ++= is really important. Do NOT use `:=` - that will block testing
   ).jvmSettings(
     scalacOptions := scala3Options
   )
@@ -152,7 +147,6 @@ lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
   )
   .dependsOn(rfc8941)
 
-// we only use Java akka here (doing akka-js would be a whole project by itself)
 lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
   .in(file("http4s"))
   .settings(commonSettings*)

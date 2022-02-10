@@ -51,14 +51,14 @@ object CI {
       )
 
   // todo: current version of bobcats does not support nodeJS asymetric crypto
-  case object NodeJS
-      extends CI(
-        rootProject = "rootJS",
-        jsEnv = Some(JSEnv.NodeJS),
-        testCommands = List("test"),
-        mimaReport = false,
-        suffixCommands = List()
-      )
+//  case object NodeJS
+//      extends CI(
+//        rootProject = "rootJS",
+//        jsEnv = Some(JSEnv.NodeJS),
+//        testCommands = List("test"),
+//        mimaReport = false,
+//        suffixCommands = List()
+//      )
 
   case object Firefox
       extends CI(
@@ -78,5 +78,5 @@ object CI {
         suffixCommands = List()
       )
 
-  val AllCIs: List[CI] = List(JVM, Firefox, Chrome, NodeJS)
+  val AllCIs: List[CI] = List(JVM, Firefox, Chrome) // , NodeJS)
 }

@@ -49,16 +49,16 @@ addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/he
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
-lazy val useJSEnv =
-  settingKey[JSEnv]("Use Node.js or a headless browser for running Scala.js tests")
+ThisBuild / githubWorkflowBuildMatrixAdditions += "browser" -> List("Chrome", "Firefox")
+ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.browser }}"
 
-Global / useJSEnv := JSEnv.NodeJS
+lazy val useJSEnv =
+  settingKey[JSEnv]("Browser for running Scala.js tests")
+
+Global / useJSEnv := JSEnv.Chrome //what should go in its place?
 
 ThisBuild / Test / jsEnv := {
-  val old = (Test / jsEnv).value
-
   useJSEnv.value match {
-    case JSEnv.NodeJS => old
     case JSEnv.Firefox =>
       val options = new FirefoxOptions()
       options.setHeadless(true)

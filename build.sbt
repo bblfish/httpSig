@@ -25,12 +25,21 @@ ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 
 ThisBuild / crossScalaVersions := Seq("3.1.0")
 
+ThisBuild / githubWorkflowBuildPreamble ++= Seq(
+	WorkflowStep.Use(
+		UseRef.Public("actions", "setup-node", "v2.4.0"),
+		name = Some("Setup NodeJS v14 LTS"),
+		params = Map("node-version" -> "14"),
+		cond = Some("matrix.ci == 'ciJS'")
+	)
+)
+
 ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
 ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git")
 )
 
-tlReplaceCommandAlias("ciJS", CI.AllCIs.map(_.toString).mkString)
+tlReplaceCommandAlias("ciJS", List(CI.Chrome, CI.Firefox).mkString)
 addCommandAlias("ciFirefox", CI.Firefox.toString)
 addCommandAlias("ciChrome", CI.Chrome.toString)
 

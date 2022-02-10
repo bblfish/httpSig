@@ -43,7 +43,7 @@ sealed abstract class CI(
 object CI {
   case object JVM
       extends CI(
-        rootProject = "http4sSigJS",
+        rootProject = "rootJVM",
         jsEnv = None,
         testCommands = List("test"),
         mimaReport = false, // TODO
@@ -53,7 +53,7 @@ object CI {
   // todo: current version of bobcats does not support nodeJS asymetric crypto
   case object NodeJS
       extends CI(
-        rootProject = "http4sSigJS",
+        rootProject = "rootJS",
         jsEnv = Some(JSEnv.NodeJS),
         testCommands = List("test"),
         mimaReport = false,
@@ -62,7 +62,7 @@ object CI {
 
   case object Firefox
       extends CI(
-        rootProject = "http4sSigJS",
+        rootProject = "rootJS",
         jsEnv = Some(JSEnv.Firefox),
         testCommands = List("test"),
         mimaReport = false,
@@ -71,12 +71,12 @@ object CI {
 
   case object Chrome
       extends CI(
-        rootProject = "http4sSigJS",
+        rootProject = "rootJS",
         jsEnv = Some(JSEnv.Chrome),
         testCommands = List("test"),
         mimaReport = false,
         suffixCommands = List()
       )
 
-  val AllCIs: List[CI] = List(Firefox, Chrome, NodeJS)
+  val AllCIs: List[CI] = List(JVM, Firefox, Chrome, NodeJS)
 }

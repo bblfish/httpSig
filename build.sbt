@@ -4,6 +4,7 @@ import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
 import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
+import JSEnv.{Chrome, Firefox, NodeJS}
 
 name := "httpSig"
 
@@ -17,34 +18,42 @@ ThisBuild / developers := List(
   tlGitHubDev("bblfish", "Henry Story")
 )
 
-enablePlugins(TypelevelCiReleasePlugin)
 enablePlugins(TypelevelSonatypePlugin)
 
-ThisBuild / tlCiReleaseBranches := Seq("main")
+ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
 ThisBuild / crossScalaVersions := Seq("3.1.1")
 
-//ThisBuild / githubWorkflowBuildPreamble ++= Seq(
-//  WorkflowStep.Use(
-//    UseRef.Public("actions", "setup-node", "v2.4.0"),
-//    name = Some("Setup NodeJS v14 LTS"),
-//    params = Map("node-version" -> "14"),
-//    cond = Some("matrix.ci == 'ciJS'")
-//  )
-//)
+ThisBuild / githubWorkflowBuildPreamble ++= Seq(
+  WorkflowStep.Use(
+    UseRef.Public("actions", "setup-node", "v2.4.0"),
+    name = Some("Setup NodeJS v14 LTS"),
+    params = Map("node-version" -> "14"),
+    cond = Some("matrix.project == 'rootJS' && matrix.jsenv == 'NodeJS'")
+  )
+)
+
+val jsenvs = List(NodeJS, Chrome, Firefox).map(_.toString)
+ThisBuild / githubWorkflowBuildMatrixAdditions += "jsenv" -> jsenvs
+ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.jsenv }}"
+ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
+  for {
+    scala <- (ThisBuild / crossScalaVersions).value.init
+    jsenv <- jsenvs.tail
+  } yield MatrixExclude(Map("scala" -> scala, "jsenv" -> jsenv))
+}
+ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
+  for {
+    jsenv <- jsenvs.tail
+  } yield MatrixExclude(Map("project" -> "rootJVM", "jsenv" -> jsenv))
+}
 
 ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
 ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git")
 )
-
-tlReplaceCommandAlias("ciJS", List(CI.Chrome, CI.Firefox).mkString)
-addCommandAlias("ciFirefox", CI.Firefox.toString)
-addCommandAlias("ciChrome", CI.Chrome.toString)
-
-addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
 
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
@@ -55,15 +64,18 @@ ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSE
 lazy val useJSEnv =
   settingKey[JSEnv]("Browser for running Scala.js tests")
 
-Global / useJSEnv := JSEnv.Chrome //what should go in its place?
+Global / useJSEnv := JSEnv.NodeJS //what should go in its place?
 
 ThisBuild / Test / jsEnv := {
+  val old = (Test / jsEnv).value
+
   useJSEnv.value match {
-    case JSEnv.Firefox =>
+    case NodeJS => old
+    case Firefox =>
       val options = new FirefoxOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
-    case JSEnv.Chrome =>
+    case Chrome =>
       val options = new ChromeOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)

@@ -41,8 +41,7 @@ ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSE
 ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
   for {
     scala <- (ThisBuild / crossScalaVersions).value.init
-    jsenv <- jsenvs.tail
-  } yield MatrixExclude(Map("scala" -> scala, "jsenv" -> jsenv))
+  } yield MatrixExclude(Map("scala" -> scala, "jsenv" -> NodeJS.toString))
 }
 ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
   for {

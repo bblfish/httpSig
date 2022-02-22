@@ -58,7 +58,6 @@ ThisBuild / scmInfo := Some(
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
-ThisBuild / githubWorkflowBuildMatrixAdditions += "browser" -> List("Chrome", "Firefox")
 ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.browser }}"
 
 lazy val useJSEnv =

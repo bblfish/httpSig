@@ -32,7 +32,6 @@ jobs:
         java: [temurin@17]
         project: [rootJS, rootJVM]
         jsenv: [NodeJS, Chrome, Firefox]
-        browser: [Chrome, Firefox]
         exclude:
           - project: rootJVM
             jsenv: Chrome

@@ -62,7 +62,7 @@ ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSE
 lazy val useJSEnv =
   settingKey[JSEnv]("Browser for running Scala.js tests")
 
-Global / useJSEnv := JSEnv.NodeJS //what should go in its place?
+Global / useJSEnv := JSEnv.Chrome //what should go in its place?
 
 ThisBuild / Test / jsEnv := {
   val old = (Test / jsEnv).value

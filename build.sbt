@@ -4,18 +4,21 @@ import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
 import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
-import JSEnv.{Chrome, Firefox, NodeJS}
 
 name := "httpSig"
 
 ThisBuild / tlBaseVersion          := "0.2"
 ThisBuild / tlUntaggedAreSnapshots := true
 
-ThisBuild / organization     := "net.bblfish.crypto"
-ThisBuild / organizationName := "Henry Story"
-ThisBuild / startYear        := Some(2021)
 ThisBuild / developers := List(
   tlGitHubDev("bblfish", "Henry Story")
+)
+ThisBuild / startYear        := Some(2021)
+ThisBuild / organization     := "net.bblfish.crypto"
+ThisBuild / organizationName := "Henry Story"
+ThisBuild / homepage         := Some(url("https://github.com/bblfish/httpSig"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git")
 )
 
 ThisBuild / tlCiReleaseBranches := Seq()
@@ -33,11 +36,11 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   )
 )
 
-lazy val jsenvs = List(NodeJS, Chrome, Firefox).map(_.toString)
+lazy val jsenvs = List(JSEnv.NodeJS, JSEnv.Chrome, JSEnv.Firefox).map(_.toString)
 ThisBuild / githubWorkflowBuildMatrixAdditions += "jsenv" -> jsenvs
 ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.jsenv }}"
 ThisBuild / githubWorkflowBuildMatrixExclusions += MatrixExclude(
-  Map("project" -> "rootJS", "jsenv" -> NodeJS.toString)
+  Map("project" -> "rootJS", "jsenv" -> JSEnv.NodeJS.toString)
 )
 
 ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
@@ -45,11 +48,6 @@ ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
     jsenv <- jsenvs.tail
   } yield MatrixExclude(Map("project" -> "rootJVM", "jsenv" -> jsenv))
 }
-
-ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
-ThisBuild / scmInfo := Some(
-  ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git")
-)
 
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
@@ -65,12 +63,12 @@ ThisBuild / Test / jsEnv := {
   val old = (Test / jsEnv).value
 
   useJSEnv.value match {
-    case NodeJS => old
-    case Firefox =>
+    case JSEnv.NodeJS => old
+    case JSEnv.Firefox =>
       val options = new FirefoxOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
-    case Chrome =>
+    case JSEnv.Chrome =>
       val options = new ChromeOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)

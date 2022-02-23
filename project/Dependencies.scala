@@ -21,8 +21,7 @@ object Dependencies {
   lazy val sonatypeSNAPSHOT: MavenRepository =
     "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
   object Ver {
-    val scala = "3.1.0"
-
+    val scala = "3.1.1"
   }
   // https://http4s.org/v1.0/client/
   object http4s {
@@ -43,7 +42,8 @@ object Dependencies {
   object cats {
     // https://search.maven.org/artifact/org.typelevel/cats-parse_3/0.3.6/jar
     // https://search.maven.org/artifact/org.typelevel/cats-parse_3
-    lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.6")
+    lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3-25-7b524da")
+    // https://oss.sonatype.org/content/repositories/snapshots/net/bblfish/crypto/bobcats_3/
     lazy val bobcats =
       Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-69106e6-SNAPSHOT")
   }

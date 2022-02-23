@@ -4,61 +4,65 @@ import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
 import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
+import JSEnv.*
 
 name := "httpSig"
 
 ThisBuild / tlBaseVersion          := "0.2"
 ThisBuild / tlUntaggedAreSnapshots := true
 
-ThisBuild / organization     := "net.bblfish.crypto"
-ThisBuild / organizationName := "Henry Story"
-ThisBuild / startYear        := Some(2021)
 ThisBuild / developers := List(
   tlGitHubDev("bblfish", "Henry Story")
 )
-
-enablePlugins(TypelevelCiReleasePlugin)
-enablePlugins(TypelevelSonatypePlugin)
-
-ThisBuild / tlCiReleaseBranches := Seq("main")
-ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
-//ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
-
-ThisBuild / crossScalaVersions := Seq("3.1.0")
-
-//ThisBuild / githubWorkflowBuildPreamble ++= Seq(
-//  WorkflowStep.Use(
-//    UseRef.Public("actions", "setup-node", "v2.4.0"),
-//    name = Some("Setup NodeJS v14 LTS"),
-//    params = Map("node-version" -> "14"),
-//    cond = Some("matrix.ci == 'ciJS'")
-//  )
-//)
-
-ThisBuild / homepage := Some(url("https://github.com/bblfish/httpSig"))
+ThisBuild / startYear        := Some(2021)
+ThisBuild / organization     := "net.bblfish.crypto"
+ThisBuild / organizationName := "Henry Story"
+ThisBuild / homepage         := Some(url("https://github.com/bblfish/httpSig"))
 ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/bblfish/httpSig"), "git@github.com:bblfish/httpSig.git")
 )
 
-tlReplaceCommandAlias("ciJS", List(CI.Chrome, CI.Firefox).mkString)
-addCommandAlias("ciFirefox", CI.Firefox.toString)
-addCommandAlias("ciChrome", CI.Chrome.toString)
+ThisBuild / tlCiReleaseBranches := Seq()
+ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
+//ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
-addCommandAlias("prePR", "; root/clean; scalafmtSbt; +root/scalafmtAll; +root/headerCreate")
+ThisBuild / crossScalaVersions := Seq("3.1.1")
+
+ThisBuild / githubWorkflowBuildPreamble ++= Seq(
+  WorkflowStep.Use(
+    UseRef.Public("actions", "setup-node", "v2.4.0"),
+    name = Some("Setup NodeJS v14 LTS"),
+    params = Map("node-version" -> "14"),
+    cond = Some("matrix.project == 'rootJS' && matrix.jsenv == 'NodeJS'")
+  )
+)
+
+lazy val jsenvs = List(JSEnv.NodeJS, JSEnv.Chrome, JSEnv.Firefox).map(_.toString)
+ThisBuild / githubWorkflowBuildMatrixAdditions += "jsenv" -> jsenvs
+ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.jsenv }}"
+ThisBuild / githubWorkflowBuildMatrixExclusions += MatrixExclude(
+  Map("project" -> "rootJS", "jsenv" -> JSEnv.NodeJS.toString)
+)
+
+ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
+  for {
+    jsenv <- jsenvs.tail
+  } yield MatrixExclude(Map("project" -> "rootJVM", "jsenv" -> jsenv))
+}
 
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
-ThisBuild / githubWorkflowBuildMatrixAdditions += "browser" -> List("Chrome", "Firefox")
-ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.browser }}"
-
 lazy val useJSEnv =
   settingKey[JSEnv]("Browser for running Scala.js tests")
 
-Global / useJSEnv := JSEnv.Chrome //what should go in its place?
+Global / useJSEnv := JSEnv.NodeJS //what should go in its place?
 
 ThisBuild / Test / jsEnv := {
+  val old = (Test / jsEnv).value
+
   useJSEnv.value match {
+    case JSEnv.NodeJS => old
     case JSEnv.Firefox =>
       val options = new FirefoxOptions()
       options.setHeadless(true)
@@ -184,7 +188,7 @@ lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
     description := "Test Utilities"
   )
 
-val scala3Options = Seq(
+lazy val scala3Options = Seq(
   // "-classpath", "foo:bar:...",         // Add to the classpath.
   // "-encoding", "utf-8",                // Specify character encoding used by source files.
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
@@ -206,7 +210,7 @@ val scala3Options = Seq(
   // "-Ysafe-init",                       // Warn on field access before initialization
   "-Yexplicit-nulls" // For explicit nulls behavior.
 )
-val scala3jsOptions = Seq(
+lazy val scala3jsOptions = Seq(
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   "-new-syntax", // Require `then` and `do` in control expressions.
   "-source:future", // Choices: future and future-migration. I use this to force future deprecation warnings, etc.

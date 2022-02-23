@@ -74,11 +74,11 @@ ThisBuild / Test / jsEnv := {
   }
 }
 
-lazy val root = tlCrossRootProject.aggregate(rfc8941, akkaSig, http4sSig)
+lazy val root = tlCrossRootProject.aggregate(rfc8941, ietfSigHttp, http4sSig, akkaSig)
 
 lazy val commonSettings = Seq(
   name        := "HttpSig Library",
-  description := "Solid App",
+  description := "Set of libraries implementing IETF `Signing Http Messages` RFC",
   startYear   := Some(2021),
   updateOptions := updateOptions.value.withCachedResolution(
     true
@@ -90,7 +90,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
   .settings(commonSettings*)
   .settings(
     name        := "rfc8941",
-    description := "RFC8941 (Structured Field Values) parser",
+    description := "RFC8941 Structured Field Values parser",
     libraryDependencies += cats.parse.value,
     libraryDependencies += tests.munit.value % Test
   ).jsSettings(
@@ -99,28 +99,36 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
     scalacOptions := scala3Options
   )
 
-// we only use Java akka here (doing akka-js would be a whole project by itself)
-lazy val akkaSig = project
-  .in(file("akka"))
+lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
+  .in(file("ietfSig"))
   .settings(commonSettings*)
   .settings(
-    name          := "AkkaHttpSig",
-    description   := "Signing HTTP Messages parser for Akka headers",
+    name        := "Signing Http Messages Core",
+    description := "Generic implementation of the IETF `Signing Http Messages` RFC",
+    libraryDependencies += cats.bobcats.value
+  )
+  .jsSettings(
+    scalacOptions ++= scala3jsOptions // ++= is really important. Do NOT use `:=` - that will block testing
+  )
+  .jvmSettings(
     scalacOptions := scala3Options,
-    libraryDependencies ++= Seq(
-      akka.http.value,
-      akka.stream.value,
-      akka.typed.value
-//			java.nimbusDS
-    ),
     libraryDependencies ++= java.bouncy
-  ).dependsOn(ietfSigHttp.jvm, ietfSigHttpTests.jvm % Test)
+  )
+  .dependsOn(rfc8941)
+
+lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
+  .in(file("test"))
+  .settings(commonSettings*)
+  .settings(
+    name        := "test utils",
+    description := "Test Utilities"
+  )
 
 lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
   .in(file("ietfSigTests"))
   .settings(commonSettings*)
   .settings(
-    name        := "ietfSigTests",
+    name        := "IETF Http Signature Tests",
     description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
     libraryDependencies ++= Seq(
       tests.munitEffect.value,
@@ -137,28 +145,28 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
   )
   .dependsOn(ietfSigHttp)
 
-lazy val ietfSigHttp = crossProject(JVMPlatform, JSPlatform)
-  .in(file("ietfSig"))
+// we only use Java akka here (doing akka-js would be a whole project by itself)
+lazy val akkaSig = project
+  .in(file("akka"))
   .settings(commonSettings*)
   .settings(
-    name        := "ietfSig",
-    description := "generic implementation of IETF `Signing Http Messages`",
-    libraryDependencies += cats.bobcats.value
-  )
-  .jsSettings(
-    scalacOptions ++= scala3jsOptions // ++= is really important. Do NOT use `:=` - that will block testing
-  )
-  .jvmSettings(
+    name          := "Akka Http Signature",
+    description   := "Signing HTTP Messages parser for Akka HTTP Messages",
     scalacOptions := scala3Options,
+    libraryDependencies ++= Seq(
+      akka.http.value,
+      akka.stream.value,
+      akka.typed.value
+      //			java.nimbusDS
+    ),
     libraryDependencies ++= java.bouncy
-  )
-  .dependsOn(rfc8941)
+  ).dependsOn(ietfSigHttp.jvm, ietfSigHttpTests.jvm % Test)
 
 lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
   .in(file("http4s"))
   .settings(commonSettings*)
   .settings(
-    name        := "http4s Sig",
+    name        := "http4s Http Signature",
     description := "Signing HTTP Messages parser for http4s headers library",
     libraryDependencies ++= Seq(
       http4s.client.value,
@@ -179,14 +187,6 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies ++= java.bouncy
   )
   .dependsOn(ietfSigHttp, ietfSigHttpTests % Test, testUtils % Test)
-
-lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
-  .in(file("test"))
-  .settings(commonSettings*)
-  .settings(
-    name        := "testUtils",
-    description := "Test Utilities"
-  )
 
 lazy val scala3Options = Seq(
   // "-classpath", "foo:bar:...",         // Add to the classpath.

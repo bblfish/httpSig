@@ -18,8 +18,6 @@ ThisBuild / developers := List(
   tlGitHubDev("bblfish", "Henry Story")
 )
 
-enablePlugins(TypelevelSonatypePlugin)
-
 ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
@@ -35,14 +33,13 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   )
 )
 
-val jsenvs = List(NodeJS, Chrome, Firefox).map(_.toString)
+lazy val jsenvs = List(NodeJS, Chrome, Firefox).map(_.toString)
 ThisBuild / githubWorkflowBuildMatrixAdditions += "jsenv" -> jsenvs
 ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.jsenv }}"
-ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
-  for {
-    scala <- Seq("3.1.1") // (ThisBuild / crossScalaVersions).value.init
-  } yield MatrixExclude(Map("scala" -> scala, "jsenv" -> NodeJS.toString))
-}
+ThisBuild / githubWorkflowBuildMatrixExclusions += MatrixExclude(
+  Map("project" -> "rootJS", "jsenv" -> NodeJS.toString)
+)
+
 ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
   for {
     jsenv <- jsenvs.tail
@@ -194,7 +191,7 @@ lazy val testUtils = crossProject(JVMPlatform, JSPlatform)
     description := "Test Utilities"
   )
 
-val scala3Options = Seq(
+lazy val scala3Options = Seq(
   // "-classpath", "foo:bar:...",         // Add to the classpath.
   // "-encoding", "utf-8",                // Specify character encoding used by source files.
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
@@ -216,7 +213,7 @@ val scala3Options = Seq(
   // "-Ysafe-init",                       // Warn on field access before initialization
   "-Yexplicit-nulls" // For explicit nulls behavior.
 )
-val scala3jsOptions = Seq(
+lazy val scala3jsOptions = Seq(
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   "-new-syntax", // Require `then` and `do` in control expressions.
   "-source:future", // Choices: future and future-migration. I use this to force future deprecation warnings, etc.

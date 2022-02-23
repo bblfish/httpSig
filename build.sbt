@@ -53,8 +53,6 @@ ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
-ThisBuild / githubWorkflowBuildSbtStepPreamble += s"set Global / useJSEnv := JSEnv.$${{ matrix.browser }}"
-
 lazy val useJSEnv =
   settingKey[JSEnv]("Browser for running Scala.js tests")
 

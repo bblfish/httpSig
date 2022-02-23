@@ -72,23 +72,23 @@ jobs:
           node-version: 14
 
       - name: Check that workflows are up to date
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' ''project /'' githubWorkflowCheck'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''project /'' githubWorkflowCheck'
 
       - name: Check headers and formatting
         if: matrix.java == 'temurin@17'
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' headerCheckAll scalafmtCheckAll ''project /'' scalafmtSbtCheck'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' headerCheckAll scalafmtCheckAll ''project /'' scalafmtSbtCheck'
 
       - name: scalaJSLink
         if: matrix.project == 'rootJS'
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' Test/scalaJSLinkerResult'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' Test/scalaJSLinkerResult'
 
       - name: Test
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' test'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' test'
 
       - name: Check binary compatibility
         if: matrix.java == 'temurin@17'
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' mimaReportBinaryIssues'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' mimaReportBinaryIssues'
 
       - name: Generate API documentation
         if: matrix.java == 'temurin@17'
-        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.browser }}'' doc'
+        run: 'sbt ''project ${{ matrix.project }}'' ''++${{ matrix.scala }}'' ''set Global / useJSEnv := JSEnv.${{ matrix.jsenv }}'' doc'

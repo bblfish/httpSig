@@ -4,6 +4,7 @@ import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
 import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
+import JSEnv.*
 
 name := "httpSig"
 

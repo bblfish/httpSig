@@ -24,7 +24,6 @@ import run.cosy.http.{Http, HttpOps}
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
 import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
 import munit.CatsEffectSuite
-import run.cosy.http.auth.AgentIds.PureKeyId
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
@@ -993,7 +992,7 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
        spec: Try[SPKIKeySpec[AsymmetricKeyAlg]],
        sig: Signature,
        keyId: SfString
-   ): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+   ): IO[MS.SignatureVerifier[IO, KeyIdentified]] =
      for
         keyspec    <- IO.fromTry(spec)
         verifierFn <- bobcats.Verifier[IO].build(keyspec, sig)
@@ -1037,7 +1036,7 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
 
    /** emulate fetching the signature verification info for the keyids given in the Spec
      */
-   def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, Keyidentifier]] =
+   def keyidFetcher(keyid: Rfc8941.SfString): IO[MS.SignatureVerifier[IO, KeyIdentified]] =
      keyid.asciiStr match
         case "test-key-rsa-pss" =>
           verifierFor(rsaPSSPubKey, AsymmetricKeyAlg.`rsa-pss-sha512`, keyid)

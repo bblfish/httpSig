@@ -48,11 +48,11 @@ object Dependencies {
       Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-69106e6-SNAPSHOT")
   }
   object akka {
-    lazy val typed  = akka("akka-actor-typed", CoreVersion)
-    lazy val stream = akka("akka-stream", CoreVersion)
-    lazy val http   = akka("akka-http", HttpVersion)
-    val CoreVersion = "2.6.17"
-    val HttpVersion = "10.2.7"
+    lazy val typed       = akka("akka-actor-typed", CoreVersion)
+    lazy val stream      = akka("akka-stream", CoreVersion)
+    lazy val http        = akka("akka-http", HttpVersion)
+    lazy val CoreVersion = "2.6.18"
+    lazy val HttpVersion = "10.2.8"
     def apply(id: String, version: String): Def.Initialize[ModuleID] =
       Def.setting("com.typesafe.akka" %% id % version cross CrossVersion.for3Use2_13)
   }
@@ -79,7 +79,7 @@ object Dependencies {
     )
   }
   object NPM {
-    val n3    = "n3"    -> "1.11.2"
-    val jsDom = "jsdom" -> "18.1.1"
+    lazy val n3    = "n3"    -> "1.11.2"
+    lazy val jsDom = "jsdom" -> "18.1.1"
   }
 }

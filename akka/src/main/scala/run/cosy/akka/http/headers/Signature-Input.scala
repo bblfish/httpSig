@@ -69,16 +69,16 @@ object `Signature-Input`
      `Signature-Input`(SigInputs(name, sigInput))
    def unapply(h: HttpHeader): Option[SigInputs] =
      h match
-        case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName =>
-          parse(h.value).toOption
-        case _ => None
+     case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName =>
+       parse(h.value).toOption
+     case _ => None
 
    def parse(value: String): Try[SigInputs] =
      Rfc8941.Parser.sfDictionary.parseAll(value) match
-        case Left(e) => Failure(HTTPHeaderParseException(e, value))
-        case Right(lm) => SigInputs(lm).toRight(
-            InvalidSigException(
-              "Signature-Input Header Parses but data structure is not appropriate"
-            )
-          ).toTry
+     case Left(e) => Failure(HTTPHeaderParseException(e, value))
+     case Right(lm) => SigInputs(lm).toRight(
+         InvalidSigException(
+           "Signature-Input Header Parses but data structure is not appropriate"
+         )
+       ).toTry
 end `Signature-Input`

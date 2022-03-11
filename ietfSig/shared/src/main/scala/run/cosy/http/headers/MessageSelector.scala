@@ -91,10 +91,10 @@ trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
      */
    override def signingString(msg: HM, params: Rfc8941.Params = ListMap()): Try[String] =
      params.toSeq match
-        case Seq()                                   => signingStringFor(msg)
-        case Seq(keyParam -> (tk: Rfc8941.SfString)) => signingStringFor(msg, tk)
-        case _ =>
-          Failure(InvalidSigException(s"""Dictionary Selector params »${params}« is malformed """))
+     case Seq()                                   => signingStringFor(msg)
+     case Seq(keyParam -> (tk: Rfc8941.SfString)) => signingStringFor(msg, tk)
+     case _ =>
+       Failure(InvalidSigException(s"""Dictionary Selector params »${params}« is malformed """))
 
    final def signingStringFor(msg: HM): Try[String] = sfDictParse(msg).map { dict =>
      headerName + dict.canon
@@ -121,8 +121,8 @@ trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
 
    def parse(headerValue: String): Try[SfDict] =
      Rfc8941.Parser.sfDictionary.parseAll(headerValue) match
-        case Left(err)   => Failure(HTTPHeaderParseException(err, headerValue))
-        case Right(dict) => Success(dict)
+     case Left(err)   => Failure(HTTPHeaderParseException(err, headerValue))
+     case Right(dict) => Success(dict)
 
 end DictSelector
 

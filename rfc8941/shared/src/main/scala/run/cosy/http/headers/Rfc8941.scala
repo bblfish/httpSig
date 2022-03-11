@@ -123,8 +123,8 @@ object Rfc8941:
 
       @throws[NumberFormatException]
       def apply(sfDecStr: String): SfDec = Parser.sfDecimal.parseAll(sfDecStr) match
-         case Left(err)  => throw new NumberFormatException(err.toString)
-         case Right(num) => num
+      case Left(err)  => throw new NumberFormatException(err.toString)
+      case Right(num) => num
 
       // no need to check bounds if parsed by parser below
       private[Rfc8941] def unsafeParsed(int: String, fract: String): SfDec =
@@ -152,11 +152,11 @@ object Rfc8941:
       @throws[ParsingException]
       def apply(t: String): Token =
         Parser.sfToken.parseAll(t) match
-           case Right(value) => value
-           case Left(err) => throw ParsingException(
-               s"error paring token $t",
-               s"failed at offset ${err.failedAtOffset}"
-             )
+        case Right(value) => value
+        case Left(err) => throw ParsingException(
+            s"error paring token $t",
+            s"failed at offset ${err.failedAtOffset}"
+          )
 
       private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
    end Token
@@ -296,14 +296,14 @@ object Rfc8941:
       given itemSer: Serialise[Item] with
          extension (o: Item)
            def canon: String = o match
-              case i: SfInt => i.long.toString
-              // todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
-              case d: SfDec    => d.double.toString
-              case s: SfString => s.formattedString
-              case tk: Token   => tk.t
-              case as: Bytes => ":" + Base64.getEncoder.nn
-                  .encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
-              case b: Boolean => if b then "?1" else "?0"
+           case i: SfInt => i.long.toString
+           // todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
+           case d: SfDec    => d.double.toString
+           case s: SfString => s.formattedString
+           case tk: Token   => tk.t
+           case as: Bytes => ":" + Base64.getEncoder.nn
+               .encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
+           case b: Boolean => if b then "?1" else "?0"
 
       //
       // complex types
@@ -313,8 +313,8 @@ object Rfc8941:
          extension (o: Param)
            def canon: String = ";" + o._1.canon + {
              o._2 match
-                case b: Boolean => ""
-                case other      => "=" + other.canon
+             case b: Boolean => ""
+             case other      => "=" + other.canon
            }
 
       given paramsSer(using Serialise[Param]): Serialise[Params] with
@@ -327,8 +327,8 @@ object Rfc8941:
       ): Serialise[Parameterized] with
          extension (o: Parameterized)
            def canon: String = o match
-              case l: IList => l.items.map(i => i.canon).mkString("(", " ", ")") + l.params.canon
-              case pi: PItem[?] => pi.item.canon + pi.params.canon
+           case l: IList     => l.items.map(i => i.canon).mkString("(", " ", ")") + l.params.canon
+           case pi: PItem[?] => pi.item.canon + pi.params.canon
 
       given sfDictSer(using
           Serialise[Item],

@@ -44,13 +44,13 @@ object AkkaTp extends Http:
 
          def headerValue(name: String): Option[String] =
            name.toLowerCase(java.util.Locale.ENGLISH) match
-              case "content-type" =>
-                if msg.entity.isKnownEmpty then None
-                else Option(msg.entity.contentType.toString)
-              case "content-length" =>
-                if msg.entity.isKnownEmpty then Some("0")
-                else msg.entity.contentLengthOption.map(_.toString)
-              // todo: need to adapt for multiple headers
-              case _ =>
-                import scala.jdk.OptionConverters.*
-                msg.getHeader(name).toScala.nn.map(_.value.nn)
+           case "content-type" =>
+             if msg.entity.isKnownEmpty then None
+             else Option(msg.entity.contentType.toString)
+           case "content-length" =>
+             if msg.entity.isKnownEmpty then Some("0")
+             else msg.entity.contentLengthOption.map(_.toString)
+           // todo: need to adapt for multiple headers
+           case _ =>
+             import scala.jdk.OptionConverters.*
+             msg.getHeader(name).toScala.nn.map(_.value.nn)

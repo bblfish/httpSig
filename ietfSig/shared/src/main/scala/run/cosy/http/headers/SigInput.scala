@@ -86,8 +86,8 @@ final case class SigInput private (val il: IList):
 
    def keyid: Option[Rfc8941.SfString] =
      il.params.get(keyidTk) match
-        case Some(s: SfString) => Some(s)
-        case _                 => None
+     case Some(s: SfString) => Some(s)
+     case _                 => None
 
    def alg: Option[String]   = il.params.get(algTk).collect { case SfString(str) => str }
    def nonce: Option[String] = il.params.get(nonceTk).collect { case SfString(str) => str }
@@ -122,8 +122,8 @@ object SigInput:
    // this is really functioning as a constructor in pattern matching contexts
    def unapply(pzd: Parameterized): Option[SigInput] =
      pzd match
-        case il: IList if valid(il) => Some(new SigInput(il))
-        case _                      => None
+     case il: IList if valid(il) => Some(new SigInput(il))
+     case _                      => None
 
    /** A Valid SigInput IList has an Internal list of parameterized SfStrings
      */

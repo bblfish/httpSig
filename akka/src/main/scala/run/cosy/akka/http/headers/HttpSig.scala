@@ -31,6 +31,6 @@ import scala.util.Try
 object HSCredentials:
    def unapply(cred: HttpCredentials): Option[HttpSig] =
      cred match
-        case GenericHttpCredentials("HttpSig", _, parameters) =>
-          parameters.get("proof").flatMap(str => Try(HttpSig(Rfc8941.Token(str))).toOption)
-        case _ => None
+     case GenericHttpCredentials("HttpSig", _, parameters) =>
+       parameters.get("proof").flatMap(str => Try(HttpSig(Rfc8941.Token(str))).toOption)
+     case _ => None

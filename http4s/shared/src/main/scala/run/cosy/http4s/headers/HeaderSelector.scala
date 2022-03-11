@@ -242,15 +242,15 @@ object `@query-params` extends MessageSelector[Request[?]]:
 
    override def signingString(msg: Request[?], params: Rfc8941.Params): Try[String] =
      params.toSeq match
-        case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
-            val queryStr = msg.uri.query.params.get(value.asciiStr).getOrElse("")
-            s""""$lowercaseName";name=${value.canon}: $queryStr"""
-          }
-        case _ => Failure(
-            SelectorException(
-              s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
-            )
-          )
+     case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
+         val queryStr = msg.uri.query.params.get(value.asciiStr).getOrElse("")
+         s""""$lowercaseName";name=${value.canon}: $queryStr"""
+       }
+     case _ => Failure(
+         SelectorException(
+           s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
+         )
+       )
 end `@query-params`
 
 object `@request-response` extends MessageSelector[Request[?]]:
@@ -260,12 +260,12 @@ object `@request-response` extends MessageSelector[Request[?]]:
 
    override def signingString(msg: Request[?], params: Rfc8941.Params): Try[String] =
      params.toSeq match
-        case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
-        case _ => Failure(
-            SelectorException(
-              s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
-            )
-          )
+     case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+     case _ => Failure(
+         SelectorException(
+           s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
+         )
+       )
 
    protected def signingStringFor(msg: Request[?], key: Rfc8941.SfString): Try[String] =
      for

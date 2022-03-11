@@ -67,18 +67,17 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
      */
    extension [R <: Message[H]](msg: R)(using selectorDB: SelectorOps[R])
 
-      /** Generate a function to create a new HttpRequest with the given Signature-Input header.
-        * Called by the client, building the message.
+      /** Generate a new HttpRequest using the sigInput parameters to generate a Signing String and
+        * sign that with the signerF function.
         *
         * @param name
-        *   the name of the signature todo: this should probably be done by the code, as it will
-        *   depend on other signatures present in the header
+        *   the name of the signature todo: this should probably be selected by the function, as a
+        *   correct choice will depend on other signatures present in the header
         * @param sigInput
         *   header describing the headers to sign as per "Signing Http Messages" RFC
         * @return
-        *   a function to create a new HttpRequest when given signing function wrapped in a F the F
-        *   can capture an IllegalArgumentException if the required headers are not present in the
-        *   request
+        *   a new HttpRequest when given signing function wrapped in a F. The F can capture an
+        *   IllegalArgumentException if the required headers are not present in the request
         */
       def withSigInput[F[_]](
           name: Rfc8941.Token,
@@ -97,16 +96,15 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
         ))
       end withSigInput
 
-      /** Generate the signature string, given the `signature-input` header. Note, that the headers
-        * to be signed, always contains the `signature-input` header itself.
+      /** Generate the signature string, given the `signature-input` header for this message. Note,
+        * that the headers to be signed, always contains the `signature-input` header itself.
         *
         * @param sigInput
         *   the sigInput header specifying the
         * @return
         *   signing String for given Signature Input on this http message. This string will either
         *   need to be verified with a public key against the given one, or will need to be signed
-        *   to be added to the Request. In the latter case use the withSigInput method. todo: it may
-        *   be more correct if the result is a byte array, rather than a Unicode String.
+        *   to be added to the Request. In the latter case use the withSigInput method.
         */
       def signingString(sigInput: SigInput): Try[SigningString] =
          import Rfc8941.Serialise.{*, given}
@@ -114,16 +112,16 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
          @tailrec
          def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
            todo match
-              case Seq() => Success(onto)
-              case pih :: tail =>
-                if (pih == `@signature-params`.pitem) then
-                   val sigp = `@signature-params`.signingString(sigInput)
-                   Success(if onto == "" then sigp else onto + "\n" + sigp)
-                else
-                   selectorDB.select(msg, pih) match
-                      case Success(hdr) =>
-                        buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
-                      case f => f
+           case Seq() => Success(onto)
+           case pih :: tail =>
+             if (pih == `@signature-params`.pitem) then
+                val sigp = `@signature-params`.signingString(sigInput)
+                Success(if onto == "" then sigp else onto + "\n" + sigp)
+             else
+                selectorDB.select(msg, pih) match
+                case Success(hdr) =>
+                  buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
+                case f => f
          end buildSigString
 
          buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
@@ -217,23 +215,23 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
          @tailrec
          def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
            todo match
-              case Seq() => Success(onto)
-              case pih :: tail =>
-                if (pih == `@signature-params`.pitem) then
-                   val sigp = `@signature-params`.signingString(sigInput)
-                   Success(if onto == "" then sigp else onto + "\n" + sigp)
-                else
-                   val x = responseSelDB.get(pih.item) match
-                      case Success(selector) => selector.signingString(response, pih.params)
-                      case Failure(x) => requestSelDB.get(pih.item).flatMap { selector =>
-                          if selector.specialForRequests then
-                             selector.signingString(request, pih.params)
-                          else Failure(x)
-                        }
-                   x match
-                      case Success(hdr) =>
-                        buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
-                      case f => f
+           case Seq() => Success(onto)
+           case pih :: tail =>
+             if (pih == `@signature-params`.pitem) then
+                val sigp = `@signature-params`.signingString(sigInput)
+                Success(if onto == "" then sigp else onto + "\n" + sigp)
+             else
+                val x = responseSelDB.get(pih.item) match
+                case Success(selector) => selector.signingString(response, pih.params)
+                case Failure(x) => requestSelDB.get(pih.item).flatMap { selector =>
+                    if selector.specialForRequests then
+                       selector.signingString(request, pih.params)
+                    else Failure(x)
+                  }
+                x match
+                case Success(hdr) =>
+                  buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
+                case f => f
          end buildSigString
 
          buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")

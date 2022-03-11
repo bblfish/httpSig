@@ -62,15 +62,15 @@ ThisBuild / Test / jsEnv := {
   val old = (Test / jsEnv).value
 
   useJSEnv.value match {
-    case JSEnv.NodeJS => old
-    case JSEnv.Firefox =>
-      val options = new FirefoxOptions()
-      options.setHeadless(true)
-      new SeleniumJSEnv(options)
-    case JSEnv.Chrome =>
-      val options = new ChromeOptions()
-      options.setHeadless(true)
-      new SeleniumJSEnv(options)
+  case JSEnv.NodeJS => old
+  case JSEnv.Firefox =>
+    val options = new FirefoxOptions()
+    options.setHeadless(true)
+    new SeleniumJSEnv(options)
+  case JSEnv.Chrome =>
+    val options = new ChromeOptions()
+    options.setHeadless(true)
+    new SeleniumJSEnv(options)
   }
 }
 

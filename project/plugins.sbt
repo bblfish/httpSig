@@ -8,6 +8,7 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6+9-9da40876-SNAPSHOT")
 
 // https://typelevel.org/sbt-typelevel/index.html
-addSbtPlugin("org.typelevel" % "sbt-typelevel" % "0.4.5")
+// https://search.maven.org/search?q=a:sbt-typelevel
+addSbtPlugin("org.typelevel" % "sbt-typelevel" % "0.4.6")
 addSbtPlugin("org.scala-js"  % "sbt-scalajs"   % "1.9.0")
 addSbtPlugin("com.eed3si9n"  % "sbt-buildinfo" % "0.11.0")

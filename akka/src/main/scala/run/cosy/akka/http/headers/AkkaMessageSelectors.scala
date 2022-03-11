@@ -72,10 +72,10 @@ class AkkaMessageSelectors(
         override def signingString(msg: Message[A], params: Rfc8941.Params): Try[String] =
           if params.isEmpty then
              msg.entity.contentType match
-                case NoContentType => Failure(
-                    UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
-                  )
-                case ct => Success(s""""$lowercaseName": $ct""")
+             case NoContentType => Failure(
+                 UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
+               )
+             case ct => Success(s""""$lowercaseName": $ct""")
           else
              Failure(SelectorException(
                s"selector $lowercaseName does not take parameters. Received " + params
@@ -86,10 +86,10 @@ class AkkaMessageSelectors(
         override def signingString(msg: Message[A], params: Rfc8941.Params): Try[String] =
           if params.isEmpty then
              msg.entity.contentLengthOption match
-                case None => Failure(
-                    UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
-                  )
-                case Some(cl) => Success(s""""$lowercaseName": $cl""")
+             case None => Failure(
+                 UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
+               )
+             case Some(cl) => Success(s""""$lowercaseName": $cl""")
           else
              Failure(SelectorException(
                s"selector $lowercaseName does not take parameters. Received " + params
@@ -188,15 +188,15 @@ class AkkaMessageSelectors(
 
         override def signingString(msg: Request[A], params: Rfc8941.Params): Try[String] =
           params.toSeq match
-             case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
-                 val queryStr = msg.uri.query().get(value.asciiStr).getOrElse("")
-                 s""""$lowercaseName";name=${value.canon}: $queryStr"""
-               }
-             case _ => Failure(
-                 SelectorException(
-                   s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
-                 )
-               )
+          case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
+              val queryStr = msg.uri.query().get(value.asciiStr).getOrElse("")
+              s""""$lowercaseName";name=${value.canon}: $queryStr"""
+            }
+          case _ => Failure(
+              SelectorException(
+                s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
+              )
+            )
    override lazy val `@request-response`: MessageSelector[Request[A]] =
      new MessageSelector[Request[A]]:
         val keyParam: Rfc8941.Token              = Rfc8941.Token("key")
@@ -205,12 +205,12 @@ class AkkaMessageSelectors(
 
         override def signingString(msg: Request[A], params: Rfc8941.Params): Try[String] =
           params.toSeq match
-             case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
-             case _ => Failure(
-                 SelectorException(
-                   s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
-                 )
-               )
+          case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+          case _ => Failure(
+              SelectorException(
+                s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
+              )
+            )
 
         protected def signingStringFor(msg: Request[A], key: Rfc8941.SfString): Try[String] =
           for

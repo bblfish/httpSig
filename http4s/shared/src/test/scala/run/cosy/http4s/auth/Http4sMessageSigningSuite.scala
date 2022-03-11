@@ -35,32 +35,32 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
 
    override def toRequest(request: HttpMessage): Request[H] =
      request.split(Array('\n', '\r')).toList match
-        case head :: tail =>
-          head.split("\\s+").nn.toList match
-             case methd :: path :: httpVersion :: Nil =>
-               val Right(m) = org.http4s.Method.fromString(methd.nn): @unchecked
-               val Right(p) = org.http4s.Uri.fromString(path.nn): @unchecked
-               val Right(v) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
-               val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
-               import org.http4s.Header.ToRaw.{given, *}
-               // we can ignore the body here, since that is actually not relevant to signing
-               org.http4s.Request(m, p, v, org.http4s.Headers(rawH))
-             case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
-        case _ => throw new Exception("Badly formed HTTP request")
+     case head :: tail =>
+       head.split("\\s+").nn.toList match
+       case methd :: path :: httpVersion :: Nil =>
+         val Right(m) = org.http4s.Method.fromString(methd.nn): @unchecked
+         val Right(p) = org.http4s.Uri.fromString(path.nn): @unchecked
+         val Right(v) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
+         val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
+         import org.http4s.Header.ToRaw.{given, *}
+         // we can ignore the body here, since that is actually not relevant to signing
+         org.http4s.Request(m, p, v, org.http4s.Headers(rawH))
+       case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
+     case _ => throw new Exception("Badly formed HTTP request")
 
    override def toResponse(response: HttpMessage): Response[H] =
      response.split(Array('\n', '\r')).nn.toList match
-        case head :: tail =>
-          head.split("\\s+").nn.toList match
-             case httpVersion :: statusCode :: statusCodeStr :: Nil =>
-               val Right(status) =
-                 org.http4s.Status.fromInt(Integer.parseInt(statusCode.nn)): @unchecked
-               val Right(version) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
-               val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
-               import org.http4s.Header.ToRaw.{given, *}
-               org.http4s.Response(status, version, org.http4s.Headers(rawH))
-             case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
-        case _ => throw new Exception("Badly formed HTTP request")
+     case head :: tail =>
+       head.split("\\s+").nn.toList match
+       case httpVersion :: statusCode :: statusCodeStr :: Nil =>
+         val Right(status) =
+           org.http4s.Status.fromInt(Integer.parseInt(statusCode.nn)): @unchecked
+         val Right(version) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
+         val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
+         import org.http4s.Header.ToRaw.{given, *}
+         org.http4s.Response(status, version, org.http4s.Headers(rawH))
+       case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
+     case _ => throw new Exception("Badly formed HTTP request")
 
    private def parseHeaders(nonMethodLines: List[String]) =
       val (headers, body) = // we loose the body for the moment

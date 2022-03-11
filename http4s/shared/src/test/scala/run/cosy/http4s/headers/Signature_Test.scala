@@ -93,8 +93,8 @@ class Signature_Test extends munit.FunSuite:
              Raw(ci"Signature", ex1.SigString + ", " + ex2.SigString),
              Raw(ci"Signature-Input", SigInpEx.`§4.1`("sig2").SigInputParamsTxt)
            ).get[Signature] match
-              case Some(sig) => assertEquals(sig, new Signature(combinedExpected))
-              case None      => fail("Signature header missing")
+           case Some(sig) => assertEquals(sig, new Signature(combinedExpected))
+           case None      => fail("Signature header missing")
       }
 
 end Signature_Test

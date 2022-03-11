@@ -46,15 +46,15 @@ object Http:
 
    type Request[H <: Http] =
      H match
-        case GetRequest[req] => req
+     case GetRequest[req] => req
 
    type Response[H <: Http] =
      H match
-        case GetResponse[res] => res
+     case GetResponse[res] => res
 
    type Header[H <: Http] <: Matchable =
      H match
-        case GetHeader[res] => res
+     case GetHeader[res] => res
 
    private type GetMessage[M]             = Http { type Message = M }
    private type GetRequest[R]             = Http { type Request = R }

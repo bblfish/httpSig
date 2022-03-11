@@ -53,10 +53,10 @@ trait TypedAkkaSelector[HM <: HttpMessage, HdrType <: HttpHeader: scala.reflect.
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
       val headerValues: Seq[String] = msg.headers[HdrType].map(_.value())
       headerValues match
-         case Seq() => Failure(UnableToCreateSigHeaderException(
-             s"No headers »$lowercaseHeaderName« in http message"
-           ))
-         case head :: tail => Success(NonEmptyList(head, tail))
+      case Seq() => Failure(UnableToCreateSigHeaderException(
+          s"No headers »$lowercaseHeaderName« in http message"
+        ))
+      case head :: tail => Success(NonEmptyList(head, tail))
 
 trait AkkaHeaderSelector[HM <: HttpMessage] extends HeaderSelector[HM]:
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
@@ -64,10 +64,10 @@ trait AkkaHeaderSelector[HM <: HttpMessage] extends HeaderSelector[HM]:
         .filter(_.lowercaseName() == lowercaseHeaderName)
         .map(_.value())
       headersValues match
-         case Seq() => Failure(UnableToCreateSigHeaderException(
-             s"No headers »$lowercaseHeaderName« in http message"
-           ))
-         case head :: tail => Success(NonEmptyList(head, tail))
+      case Seq() => Failure(UnableToCreateSigHeaderException(
+          s"No headers »$lowercaseHeaderName« in http message"
+        ))
+      case head :: tail => Success(NonEmptyList(head, tail))
 
 /** for all headers for which Akka HTTP does not provide a built-in parser */
 trait UntypedAkkaSelector[HM <: HttpMessage]

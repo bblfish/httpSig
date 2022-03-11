@@ -52,13 +52,13 @@ object Signature
    def apply(sig: Signatures): SM = new Signature(sig)
    def unapply(h: HttpHeader): Option[Signatures] =
      h match
-        case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName =>
-          parse(h.value).toOption
-        case _ => None
+     case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName =>
+       parse(h.value).toOption
+     case _ => None
    def parse(value: String): Try[Signatures] =
      Rfc8941.Parser.sfDictionary.parseAll(value) match
-        case Left(e) => Failure(HTTPHeaderParseException(e, value))
-        case Right(lm) => Signatures(lm).toRight(
-            InvalidSigException("Signature Header Parses but data structure is not appropriate")
-          ).toTry
+     case Left(e) => Failure(HTTPHeaderParseException(e, value))
+     case Right(lm) => Signatures(lm).toRight(
+         InvalidSigException("Signature Header Parses but data structure is not appropriate")
+       ).toTry
 end Signature

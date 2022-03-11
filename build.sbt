@@ -53,6 +53,10 @@ ThisBuild / githubWorkflowBuildMatrixExclusions ++= {
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec.temurin("17"))
 ThisBuild / resolvers += sonatypeSNAPSHOT
 
+//may want to remove for sbt-tylevel 0.5 - added this to avoid having all tests run for pull and push in CI
+//see https://github.com/typelevel/sbt-typelevel/issues/177
+ThisBuild / githubWorkflowTargetBranches := Seq("main")
+
 lazy val useJSEnv =
   settingKey[JSEnv]("Browser for running Scala.js tests")
 

@@ -19,9 +19,11 @@ package run.cosy.http.auth
 import scala.util.Try
 
 trait Agent
+trait Authenticated
+
 trait KeyIdentified:
    def keyId: String
 
-case class PureKeyId(keyId: String) extends KeyIdentified with Agent
+case class PureKeyId(keyId: String) extends KeyIdentified, Authenticated, Agent
 class Anonymous                     extends Agent
-object WebServerAgent               extends Agent
+object WebServerAgent               extends Agent, Authenticated

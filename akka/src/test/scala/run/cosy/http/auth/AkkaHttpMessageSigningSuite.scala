@@ -19,25 +19,9 @@ package run.cosy.http.auth
 import scala.util.Success
 import akka.http.scaladsl.model.HttpMethods.*
 import akka.http.scaladsl.model.headers.*
-import akka.http.scaladsl.model.{
-  ContentTypes,
-  DateTime,
-  HttpEntity,
-  HttpMethods,
-  HttpRequest,
-  HttpResponse,
-  MediaTypes,
-  StatusCodes,
-  Uri
-}
+import akka.http.scaladsl.model.{ContentTypes, DateTime, HttpEntity, HttpMethods, HttpRequest, HttpResponse, MediaTypes, StatusCodes, Uri}
 import run.cosy.akka.http.AkkaTp
-import run.cosy.akka.http.headers.{
-  AkkaDictSelector,
-  AkkaMessageSelectors,
-  Signature,
-  UntypedAkkaSelector,
-  `Signature-Input`
-}
+import run.cosy.akka.http.headers.{AkkaDictSelector, AkkaMessageSelectors, Signature, UntypedAkkaSelector, `Signature-Input`}
 import run.cosy.http.headers.{DictSelector, Rfc8941, SigInput, SigInputs, Signatures}
 import run.cosy.http.auth.HttpMessageSigningSuite
 import run.cosy.http.Http
@@ -46,18 +30,26 @@ import run.cosy.http.utils.StringUtils.*
 import run.cosy.akka.http.headers.`Signature-Input`
 import run.cosy.http.headers.Rfc8941.*
 import run.cosy.http.headers.MessageSelector
-import scala.language.implicitConversions
 
-class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
-   type A = AkkaTp.type
+import scala.language.implicitConversions
+import run.cosy.akka.http.AkkaTp.H4
+
+import cats.effect.{Async, IO}
+
+class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, H4]:
    given pem: bobcats.util.PEMUtils                       = bobcats.util.BouncyJavaPEMUtils
-   given ops: run.cosy.http.HttpOps[A]                    = run.cosy.akka.http.AkkaTp.httpOps
+   given ops: run.cosy.http.HttpOps[H4]                    = run.cosy.akka.http.AkkaTp.httpOps
    given sigSuite: run.cosy.http.auth.SigningSuiteHelpers = new SigningSuiteHelpers
    val selectorsSecure   = AkkaMessageSelectors(true, Uri.Host("bblfish.net"), 443)
    val selectorsInSecure = AkkaMessageSelectors(false, Uri.Host("bblfish.net"), 80)
-   val messageSignature: run.cosy.http.auth.MessageSignature[A] = AkkaHttpMessageSignature
+   val messageSignature: run.cosy.http.auth.MessageSignature[H4] = AkkaHttpMessageSignature
    import selectorsSecure.*
-
+   //todo: can scala not infer the following implicits?
+   implicit def akkaReqToGeneric(req: HttpRequest): Http.Request[IO,H4] =
+     req.asInstanceOf[Http.Request[IO,H4]]
+   implicit def akkaReqToGeneric(req: HttpResponse): Http.Response[IO,H4] =
+    req.asInstanceOf[Http.Response[IO,H4]]
+    
    /** todo: with Akka it is possible to automatically convert a String to an HttpMessage, but it
      * requires more work, a different test suite potentially, etc... That will be needed for large
      * test suites though. See
@@ -65,7 +57,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
      *   1. akka.http.impl.engine.parsing.ResponseParserSpec
      */
    @throws[Exception]
-   def toRequest(request: HttpMessage): Request[A] =
+   def toRequest(request: HttpMessage): Request[IO,H4] =
      request match
         case `§2.1.2_HeaderField` => HttpRequest(
             method = HttpMethods.GET,
@@ -184,12 +176,13 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 					|  eKR2CD6IJQvacn5A4Ix5BUAVGqlyp8JYm+S/CWJi31PNUjRRCusCVRj05NrxABNFv3\
 					|  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single
           ): @unchecked
-          val req: Request[A] = toRequest(`§2.3_Request`)
-          req.withHeaders(req.headers ++ Seq(`Signature-Input`(sigIn), Signature(sig)))
+          val req: Request[IO, H4] = toRequest(`§2.3_Request`)
+          val newreq  = req.addHeaders(Seq(`Signature-Input`(sigIn), Signature(sig)))
+          newreq
         case `§4.3_Request` =>
           val forwardedHdr    = RawHeader("Forwarded", "for=192.0.2.123")
-          val req: Request[A] = toRequest(`§3.2_Request`)
-          req.withHeaders(req.headers ++ Seq(forwardedHdr))
+          val req: Request[IO, H4] = toRequest(`§3.2_Request`)
+          req.addHeaders(req.headers ++ Seq(forwardedHdr))
         case `§4.3_Enhanced` =>
           // here we try raw headers
           val forwardedHdr = RawHeader("Forwarded", "for=192.0.2.123")
@@ -216,8 +209,8 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
 				  |    cDHkNaavcokmq+3EBDCQTzgwLqfDmV0vLCXtDda6CNO2Zyum/pMGboCnQn/VkQ+\
 				  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single
           )
-          val req: Request[A] = toRequest(`§2.3_Request`)
-          req.withHeaders(req.headers ++ Seq(forwardedHdr, sigIn, sig))
+          val req: Request[IO, H4] = toRequest(`§2.3_Request`)
+          req.addHeaders(Seq(forwardedHdr, sigIn, sig))
         case B2_test_request => HttpRequest(
             method = HttpMethods.POST,
             uri = Uri("/foo?param=value&pet=dog"),
@@ -252,7 +245,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
         case _ => throw new Exception("no translation available for request " + request)
 
    @throws[Exception]
-   def toResponse(response: HttpMessage): Response[A] =
+   def toResponse(response: HttpMessage): Response[IO, H4] =
      response match
         case `§2.2.10_Response` => HttpResponse(StatusCodes.OK)
             .withHeaders(Date(DateTime.now))
@@ -283,15 +276,15 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[AkkaTp.type]:
      entity = HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
    )
 
-   val `x-example`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]:
+   val `x-example`: MessageSelector[Request[IO,H4]] = new UntypedAkkaSelector[Request[IO,H4]]:
       override val lowercaseName: String = "x-example"
-   val `x-empty-header`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]:
+   val `x-empty-header`: MessageSelector[Request[IO,H4]] = new UntypedAkkaSelector[Request[IO, H4]]:
       override val lowercaseName: String = "x-empty-header"
-   val `x-ows-header`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]:
+   val `x-ows-header`: MessageSelector[Request[IO, H4]] = new UntypedAkkaSelector[Request[IO, H4]]:
       override val lowercaseName: String = "x-ows-header"
-   val `x-obs-fold-header`: MessageSelector[Request[A]] = new UntypedAkkaSelector[Request[A]]:
+   val `x-obs-fold-header`: MessageSelector[Request[IO, H4]] = new UntypedAkkaSelector[Request[IO, H4]]:
       override val lowercaseName: String = "x-obs-fold-header"
-   val `x-dictionary`: DictSelector[Message[A]] = new AkkaDictSelector[Message[A]]:
+   val `x-dictionary`: DictSelector[Message[IO, H4]] = new AkkaDictSelector[Message[IO,  H4]]:
       override val lowercaseName: String = "x-dictionary"
 
    test("§2.2.6. Request Target for CONNECT (does not work for Akka)".fail) {

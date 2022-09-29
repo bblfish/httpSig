@@ -19,9 +19,11 @@ package run.cosy.http
 import run.cosy.http.Http.Header
 
 trait Http:
-   type Message <: Matchable
-   type Request <: Message
-   type Response <: Message
+   rdf =>
+   type H4 = rdf.type
+   type Message[F[_]] <: Matchable
+   type Request[F[_]] <: Message[F]
+   type Response[F[_]] <: Message[F]
    type Header <: Matchable
 end Http
 
@@ -29,11 +31,13 @@ trait HttpOps[H <: Http]:
    import Http.*
 
    /** extensions needed to abstract across HTTP implementations for our purposes */
-   extension (msg: Message[H])
-     def headers: Seq[Header[H]]
+   extension [F[_]](msg: Http.Message[F, H])
+     def headers: Seq[Http.Header[H]]
 
-   extension [R <: Message[H]](msg: R)
-      def addHeaders(headers: Seq[Header[H]]): R
+   extension [F[_], R <: Http.Message[F, H]](msg: R)
+      def addHeaders(headers: Seq[Http.Header[H]]): R
+      // here we do really add a header to existing ones.
+      // note http4s 
       def addHeader(name: String, value: String): R
       // this is used in tests
       def removeHeader(name: String): R
@@ -42,22 +46,22 @@ trait HttpOps[H <: Http]:
 end HttpOps
 
 object Http:
-   type Message[H <: Http] = Request[H] | Response[H]
+   type Message[F[_], H <: Http] =  Request[F, H] | Response[F, H]
 
-   type Request[H <: Http] =
+   type Request[F[_], H <: Http]  =
      H match
-        case GetRequest[req] => req
+        case GetRequest[F, req] => req
 
-   type Response[H <: Http] =
+   type Response[F[_], H <: Http]  =
      H match
-        case GetResponse[res] => res
+        case GetResponse[F, res] => res
 
    type Header[H <: Http] <: Matchable =
      H match
         case GetHeader[res] => res
 
-   private type GetMessage[M]             = Http { type Message = M }
-   private type GetRequest[R]             = Http { type Request = R }
-   private type GetResponse[R]            = Http { type Response = R }
+//   private type GetMessage[F[_], M]       = Http { type Message[F] = M }
+   private type GetRequest[F[_], R]       = Http { type Request[F] = R }
+   private type GetResponse[F[_], R]      = Http { type Response[F] = R }
    private type GetHeader[R <: Matchable] = Http { type Header = R }
 end Http

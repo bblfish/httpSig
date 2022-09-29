@@ -22,18 +22,19 @@ import run.cosy.http.headers.{DictSelector, HeaderSelector, MessageSelectors}
 import run.cosy.http4s.Http4sTp
 import org.http4s.{Header, Method, ParseResult, Uri}
 import org.typelevel.ci.CIString
+import run.cosy.http.Http
 import run.cosy.http4s.headers.{BasicHeaderSelector, Http4sDictSelector, Http4sMessageSelectors}
 import run.cosy.http.headers.MessageSelector
+import run.cosy.http4s.Http4sTp.H4
 
-trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
-   type H = Http4sTp.type
-   override val selectorsSecure: MessageSelectors[H] =
+trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
+   override val selectorsSecure: MessageSelectors[F,H4] =
      new Http4sMessageSelectors(true, Uri.Authority(None, Uri.RegName("bblfish.net"), None), 443)
-   override val selectorsInSecure: MessageSelectors[H] =
+   override val selectorsInSecure: MessageSelectors[F, H4] =
      new Http4sMessageSelectors(false, Uri.Authority(None, Uri.RegName("bblfish.net"), None), 80)
-   override val messageSignature: MessageSignature[H] = run.cosy.http4s.auth.Http4sMessageSignature
+   override val messageSignature: MessageSignature[H4] = run.cosy.http4s.auth.Http4sMessageSignature
 
-   override def toRequest(request: HttpMessage): Request[H] =
+   override def toRequest(request: HttpMessage): Http.Request[F, H4] =
      request.split(Array('\n', '\r')).toList match
         case head :: tail =>
           head.split("\\s+").nn.toList match
@@ -44,11 +45,12 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
                val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
                // we can ignore the body here, since that is actually not relevant to signing
-               org.http4s.Request(m, p, v, org.http4s.Headers(rawH))
+               org.http4s.Request[F](m, p, v, org.http4s.Headers(rawH))
+                 .asInstanceOf[Http.Request[F,H4]] //<- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
-   override def toResponse(response: HttpMessage): Response[H] =
+   override def toResponse(response: HttpMessage): Response[F, H4] =
      response.split(Array('\n', '\r')).nn.toList match
         case head :: tail =>
           head.split("\\s+").nn.toList match
@@ -58,7 +60,8 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
                val Right(version) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
                val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
-               org.http4s.Response(status, version, org.http4s.Headers(rawH))
+               org.http4s.Response[F](status, version, org.http4s.Headers(rawH))
+                 .asInstanceOf[Http.Response[F,H4]] //<- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
@@ -75,24 +78,24 @@ trait Http4sMessageSigningSuite extends HttpMessageSigningSuite[Http4sTp.type]:
         case (h, v) => Header.Raw(CIString(h.trim.nn), v.tail.trim.nn)
       }
       rawH.reverse
-   override val `x-example`: MessageSelector[Request[H]] =
-     new BasicHeaderSelector[Request[H]]:
+   override val `x-example`: MessageSelector[Request[F, H4]] =
+     new BasicHeaderSelector[F, Request[F, H4]]:
         override val lowercaseName: String = "x-example"
 
-   override val `x-empty-header`: MessageSelector[Request[H]] =
-     new BasicHeaderSelector[Request[H]]:
+   override val `x-empty-header`: MessageSelector[Request[F, H4]] =
+     new BasicHeaderSelector[F, Request[F, H4]]:
         override val lowercaseName: String = "x-empty-header"
 
-   override val `x-ows-header`: MessageSelector[Request[H]] =
-     new BasicHeaderSelector[Request[H]]:
+   override val `x-ows-header`: MessageSelector[Request[F, H4]] =
+     new BasicHeaderSelector[F, Request[F, H4]]:
         override val lowercaseName: String = "x-ows-header"
 
-   override val `x-obs-fold-header`: MessageSelector[Request[H]] =
-     new BasicHeaderSelector[Request[H]]:
+   override val `x-obs-fold-header`: MessageSelector[Request[F, H4]] =
+     new BasicHeaderSelector[F, Request[F, H4]]:
         override val lowercaseName: String = "x-obs-fold-header"
 
-   override val `x-dictionary`: DictSelector[Message[H]] =
-     new Http4sDictSelector[Message[H]]:
+   override val `x-dictionary`: DictSelector[Message[F, H4]] =
+     new Http4sDictSelector[F, Message[F, H4]]:
         override val lowercaseName: String = "x-dictionary"
 
    test("§2.2.6. Request Target for CONNECT (works for Http4s but not Akka)") {

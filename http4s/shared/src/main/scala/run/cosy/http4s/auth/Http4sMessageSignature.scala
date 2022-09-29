@@ -17,10 +17,9 @@
 package run.cosy.http4s.auth
 
 import run.cosy.http.auth.{SignatureInputMatcher, SignatureMatcher}
-import run.cosy.http4s.Http4sTp
+import run.cosy.http4s.Http4sTp.H4
 
-object Http4sMessageSignature extends run.cosy.http.auth.MessageSignature[Http4sTp.type]:
-   type H = Http4sTp.type
-   override protected val Signature: SignatureMatcher[H] = run.cosy.http4s.headers.Signature
-   override protected val `Signature-Input`: SignatureInputMatcher[H] =
+object Http4sMessageSignature extends run.cosy.http.auth.MessageSignature[H4]:
+   override protected val Signature: SignatureMatcher[H4] = run.cosy.http4s.headers.Signature
+   override protected val `Signature-Input`: SignatureInputMatcher[H4] =
      run.cosy.http4s.headers.`Signature-Input`

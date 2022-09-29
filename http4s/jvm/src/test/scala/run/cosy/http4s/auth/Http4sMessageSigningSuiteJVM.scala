@@ -19,8 +19,9 @@ package run.cosy.http4s.auth
 import run.cosy.http.HttpOps
 import run.cosy.http.auth.SigningSuiteHelpers
 import run.cosy.http4s.Http4sTp
+import run.cosy.http4s.Http4sTp.H4
 
-class Http4sMessageSigningSuiteJVM extends run.cosy.http4s.auth.Http4sMessageSigningSuite:
+class Http4sMessageSigningSuiteJVM[F[_]] extends run.cosy.http4s.auth.Http4sMessageSigningSuite[F]:
    given pem: bobcats.util.PEMUtils             = bobcats.util.BouncyJavaPEMUtils
-   override given ops: HttpOps[Http4sTp.type]   = Http4sTp.httpOps
+   override given ops: HttpOps[H4]   = Http4sTp.httpOps
    override given sigSuite: SigningSuiteHelpers = new SigningSuiteHelpers

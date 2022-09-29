@@ -156,7 +156,8 @@ lazy val akkaSig = project
     libraryDependencies ++= Seq(
       akka.http.value,
       akka.stream.value,
-      akka.typed.value
+      akka.typed.value,
+      cats.catsEffect.value
       //			java.nimbusDS
     ),
     libraryDependencies ++= java.bouncy

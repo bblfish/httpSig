@@ -47,7 +47,7 @@ class AkkaMessageSelectors[F[_]](
     val defaultPort: Int
 ) extends MessageSelectors[F, H4]:
    import Http.*
-   
+
    override lazy val authorization: MessageSelector[Http.Request[F, H4]] =
      new TypedAkkaSelector[Http.Request[F, H4], Authorization]:
         def akkaCompanion = Authorization
@@ -85,17 +85,17 @@ class AkkaMessageSelectors[F[_]](
      new UntypedAkkaSelector[Http.Message[F, H4]]:
         override val lowercaseName: String = "content-length"
         override def signingString(msg: Http.Message[F, H4], params: Rfc8941.Params): Try[String] =
-          val m = msg.asInstanceOf[HttpMessage]
-          if params.isEmpty then
-             m.entity.contentLengthOption match
-                case None => Failure(
-                    UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
-                  )
-                case Some(cl) => Success(s""""$lowercaseName": $cl""")
-          else
-             Failure(SelectorException(
-               s"selector $lowercaseName does not take parameters. Received " + params
-             ))
+           val m = msg.asInstanceOf[HttpMessage]
+           if params.isEmpty then
+              m.entity.contentLengthOption match
+                 case None => Failure(
+                     UnableToCreateSigHeaderException(s"""No header '$lowercaseName' in request""")
+                   )
+                 case Some(cl) => Success(s""""$lowercaseName": $cl""")
+           else
+              Failure(SelectorException(
+                s"selector $lowercaseName does not take parameters. Received " + params
+              ))
    override lazy val `client-cert`: MessageSelector[Http.Message[F, H4]] =
      new UntypedAkkaSelector[Http.Message[F, H4]]:
         override val lowercaseName: String = "client-cert"
@@ -112,8 +112,8 @@ class AkkaMessageSelectors[F[_]](
         override def specialForRequests: Boolean = true
 
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Try(r.uri.toString()) // tests needed with connnect
+           val r = req.asInstanceOf[HttpRequest]
+           Try(r.uri.toString()) // tests needed with connnect
         //		req.method match
         //		case HttpMethods.CONNECT => Failure(UnableToCreateSigHeaderException("Akka cannot correctly prcess @request-target on CONNECT requests"))
         //		case _ => Success(s""""$lowercaseName": ${req.uri}""")
@@ -123,15 +123,15 @@ class AkkaMessageSelectors[F[_]](
         override def specialForRequests: Boolean = true
 
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Success(r.method.value) // already uppercase
+           val r = req.asInstanceOf[HttpRequest]
+           Success(r.method.value) // already uppercase
    override lazy val `@target-uri`: BasicMessageSelector[Http.Request[F, H4]] =
      new BasicMessageSelector[Http.Request[F, H4]]:
         override def lowercaseName: String       = "@target-uri"
         override def specialForRequests: Boolean = true
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Success(r.effectiveUri(securedConnection, defaultHostHeader).toString())
+           val r = req.asInstanceOf[HttpRequest]
+           Success(r.effectiveUri(securedConnection, defaultHostHeader).toString())
 
    override lazy val `@authority`: BasicMessageSelector[Http.Request[F, H4]] =
      new BasicMessageSelector[Http.Request[F, H4]]:
@@ -140,10 +140,10 @@ class AkkaMessageSelectors[F[_]](
 
         // todo: inefficient as it builds whole URI to extract only a small piece
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Try(r.effectiveUri(true, defaultHostHeader)
-            .authority.toString().toLowerCase(Locale.US).nn // is locale correct?
-          )
+           val r = req.asInstanceOf[HttpRequest]
+           Try(r.effectiveUri(true, defaultHostHeader)
+             .authority.toString().toLowerCase(Locale.US).nn // is locale correct?
+           )
    private lazy val defaultHostHeader =
       val p =
         if defaultPort == 0 then 0
@@ -167,15 +167,15 @@ class AkkaMessageSelectors[F[_]](
         override def specialForRequests: Boolean = true
 
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Try(r.uri.path.toString())
+           val r = req.asInstanceOf[HttpRequest]
+           Try(r.uri.path.toString())
    override lazy val `@status`: BasicMessageSelector[Http.Response[F, H4]] =
      new BasicMessageSelector[Http.Response[F, H4]]:
         override def lowercaseName: String = "@status"
 
         override protected def signingStringValue(res: Http.Response[F, H4]): Try[String] =
-          val r = res.asInstanceOf[HttpResponse]
-          Try("" + r.status.intValue())
+           val r = res.asInstanceOf[HttpResponse]
+           Try("" + r.status.intValue())
 
    override lazy val `@query`: BasicMessageSelector[Http.Request[F, H4]] =
      new BasicMessageSelector[Http.Request[F, H4]]:
@@ -184,8 +184,8 @@ class AkkaMessageSelectors[F[_]](
         override def specialForRequests: Boolean = true
 
         override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-          val r = req.asInstanceOf[HttpRequest]
-          Try(r.uri.queryString(ASCII).map("?" + _).getOrElse(""))
+           val r = req.asInstanceOf[HttpRequest]
+           Try(r.uri.queryString(ASCII).map("?" + _).getOrElse(""))
 
    override lazy val `@query-params`: MessageSelector[Http.Request[F, H4]] =
      new MessageSelector[Http.Request[F, H4]]:
@@ -197,8 +197,8 @@ class AkkaMessageSelectors[F[_]](
         override def signingString(req: Http.Request[F, H4], params: Rfc8941.Params): Try[String] =
           params.toSeq match
              case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
-               val r = req.asInstanceOf[HttpRequest]
-               val queryStr = r.uri.query().get(value.asciiStr).getOrElse("")
+                 val r        = req.asInstanceOf[HttpRequest]
+                 val queryStr = r.uri.query().get(value.asciiStr).getOrElse("")
                  s""""$lowercaseName";name=${value.canon}: $queryStr"""
                }
              case _ => Failure(
@@ -221,7 +221,10 @@ class AkkaMessageSelectors[F[_]](
                  )
                )
 
-        protected def signingStringFor(msg: Http.Request[F, H4], key: Rfc8941.SfString): Try[String] =
+        protected def signingStringFor(
+            msg: Http.Request[F, H4],
+            key: Rfc8941.SfString
+        ): Try[String] =
           for
              sigsDict <- signature.sfDictParse(msg)
              keyStr   <- Try(Rfc8941.Token(key.asciiStr))

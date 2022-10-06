@@ -28,7 +28,7 @@ import run.cosy.http.headers.MessageSelector
 import run.cosy.http4s.Http4sTp.H4
 
 trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
-   override val selectorsSecure: MessageSelectors[F,H4] =
+   override val selectorsSecure: MessageSelectors[F, H4] =
      new Http4sMessageSelectors(true, Uri.Authority(None, Uri.RegName("bblfish.net"), None), 443)
    override val selectorsInSecure: MessageSelectors[F, H4] =
      new Http4sMessageSelectors(false, Uri.Authority(None, Uri.RegName("bblfish.net"), None), 80)
@@ -46,7 +46,7 @@ trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
                import org.http4s.Header.ToRaw.{given, *}
                // we can ignore the body here, since that is actually not relevant to signing
                org.http4s.Request[F](m, p, v, org.http4s.Headers(rawH))
-                 .asInstanceOf[Http.Request[F,H4]] //<- todo: why needed?
+                 .asInstanceOf[Http.Request[F, H4]] // <- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
@@ -61,7 +61,7 @@ trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
                val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
                org.http4s.Response[F](status, version, org.http4s.Headers(rawH))
-                 .asInstanceOf[Http.Response[F,H4]] //<- todo: why needed?
+                 .asInstanceOf[Http.Response[F, H4]] // <- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 

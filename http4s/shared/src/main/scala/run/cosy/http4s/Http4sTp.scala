@@ -29,32 +29,32 @@ object Http4sTp extends Http:
    override type Header = org.http4s.Header.Raw
 
    given httpOps: HttpOps[H4] with
-      
+
       extension [F[_]](msg: Http.Message[F, H4])
         def headers: Seq[Http.Header[H4]] =
-          //the asInstanceOf is needed here to avoid infinite recursion on `headers`
+          // the asInstanceOf is needed here to avoid infinite recursion on `headers`
           msg.asInstanceOf[org.http4s.Message[F]].headers.headers
 
       extension [F[_], R <: Http.Message[F, H4]](msg: R)
          def addHeaders(headers: Seq[Http.Header[H4]]): R =
-           val m = msg.asInstanceOf[org.http4s.Message[F]]
-           m.withHeaders((m.headers ++ Headers(headers)))
-             .asInstanceOf[R]
+            val m = msg.asInstanceOf[org.http4s.Message[F]]
+            m.withHeaders((m.headers ++ Headers(headers)))
+              .asInstanceOf[R]
 
          def addHeader(name: String, value: String): R =
-           val m = msg.asInstanceOf[org.http4s.Message[F]]
-           m.putHeaders(org.http4s.Header.Raw(CIString(name), value))
-             .asInstanceOf[R]
+            val m = msg.asInstanceOf[org.http4s.Message[F]]
+            m.putHeaders(org.http4s.Header.Raw(CIString(name), value))
+              .asInstanceOf[R]
          // this is used in tests
          def removeHeader(name: String): R =
-           val m = msg.asInstanceOf[org.http4s.Message[F]]
-           m.removeHeader(CIString(name))
-             .asInstanceOf[R]
+            val m = msg.asInstanceOf[org.http4s.Message[F]]
+            m.removeHeader(CIString(name))
+              .asInstanceOf[R]
 
          // used in tests: return the Optional Value
          def headerValue(name: String): Option[String] =
-           val m = msg.asInstanceOf[org.http4s.Message[F]]
-           m.headers.get(CIString(name)).map { nel =>
-             nel.foldLeft("")((str, raw) => str + ", " + raw.value.trim)
-           }
+            val m = msg.asInstanceOf[org.http4s.Message[F]]
+            m.headers.get(CIString(name)).map { nel =>
+              nel.foldLeft("")((str, raw) => str + ", " + raw.value.trim)
+            }
 end Http4sTp

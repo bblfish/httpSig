@@ -22,16 +22,16 @@ import run.cosy.http.Http.*
 import run.cosy.http.headers.{DictSelector, HeaderSelector, MessageSelector, MessageSelectors}
 import run.cosy.http4s.Http4sTp.H4
 import run.cosy.http.headers.BasicMessageSelector
-import scala.util.{Try,Success,Failure}
+import scala.util.{Try, Success, Failure}
 import org.http4s.headers.Host
 import org.http4s.Query
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.auth.{AttributeMissingException,SelectorException}
+import run.cosy.http.auth.{AttributeMissingException, SelectorException}
 
 object Http4sMessageSelector:
    def request[F[_]](name: String): MessageSelector[Http.Request[F, H4]] =
-     new BasicHeaderSelector[F,Http.Request[F, H4]]:
+     new BasicHeaderSelector[F, Http.Request[F, H4]]:
         override val lowercaseName: String = name
    def response[F[_]](name: String): MessageSelector[Http.Response[F, H4]] =
      new BasicHeaderSelector[F, Http.Response[F, H4]]:

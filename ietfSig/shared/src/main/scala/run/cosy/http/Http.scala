@@ -37,7 +37,7 @@ trait HttpOps[H <: Http]:
    extension [F[_], R <: Http.Message[F, H]](msg: R)
       def addHeaders(headers: Seq[Http.Header[H]]): R
       // here we do really add a header to existing ones.
-      // note http4s 
+      // note http4s
       def addHeader(name: String, value: String): R
       // this is used in tests
       def removeHeader(name: String): R
@@ -46,13 +46,13 @@ trait HttpOps[H <: Http]:
 end HttpOps
 
 object Http:
-   type Message[F[_], H <: Http] =  Request[F, H] | Response[F, H]
+   type Message[F[_], H <: Http] = Request[F, H] | Response[F, H]
 
-   type Request[F[_], H <: Http]  =
+   type Request[F[_], H <: Http] =
      H match
         case GetRequest[F, req] => req
 
-   type Response[F[_], H <: Http]  =
+   type Response[F[_], H <: Http] =
      H match
         case GetResponse[F, res] => res
 

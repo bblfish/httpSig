@@ -42,11 +42,10 @@ import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http4s.Http4sTp.H4
 import org.http4s.{Request as H4Request, Message as H4Message, Response as H4Response}
 
-
 import java.util.Locale
 
-trait BasicHeaderSelector[F[_], HM <: Http.Message[F,H4]]
-    extends BasicMessageSelector[HM] with Http4sHeaderSelector[F,HM]:
+trait BasicHeaderSelector[F[_], HM <: Http.Message[F, H4]]
+    extends BasicMessageSelector[HM] with Http4sHeaderSelector[F, HM]:
    def lowercaseHeaderName: String = lowercaseName
 
    override protected def signingStringValue(msg: HM): Try[String] =
@@ -56,15 +55,15 @@ end BasicHeaderSelector
 
 trait Http4sHeaderSelector[F[_], HM <: Http.Message[F, H4]] extends HeaderSelector[HM]:
    lazy val ciLowercaseName: CIString = CIString(lowercaseHeaderName)
-   
+
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
-     val m  = msg.asInstanceOf[H4Message[F]]
-     for
-        nonEmpty <- m.headers.get(ciLowercaseName)
-          .toRight(UnableToCreateSigHeaderException(
-            s"""No headers "$lowercaseHeaderName" in http message"""
-          )).toTry
-     yield nonEmpty.map(_.value)
+      val m = msg.asInstanceOf[H4Message[F]]
+      for
+         nonEmpty <- m.headers.get(ciLowercaseName)
+           .toRight(UnableToCreateSigHeaderException(
+             s"""No headers "$lowercaseHeaderName" in http message"""
+           )).toTry
+      yield nonEmpty.map(_.value)
 end Http4sHeaderSelector
 
 trait Http4sDictSelector[F[_], HM <: Http.Message[F, H4]]

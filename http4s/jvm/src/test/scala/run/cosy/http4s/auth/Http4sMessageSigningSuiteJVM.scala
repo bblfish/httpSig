@@ -23,5 +23,5 @@ import run.cosy.http4s.Http4sTp.H4
 
 class Http4sMessageSigningSuiteJVM[F[_]] extends run.cosy.http4s.auth.Http4sMessageSigningSuite[F]:
    given pem: bobcats.util.PEMUtils             = bobcats.util.BouncyJavaPEMUtils
-   override given ops: HttpOps[H4]   = Http4sTp.httpOps
+   override given ops: HttpOps[H4]              = Http4sTp.httpOps
    override given sigSuite: SigningSuiteHelpers = new SigningSuiteHelpers

@@ -22,7 +22,12 @@ import akka.http.scaladsl.model.headers.*
 import cats.data.NonEmptyList
 import run.cosy.akka.http.headers.BetterCustomHeader
 import run.cosy.http.Http
-import run.cosy.http.auth.{AttributeMissingException, HTTPHeaderParseException, SelectorException, UnableToCreateSigHeaderException}
+import run.cosy.http.auth.{
+  AttributeMissingException,
+  HTTPHeaderParseException,
+  SelectorException,
+  UnableToCreateSigHeaderException
+}
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.{PItem, Params, Serialise, SfDict, SfString}
 import run.cosy.http.headers.*
@@ -37,7 +42,7 @@ import akka.http.scaladsl.model as ak
 import cats.effect.*
 
 /** Selectors that work on headers but take no parameters. */
-trait AkkaBasicHeaderSelector[HM <: Http.Message[IO,H4]]
+trait AkkaBasicHeaderSelector[HM <: Http.Message[IO, H4]]
     extends BasicMessageSelector[HM] with AkkaHeaderSelector[HM]:
 
    override def lowercaseHeaderName: String = lowercaseName
@@ -46,12 +51,12 @@ trait AkkaBasicHeaderSelector[HM <: Http.Message[IO,H4]]
 
 /** Akka's builtin header parsers have specialised parsers for the most well known headers.
   */
-trait TypedAkkaSelector[HM <: Http.Message[IO,H4], HdrType <: HttpHeader: scala.reflect.ClassTag]
+trait TypedAkkaSelector[HM <: Http.Message[IO, H4], HdrType <: HttpHeader: scala.reflect.ClassTag]
     extends AkkaBasicHeaderSelector[HM]:
    override val lowercaseName: String = akkaCompanion.lowercaseName
    def akkaCompanion: ModeledCompanion[HdrType]
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
-      val m = msg.asInstanceOf[ak.HttpMessage]
+      val m                         = msg.asInstanceOf[ak.HttpMessage]
       val headerValues: Seq[String] = m.headers[HdrType].map(_.value())
       headerValues match
          case Seq() => Failure(UnableToCreateSigHeaderException(
@@ -60,7 +65,7 @@ trait TypedAkkaSelector[HM <: Http.Message[IO,H4], HdrType <: HttpHeader: scala.
          case head :: tail => Success(NonEmptyList(head, tail))
 
 //todo: the type IO is arbitrary for Akka. Currently using it because of tests, which is not right
-trait AkkaHeaderSelector[HM <: Http.Message[IO,H4]] extends HeaderSelector[HM]:
+trait AkkaHeaderSelector[HM <: Http.Message[IO, H4]] extends HeaderSelector[HM]:
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
       val m = msg.asInstanceOf[ak.HttpMessage]
       val headersValues: Seq[String] = m.headers

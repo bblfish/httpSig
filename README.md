@@ -15,6 +15,29 @@ This repository contains the following projects:
   of [Signing HTTP Messages](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html)
 * [http4s](https://http4s.org) implementation of "Signing HTTP Messages" project for Java or JS clients (todo nodejs)
 
+### JavaScript Testing
+
+httpSig compiles to Java and JavaScript. 
+Testing in JS environments is done using [Selenium](https://www.selenium.dev). 
+This requires having a selenium driver. 
+On MacOs this is installed ([see Stack Overflow](https://stackoverflow.com/questions/18868743/how-to-install-selenium-webdriver-on-mac-os)) using `brew install selenium-server`. But one still requires Chrome and Firefox drivers to be installed after that.
+ * For Mozilla drivers see [their geckodriver page](https://github.com/mozilla/geckodriver/releases)
+ * For Chrome see the [Chrome Driver page](https://chromedriver.chromium.org/downloads) 
+
+Inside of sbt one can then run tests for Firefox only with
+```scala
+> set Global / useJSEnv := JSEnv.Firefox
+> test
+```
+Inside of sbt one can then run tests for Chrome only with
+```scala
+> set Global / useJSEnv := JSEnv.Chrome
+> test
+```
+NodeJS is the default.
+
+(Please fill in details for other environments)
+
 ### Released Artifacts
 
 Artifacts are released in the Sonatype [net.bblfish.crypto](https://oss.sonatype.org/content/repositories/snapshots/net/bblfish/crypto/) 

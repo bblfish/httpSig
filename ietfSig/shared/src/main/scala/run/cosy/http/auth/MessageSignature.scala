@@ -64,14 +64,13 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
    protected val `Signature-Input`: SignatureInputMatcher[H]
 
    /** [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
-     * Note: the F[_] here is playing too many roles. In http4s it is the type of the content itself, though in Akka that
-     *  is ignored. The other role of F is as a type of wrapper to fetch remote objects.
-     *  This is ok, as for our uses we don't ever look at the content of either messages, only at the headers.
-     *  (but for http4s we do need to know the type of the content or else we cannot correctly type the result of
-     *   adding headers to a Message)
+     * Note: the F[_] here is playing too many roles. In http4s it is the type of the content
+     * itself, though in Akka that is ignored. The other role of F is as a type of wrapper to fetch
+     * remote objects. This is ok, as for our uses we don't ever look at the content of either
+     * messages, only at the headers. (but for http4s we do need to know the type of the content or
+     * else we cannot correctly type the result of adding headers to a Message)
      */
-   extension [F[_], R <: Http.Message[F, H]](msg: R)(using
-     selectorDB: SelectorOps[R])
+   extension [F[_], R <: Http.Message[F, H]](msg: R)(using selectorDB: SelectorOps[R])
 
       /** Generate a function to create a new HttpRequest with the given Signature-Input header.
         * Called by the client, building the message.
@@ -191,8 +190,8 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
       def signatureAuthN[A](
           fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
       )(using
-        ME: MonadError[F, Throwable],
-        clock : Clock[F]
+          ME: MonadError[F, Throwable],
+          clock: Clock[F]
       ): HttpSig => F[A] = (httpSig) =>
         for
            (si: SigInput, sig: Bytes) <- ME.fromTry(msg.getSignature(httpSig.proofName)

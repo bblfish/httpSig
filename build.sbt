@@ -26,7 +26,7 @@ ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
-ThisBuild / crossScalaVersions := Seq("3.1.3", "3.2.0")
+ThisBuild / crossScalaVersions := Seq("3.1.3")
 
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(

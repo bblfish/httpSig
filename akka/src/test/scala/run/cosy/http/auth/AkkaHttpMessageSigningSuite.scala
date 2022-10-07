@@ -60,11 +60,6 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, H4]:
    val selectorsInSecure = AkkaMessageSelectors(false, Uri.Host("bblfish.net"), 80)
    val messageSignature: run.cosy.http.auth.MessageSignature[H4] = AkkaHttpMessageSignature
    import selectorsSecure.*
-   // todo: can scala not infer the following implicits?
-   implicit def akkaReqToGeneric(req: HttpRequest): Http.Request[IO, H4] =
-     req.asInstanceOf[Http.Request[IO, H4]]
-   implicit def akkaReqToGeneric(req: HttpResponse): Http.Response[IO, H4] =
-     req.asInstanceOf[Http.Response[IO, H4]]
 
    /** todo: with Akka it is possible to automatically convert a String to an HttpMessage, but it
      * requires more work, a different test suite potentially, etc... That will be needed for large

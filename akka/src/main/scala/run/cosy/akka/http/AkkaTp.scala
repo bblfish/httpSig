@@ -17,16 +17,22 @@
 package run.cosy.akka.http
 
 import akka.http.scaladsl.model
-import akka.http.scaladsl.model.{HttpHeader, HttpMessage}
+import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.headers.RawHeader
 import run.cosy.http.{Http, HttpOps}
 import akka.http.scaladsl.model as ak
+import cats.effect.IO
 
 object AkkaTp extends Http:
    override type Message[F[_]]  = model.HttpMessage
    override type Request[F[_]]  = model.HttpRequest
    override type Response[F[_]] = model.HttpResponse
    override type Header         = model.HttpHeader
+
+   given Conversion[model.HttpRequest, Http.Request[IO,H4]] with
+     def apply(req: HttpRequest): Http.Request[IO,H4] = req.asInstanceOf[Http.Request[IO,H4]]
+   given Conversion[model.HttpResponse, Http.Response[IO,H4]] with
+     def apply(req: HttpResponse): Http.Response[IO,H4] = req.asInstanceOf[Http.Response[IO,H4]]
 
    given httpOps: HttpOps[H4] with
 

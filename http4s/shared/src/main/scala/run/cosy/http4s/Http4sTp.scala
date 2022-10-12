@@ -22,9 +22,9 @@ import run.cosy.http.Http.{Header, Message}
 import run.cosy.http.{Http, HttpOps}
 
 object Http4sTp extends Http:
-   override type Message  = [F[_]] =>> (org.http4s.Request[F] | org.http4s.Response[F])
-   override type Request  = [F[_]] =>> org.http4s.Request[F]
-   override type Response = [F[_]] =>> org.http4s.Response[F]
+   override type Message[F[_]]  =  org.http4s.Request[F] | org.http4s.Response[F]
+   override type Request[F[_]]  =  org.http4s.Request[F]
+   override type Response[F[_]] =  org.http4s.Response[F]
 
    override type Header = org.http4s.Header.Raw
 

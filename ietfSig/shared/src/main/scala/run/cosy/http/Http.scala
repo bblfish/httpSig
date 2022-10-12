@@ -19,12 +19,14 @@ package run.cosy.http
 import run.cosy.http.Http.Header
 
 trait Http:
-   rdf =>
-   type H4 = rdf.type
+   http =>
+   type HT = http.type
    type Message[F[_]] <: Matchable
    type Request[F[_]] <: Message[F]
    type Response[F[_]] <: Message[F]
    type Header <: Matchable
+   
+   given hOps: HttpOps[HT]
 end Http
 
 trait HttpOps[H <: Http]:

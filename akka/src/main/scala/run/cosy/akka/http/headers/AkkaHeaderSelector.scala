@@ -37,12 +37,12 @@ import java.util.Locale
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 import cats.Id
-import run.cosy.akka.http.AkkaTp.H4
+import run.cosy.akka.http.AkkaTp.HT as AH
 import akka.http.scaladsl.model as ak
 import cats.effect.*
 
 /** Selectors that work on headers but take no parameters. */
-trait AkkaBasicHeaderSelector[HM <: Http.Message[IO, H4]]
+trait AkkaBasicHeaderSelector[HM <: Http.Message[IO, AH]]
     extends BasicMessageSelector[HM] with AkkaHeaderSelector[HM]:
 
    override def lowercaseHeaderName: String = lowercaseName
@@ -51,7 +51,7 @@ trait AkkaBasicHeaderSelector[HM <: Http.Message[IO, H4]]
 
 /** Akka's builtin header parsers have specialised parsers for the most well known headers.
   */
-trait TypedAkkaSelector[HM <: Http.Message[IO, H4], HdrType <: HttpHeader: scala.reflect.ClassTag]
+trait TypedAkkaSelector[HM <: Http.Message[IO, AH], HdrType <: HttpHeader: scala.reflect.ClassTag]
     extends AkkaBasicHeaderSelector[HM]:
    override val lowercaseName: String = akkaCompanion.lowercaseName
    def akkaCompanion: ModeledCompanion[HdrType]
@@ -65,7 +65,7 @@ trait TypedAkkaSelector[HM <: Http.Message[IO, H4], HdrType <: HttpHeader: scala
          case head :: tail => Success(NonEmptyList(head, tail))
 
 //todo: the type IO is arbitrary for Akka. Currently using it because of tests, which is not right
-trait AkkaHeaderSelector[HM <: Http.Message[IO, H4]] extends HeaderSelector[HM]:
+trait AkkaHeaderSelector[HM <: Http.Message[IO, AH]] extends HeaderSelector[HM]:
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
       val m = msg.asInstanceOf[ak.HttpMessage]
       val headersValues: Seq[String] = m.headers
@@ -78,10 +78,10 @@ trait AkkaHeaderSelector[HM <: Http.Message[IO, H4]] extends HeaderSelector[HM]:
          case head :: tail => Success(NonEmptyList(head, tail))
 
 /** for all headers for which Akka HTTP does not provide a built-in parser */
-trait UntypedAkkaSelector[HM <: Http.Message[IO, H4]]
+trait UntypedAkkaSelector[HM <: Http.Message[IO, AH]]
     extends AkkaBasicHeaderSelector[HM] with AkkaHeaderSelector[HM]
 
 /** todo: the UntypedAkkaSelector inheritance may not be long term */
-trait AkkaDictSelector[HM <: Http.Message[IO, H4]]
+trait AkkaDictSelector[HM <: Http.Message[IO, AH]]
     extends DictSelector[HM] with AkkaHeaderSelector[HM]:
    override def lowercaseHeaderName: String = lowercaseName

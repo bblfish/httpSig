@@ -29,20 +29,20 @@ object AkkaTp extends Http:
    override type Response[F[_]] = model.HttpResponse
    override type Header         = model.HttpHeader
 
-   given Conversion[model.HttpRequest, Http.Request[IO,H4]] with
-     def apply(req: HttpRequest): Http.Request[IO,H4] = req.asInstanceOf[Http.Request[IO,H4]]
-   given Conversion[model.HttpResponse, Http.Response[IO,H4]] with
-     def apply(req: HttpResponse): Http.Response[IO,H4] = req.asInstanceOf[Http.Response[IO,H4]]
+   given Conversion[model.HttpRequest, Http.Request[IO,HT]] with
+     def apply(req: HttpRequest): Http.Request[IO,HT] = req.asInstanceOf[Http.Request[IO,HT]]
+   given Conversion[model.HttpResponse, Http.Response[IO,HT]] with
+     def apply(req: HttpResponse): Http.Response[IO,HT] = req.asInstanceOf[Http.Response[IO,HT]]
 
-   given httpOps: HttpOps[H4] with
+   given hOps: HttpOps[HT] with
 
-      extension [F[_]](msg: Http.Message[F, H4])
-        def headers: Seq[Http.Header[H4]] =
+      extension [F[_]](msg: Http.Message[F, HT])
+        def headers: Seq[Http.Header[HT]] =
            val m = msg.asInstanceOf[ak.HttpMessage]
            m.headers
 
-      extension [F[_], R <: Http.Message[F, H4]](msg: R)
-         def addHeaders(headers: Seq[Http.Header[H4]]): R =
+      extension [F[_], R <: Http.Message[F, HT]](msg: R)
+         def addHeaders(headers: Seq[Http.Header[HT]]): R =
             // don't know how to get rid of the  asInstanceOf
             val m      = msg.asInstanceOf[HttpMessage]
             val newreq = m.withHeaders(headers.map(_.asInstanceOf[HttpHeader]) ++ m.headers)

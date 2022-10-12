@@ -25,7 +25,7 @@ import org.typelevel.ci.CIString
 import run.cosy.http.Http
 import run.cosy.http4s.headers.{BasicHeaderSelector, Http4sDictSelector, Http4sMessageSelectors}
 import run.cosy.http.headers.MessageSelector
-import run.cosy.http4s.Http4sTp.H4
+import run.cosy.http4s.Http4sTp.HT as H4
 
 trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
    override val selectorsSecure: MessageSelectors[F, H4] =

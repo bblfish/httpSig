@@ -28,15 +28,15 @@ object Http4sTp extends Http:
 
    override type Header = org.http4s.Header.Raw
 
-   given httpOps: HttpOps[H4] with
+   given hOps: HttpOps[HT] with
 
-      extension [F[_]](msg: Http.Message[F, H4])
-        def headers: Seq[Http.Header[H4]] =
+      extension [F[_]](msg: Http.Message[F, HT])
+        def headers: Seq[Http.Header[HT]] =
           // the asInstanceOf is needed here to avoid infinite recursion on `headers`
           msg.asInstanceOf[org.http4s.Message[F]].headers.headers
 
-      extension [F[_], R <: Http.Message[F, H4]](msg: R)
-         def addHeaders(headers: Seq[Http.Header[H4]]): R =
+      extension [F[_], R <: Http.Message[F, HT]](msg: R)
+         def addHeaders(headers: Seq[Http.Header[HT]]): R =
             val m = msg.asInstanceOf[org.http4s.Message[F]]
             m.withHeaders((m.headers ++ Headers(headers)))
               .asInstanceOf[R]

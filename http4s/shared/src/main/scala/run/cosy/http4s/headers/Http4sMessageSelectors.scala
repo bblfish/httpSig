@@ -20,7 +20,7 @@ import org.http4s.{Uri, Message as H4Message, Request as H4Request, Response as 
 import run.cosy.http.Http
 import run.cosy.http.Http.*
 import run.cosy.http.headers.{DictSelector, HeaderSelector, MessageSelector, MessageSelectors}
-import run.cosy.http4s.Http4sTp.H4
+import run.cosy.http4s.Http4sTp.HT as H4
 import run.cosy.http.headers.BasicMessageSelector
 import scala.util.{Try, Success, Failure}
 import org.http4s.headers.Host

@@ -24,5 +24,5 @@ import cats.effect.IO
 
 class Http4sMessageSigningSuiteJS[F[_]] extends run.cosy.http4s.auth.Http4sMessageSigningSuite[F]:
    given pem: bobcats.util.PEMUtils             = bobcats.util.WebCryptoPEMUtils
-   override given ops: HttpOps[HT]   = Http4sTp.hOps
+   override given ops: HttpOps[HT]              = Http4sTp.hOps
    override given sigSuite: SigningSuiteHelpers = new SigningSuiteHelpers

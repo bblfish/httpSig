@@ -25,7 +25,7 @@ trait Http:
    type Request[F[_]] <: Message[F]
    type Response[F[_]] <: Message[F]
    type Header <: Matchable
-   
+
    given hOps: HttpOps[HT]
 end Http
 

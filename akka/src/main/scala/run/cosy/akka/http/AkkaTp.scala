@@ -29,10 +29,10 @@ object AkkaTp extends Http:
    override type Response[F[_]] = model.HttpResponse
    override type Header         = model.HttpHeader
 
-   given Conversion[model.HttpRequest, Http.Request[IO,HT]] with
-     def apply(req: HttpRequest): Http.Request[IO,HT] = req.asInstanceOf[Http.Request[IO,HT]]
-   given Conversion[model.HttpResponse, Http.Response[IO,HT]] with
-     def apply(req: HttpResponse): Http.Response[IO,HT] = req.asInstanceOf[Http.Response[IO,HT]]
+   given Conversion[model.HttpRequest, Http.Request[IO, HT]] with
+      def apply(req: HttpRequest): Http.Request[IO, HT] = req.asInstanceOf[Http.Request[IO, HT]]
+   given Conversion[model.HttpResponse, Http.Response[IO, HT]] with
+      def apply(req: HttpResponse): Http.Response[IO, HT] = req.asInstanceOf[Http.Response[IO, HT]]
 
    given hOps: HttpOps[HT] with
 

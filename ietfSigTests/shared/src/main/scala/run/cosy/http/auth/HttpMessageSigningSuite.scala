@@ -19,14 +19,16 @@ package run.cosy.http.auth
 import bobcats.AsymmetricKeyAlg.Signature
 import bobcats.PKCS8KeySpec
 import cats.effect.Async
-import run.cosy.http.{Http, HttpOps}
+import _root_.run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
 import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
-import run.cosy.http.headers.*
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
-import run.cosy.http.utils.StringUtils.*
+import _root_.run.cosy.http.headers.*
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.utils.StringUtils.*
+import _root_.run.cosy.http.auth.MessageSignature
+import _root_.run.cosy.http.headers.SelectorOps
 import scodec.bits.ByteVector
 
 import cats.syntax.all.*
@@ -38,8 +40,8 @@ import java.security.spec.{PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, MessageDigest, Signature as JSignature}
 import java.time.Clock
 import java.util.Base64
-import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import _root_.scala.language.implicitConversions
+import _root_.scala.util.{Failure, Success, Try}
 
 trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 
@@ -51,7 +53,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
    type HttpMessage = String
    val selectorsSecure: MessageSelectors[F, H]
    val selectorsInSecure: MessageSelectors[F, H]
-   val messageSignature: run.cosy.http.auth.MessageSignature[H]
+   val messageSignature: MessageSignature[H]
    
    import messageSignature.{*, given}
    import selectorsSecure.*
@@ -73,7 +75,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
    def `request-target`(value: String): Success[String] = expectedHeader("@request-target", value)
    def expectedHeader(name: String, value: String)      = Success("\"" + name + "\": " + value)
 
-   given specialRequestSelectorOps: run.cosy.http.headers.SelectorOps[Request[F, H]] =
+   given specialRequestSelectorOps: SelectorOps[Request[F, H]] =
      selectorsSecure.requestSelectorOps.append(
        `x-example`,
        `x-empty-header`,
@@ -81,7 +83,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
        `x-obs-fold-header`,
        `x-dictionary`
      )
-   given specialResponseSelectorOps: run.cosy.http.headers.SelectorOps[Response[F, H]] =
+   given specialResponseSelectorOps: SelectorOps[Response[F, H]] =
      selectorsSecure.responseSelectorOps.append(`x-dictionary`)
 
    @throws[Exception]

@@ -50,7 +50,7 @@ object Dependencies {
       Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-7a91946-SNAPSHOT")
 
     // https://index.scala-lang.org/typelevel/cats-effect/artifacts/cats-effect/3.3.14
-    // todo: other libraries deped on cats effect, is this the right version?
+    // todo: other libraries depend on cats effect, is this the right version?
     lazy val catsEffect = Def.setting("org.typelevel" %% "cats-effect" % "3.3.14")
   }
 
@@ -71,7 +71,7 @@ object Dependencies {
       * @see
       *   https://connect2id.com/products/nimbus-jose-jwt/examples/jwk-conversion
       */
-    lazy val nimbusDS = "com.nimbusds" % "nimbus-jose-jwt" % "9.25.4"
+    lazy val nimbusDS = "com.nimbusds" % "nimbus-jose-jwt" % "9.25.6"
 
     /** BouncyCastle (for parsing PEM encoded objects at present in test) MIT style License
       *

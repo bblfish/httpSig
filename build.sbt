@@ -8,7 +8,7 @@ import JSEnv.*
 
 name := "httpSig"
 
-ThisBuild / tlBaseVersion          := "0.2"
+ThisBuild / tlBaseVersion          := "0.3"
 ThisBuild / tlUntaggedAreSnapshots := true
 
 ThisBuild / developers := List(

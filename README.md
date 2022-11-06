@@ -1,8 +1,8 @@
 ## HttpSig library
 
 This library consists of Scala and Scala-JS components implementing the
-IETF's HTTP-Bis [Signing HTTP Messages](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html)
-spec. That spec builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
+IETF's HTTP-Bis [Signing HTTP Messages](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-message-signatures)
+spec (version 13). That spec builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
 spec. It can be used in many ways, including authentication protocols such as
 [HttpSig](https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md).
 

@@ -22,7 +22,7 @@ import cats.effect.Async
 import _root_.run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
-import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
+import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, HttpMessageSignaturesV07 }
 import _root_.run.cosy.http.headers.*
 import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
@@ -1013,7 +1013,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 end HttpMessageSigningSuite
 
 class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
-   import bobcats.SigningHttpMessages.`test-key-rsa-pss`
+   import bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`
    import bobcats.util.PEMUtils.PKCS8_PEM
    import run.cosy.http.auth.MessageSignature as MS
    def verifierFor(
@@ -1036,19 +1036,19 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
      pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
 
    lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`)
 
    lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa`)
 
    lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
-     privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+     privateKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`)
 
    lazy val ecc_256_PubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-ecc-p256`)
 
    lazy val ecc_256_PrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
-     privateKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+     privateKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-ecc-p256`)
 
    lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
      for

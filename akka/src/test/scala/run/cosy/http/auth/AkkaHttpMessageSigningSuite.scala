@@ -150,7 +150,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
                 """KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu5rif3g7ckTbbX7C4\
 					  |  Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79gBeqvHNUO4bhI27p\
 					  |  4WzD1bJDG9+6ml3gkrs7rOvMtROObPuc78A95fa4+skS/t2T7OjkfsHAm/enxf1fA\
-					  |  wkk15xj0n6kmriwZfgUlOqyff0XLwuAHXFvZ+ZTyxYNoo2+EfFg4NVfqtSJch2WDY\
+                      |  wkk15xj0n6kmriwZfgUlOqyff0XLwuH4XFvZ+ZTyxYNoo2+EfFg4NVfqtSJch2WDY\
 					  |  7n/qmhZOzMfyHlggWYFnDpyP27VrzQCQg8rM1Crp6MrwGLa94v6qP8pq0sQVq2DLt\
 					  |  4NJSoRRqXTvqlWIRnexmcKXjQFVz6YSA==""".rfc8792single.base64Decode
               ))

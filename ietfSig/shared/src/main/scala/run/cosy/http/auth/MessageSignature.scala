@@ -64,8 +64,13 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
    protected val `Signature-Input`: SignatureInputMatcher[H]
 
    /** [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
+     * Note: the F[_] here is playing too many roles. In http4s it is the type of the content
+     * itself, though in Akka that is ignored. The other role of F is as a type of wrapper to fetch
+     * remote objects. This is ok, as for our uses we don't ever look at the content of either
+     * messages, only at the headers. (but for http4s we do need to know the type of the content or
+     * else we cannot correctly type the result of adding headers to a Message)
      */
-   extension [R <: Message[H]](msg: R)(using selectorDB: SelectorOps[R])
+   extension [F[_], R <: Http.Message[F, H]](msg: R)(using selectorDB: SelectorOps[R])
 
       /** Generate a function to create a new HttpRequest with the given Signature-Input header.
         * Called by the client, building the message.
@@ -80,13 +85,13 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
         *   can capture an IllegalArgumentException if the required headers are not present in the
         *   request
         */
-      def withSigInput[F[_]](
+      def withSigInput(
           name: Rfc8941.Token,
           sigInput: SigInput,
           signerF: SigningF[F]
       )(using meF: MonadError[F, Throwable]): F[R] =
         for
-           toSignBytes <- meF.fromTry(signingString(sigInput))
+           toSignBytes <- meF.fromTry(signingStr(sigInput))
            signature   <- signerF(toSignBytes)
         yield msg.addHeaders(Seq(
           `Signature-Input`(name, sigInput),
@@ -108,7 +113,7 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
         *   to be added to the Request. In the latter case use the withSigInput method. todo: it may
         *   be more correct if the result is a byte array, rather than a Unicode String.
         */
-      def signingString(sigInput: SigInput): Try[SigningString] =
+      def signingStr(sigInput: SigInput): Try[SigningString] =
          import Rfc8941.Serialise.{*, given}
 
          @tailrec
@@ -128,7 +133,7 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
 
          buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
            .flatMap(string => ByteVector.encodeAscii(string).toTry)
-      end signingString
+      end signingStr
 
       /** get the signature data for a given signature name eg `sig1` from the headers.
         *
@@ -182,10 +187,11 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
         *   1. use `fetchKeyId` to construct the needed verifier
         *   1. Verify the header, and if verified return the Agent object A
         */
-      def signatureAuthN[F[_]: Clock, A](
+      def signatureAuthN[A](
           fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
       )(using
-          ME: MonadError[F, Throwable]
+          ME: MonadError[F, Throwable],
+          clock: Clock[F]
       ): HttpSig => F[A] = (httpSig) =>
         for
            (si: SigInput, sig: Bytes) <- ME.fromTry(msg.getSignature(httpSig.proofName)
@@ -195,7 +201,7 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
            now <- summon[Clock[F]].realTime
            sigStr <-
              if si.isValidAt(now)
-             then ME.fromTry(msg.signingString(si))
+             then ME.fromTry(msg.signingStr(si))
              else
                 ME.fromTry(
                   Failure(new Throwable(s"Signature no longer valid at $now"))
@@ -206,12 +212,12 @@ trait MessageSignature[H <: Http](using ops: HttpOps[H]):
         yield agent
 
    /* needed for request-response dependencies */
-   extension (response: Response[H])(using
-       requestSelDB: SelectorOps[Request[H]],
-       responseSelDB: SelectorOps[Response[H]]
+   extension [F[_]](response: Response[F, H])(using
+       requestSelDB: SelectorOps[Request[F, H]],
+       responseSelDB: SelectorOps[Response[F, H]]
    )
 
-      def signingString(sigInput: SigInput, request: Request[H]): Try[SigningString] =
+      def signingString(sigInput: SigInput, request: Request[F, H]): Try[SigningString] =
          import Rfc8941.Serialise.{*, given}
 
          @tailrec

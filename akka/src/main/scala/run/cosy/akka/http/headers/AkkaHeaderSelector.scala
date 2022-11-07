@@ -21,6 +21,7 @@ import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.*
 import cats.data.NonEmptyList
 import run.cosy.akka.http.headers.BetterCustomHeader
+import run.cosy.http.Http
 import run.cosy.http.auth.{
   AttributeMissingException,
   HTTPHeaderParseException,
@@ -35,9 +36,13 @@ import java.nio.charset.Charset
 import java.util.Locale
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
+import cats.Id
+import run.cosy.akka.http.AkkaTp.HT as AH
+import akka.http.scaladsl.model as ak
+import cats.effect.*
 
 /** Selectors that work on headers but take no parameters. */
-trait AkkaBasicHeaderSelector[HM <: HttpMessage]
+trait AkkaBasicHeaderSelector[HM <: Http.Message[IO, AH]]
     extends BasicMessageSelector[HM] with AkkaHeaderSelector[HM]:
 
    override def lowercaseHeaderName: String = lowercaseName
@@ -46,21 +51,24 @@ trait AkkaBasicHeaderSelector[HM <: HttpMessage]
 
 /** Akka's builtin header parsers have specialised parsers for the most well known headers.
   */
-trait TypedAkkaSelector[HM <: HttpMessage, HdrType <: HttpHeader: scala.reflect.ClassTag]
+trait TypedAkkaSelector[HM <: Http.Message[IO, AH], HdrType <: HttpHeader: scala.reflect.ClassTag]
     extends AkkaBasicHeaderSelector[HM]:
    override val lowercaseName: String = akkaCompanion.lowercaseName
    def akkaCompanion: ModeledCompanion[HdrType]
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
-      val headerValues: Seq[String] = msg.headers[HdrType].map(_.value())
+      val m                         = msg.asInstanceOf[ak.HttpMessage]
+      val headerValues: Seq[String] = m.headers[HdrType].map(_.value())
       headerValues match
          case Seq() => Failure(UnableToCreateSigHeaderException(
              s"No headers »$lowercaseHeaderName« in http message"
            ))
          case head :: tail => Success(NonEmptyList(head, tail))
 
-trait AkkaHeaderSelector[HM <: HttpMessage] extends HeaderSelector[HM]:
+//todo: the type IO is arbitrary for Akka. Currently using it because of tests, which is not right
+trait AkkaHeaderSelector[HM <: Http.Message[IO, AH]] extends HeaderSelector[HM]:
    override def filterHeaders(msg: HM): Try[NonEmptyList[String]] =
-      val headersValues: Seq[String] = msg.headers
+      val m = msg.asInstanceOf[ak.HttpMessage]
+      val headersValues: Seq[String] = m.headers
         .filter(_.lowercaseName() == lowercaseHeaderName)
         .map(_.value())
       headersValues match
@@ -70,10 +78,10 @@ trait AkkaHeaderSelector[HM <: HttpMessage] extends HeaderSelector[HM]:
          case head :: tail => Success(NonEmptyList(head, tail))
 
 /** for all headers for which Akka HTTP does not provide a built-in parser */
-trait UntypedAkkaSelector[HM <: HttpMessage]
+trait UntypedAkkaSelector[HM <: Http.Message[IO, AH]]
     extends AkkaBasicHeaderSelector[HM] with AkkaHeaderSelector[HM]
 
 /** todo: the UntypedAkkaSelector inheritance may not be long term */
-trait AkkaDictSelector[HM <: HttpMessage]
+trait AkkaDictSelector[HM <: Http.Message[IO, AH]]
     extends DictSelector[HM] with AkkaHeaderSelector[HM]:
    override def lowercaseHeaderName: String = lowercaseName

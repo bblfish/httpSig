@@ -1,8 +1,8 @@
 ## HttpSig library
 
 This library consists of Scala and Scala-JS components implementing the
-IETF's HTTP-Bis [Signing HTTP Messages](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html)
-spec. That spec builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
+IETF's HTTP-Bis [Signing HTTP Messages](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-message-signatures)
+spec (version 13). That spec builds on the experience of [Amazon Web Services, Signing HTTP](https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html).
 spec. It can be used in many ways, including authentication protocols such as
 [HttpSig](https://github.com/solid/authentication-panel/blob/main/proposals/HttpSignature.md).
 
@@ -14,6 +14,29 @@ This repository contains the following projects:
 * akka: Implementation of "Signing HTTP Messages" for the [akka-http](https://akka.io/) Actor Framework of
   of [Signing HTTP Messages](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html)
 * [http4s](https://http4s.org) implementation of "Signing HTTP Messages" project for Java or JS clients (todo nodejs)
+
+### JavaScript Testing
+
+httpSig compiles to Java and JavaScript. 
+Testing in JS environments is done using [Selenium](https://www.selenium.dev). 
+This requires having a selenium driver. 
+On MacOs this is installed ([see Stack Overflow](https://stackoverflow.com/questions/18868743/how-to-install-selenium-webdriver-on-mac-os)) using `brew install selenium-server`. But one still requires Chrome and Firefox drivers to be installed after that.
+ * For Mozilla drivers see [their geckodriver page](https://github.com/mozilla/geckodriver/releases)
+ * For Chrome see the [Chrome Driver page](https://chromedriver.chromium.org/downloads) 
+
+Inside of sbt one can then run tests for Firefox only with
+```scala
+> set Global / useJSEnv := JSEnv.Firefox
+> test
+```
+Inside of sbt one can then run tests for Chrome only with
+```scala
+> set Global / useJSEnv := JSEnv.Chrome
+> test
+```
+NodeJS is the default.
+
+(Please fill in details for other environments)
 
 ### Released Artifacts
 

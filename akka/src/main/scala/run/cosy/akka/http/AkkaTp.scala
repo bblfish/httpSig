@@ -17,40 +17,57 @@
 package run.cosy.akka.http
 
 import akka.http.scaladsl.model
+import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.headers.RawHeader
 import run.cosy.http.{Http, HttpOps}
+import akka.http.scaladsl.model as ak
+import cats.effect.IO
 
 object AkkaTp extends Http:
-   override type Message  = model.HttpMessage
-   override type Request  = model.HttpRequest
-   override type Response = model.HttpResponse
-   override type Header   = model.HttpHeader
+   override type Message[F[_]]  = model.HttpMessage
+   override type Request[F[_]]  = model.HttpRequest
+   override type Response[F[_]] = model.HttpResponse
+   override type Header         = model.HttpHeader
 
-   given httpOps: HttpOps[AkkaTp.type] with
-      type A = AkkaTp.type
+   given Conversion[model.HttpRequest, Http.Request[IO, HT]] with
+      def apply(req: HttpRequest): Http.Request[IO, HT] = req.asInstanceOf[Http.Request[IO, HT]]
+   given Conversion[model.HttpResponse, Http.Response[IO, HT]] with
+      def apply(req: HttpResponse): Http.Response[IO, HT] = req.asInstanceOf[Http.Response[IO, HT]]
 
-      extension (msg: Http.Message[A])
-        def headers: Seq[Http.Header[A]] = msg.headers
+   given hOps: HttpOps[HT] with
 
-      extension [R <: Http.Message[A]](msg: R)
-         def addHeaders(headers: Seq[Http.Header[A]]): R =
-           // don't know how to get rid of the asInstanceOf
-           msg.withHeaders(msg.headers ++ headers).asInstanceOf[R]
+      extension [F[_]](msg: Http.Message[F, HT])
+        def headers: Seq[Http.Header[HT]] =
+           val m = msg.asInstanceOf[ak.HttpMessage]
+           m.headers
+
+      extension [F[_], R <: Http.Message[F, HT]](msg: R)
+         def addHeaders(headers: Seq[Http.Header[HT]]): R =
+            // don't know how to get rid of the  asInstanceOf
+            val m      = msg.asInstanceOf[HttpMessage]
+            val newreq = m.withHeaders(headers.map(_.asInstanceOf[HttpHeader]) ++ m.headers)
+            newreq.asInstanceOf[R]
 
          def addHeader(name: String, value: String): R =
-           msg.withHeaders(msg.headers.prepended(RawHeader(name, value))).asInstanceOf[R]
+            val m = msg.asInstanceOf[HttpMessage]
+            m.withHeaders(m.headers.prepended(RawHeader(name, value))).asInstanceOf[R]
 
-         def removeHeader(name: String): R = msg.removeHeader(name).asInstanceOf[R]
+         def removeHeader(name: String): R =
+            val m = msg.asInstanceOf[ak.HttpMessage]
+            m.removeHeader(name).asInstanceOf[R]
 
          def headerValue(name: String): Option[String] =
-           name.toLowerCase(java.util.Locale.ENGLISH) match
-              case "content-type" =>
-                if msg.entity.isKnownEmpty then None
-                else Option(msg.entity.contentType.toString)
-              case "content-length" =>
-                if msg.entity.isKnownEmpty then Some("0")
-                else msg.entity.contentLengthOption.map(_.toString)
-              // todo: need to adapt for multiple headers
-              case _ =>
-                import scala.jdk.OptionConverters.*
-                msg.getHeader(name).toScala.nn.map(_.value.nn)
+            val m = msg.asInstanceOf[HttpMessage]
+            name.toLowerCase(java.util.Locale.ENGLISH) match
+               case "content-type" =>
+                 if m.entity.isKnownEmpty then None
+                 else Option(m.entity.contentType.toString)
+               case "content-length" =>
+                 if m.entity.isKnownEmpty then Some("0")
+                 else m.entity.contentLengthOption.map(_.toString)
+               // todo: need to adapt for multiple headers
+               case _ =>
+                 import scala.jdk.OptionConverters.*
+                 m.getHeader(name).toScala.nn.map(_.value.nn)
+
+end AkkaTp

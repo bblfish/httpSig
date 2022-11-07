@@ -8,7 +8,7 @@ import JSEnv.*
 
 name := "httpSig"
 
-ThisBuild / tlBaseVersion          := "0.2"
+ThisBuild / tlBaseVersion          := "0.3"
 ThisBuild / tlUntaggedAreSnapshots := true
 
 ThisBuild / developers := List(
@@ -26,7 +26,7 @@ ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
-ThisBuild / crossScalaVersions := Seq("3.1.1")
+ThisBuild / crossScalaVersions := Seq("3.1.3")
 
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(
@@ -156,7 +156,8 @@ lazy val akkaSig = project
     libraryDependencies ++= Seq(
       akka.http.value,
       akka.stream.value,
-      akka.typed.value
+      akka.typed.value,
+      cats.catsEffect.value
       //			java.nimbusDS
     ),
     libraryDependencies ++= java.bouncy

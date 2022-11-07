@@ -20,39 +20,39 @@ import run.cosy.http.Http
 import run.cosy.http.headers.MessageSelector
 
 // implementations will need to specify default hosts and ports
-trait MessageSelectors[H <: Http]:
+trait MessageSelectors[F[_], H <: Http]:
    import Http.*
    val securedConnection: Boolean
 
-   lazy val authorization: MessageSelector[Request[H]]
-   lazy val `cache-control`: MessageSelector[Message[H]]
-   lazy val date: MessageSelector[Message[H]]
+   lazy val authorization: MessageSelector[Request[F, H]]
+   lazy val `cache-control`: MessageSelector[Message[F, H]]
+   lazy val date: MessageSelector[Message[F, H]]
 
-   lazy val etag: MessageSelector[Response[H]]
-   lazy val host: MessageSelector[Request[H]]
-   lazy val signature: DictSelector[Message[H]]
+   lazy val etag: MessageSelector[Response[F, H]]
+   lazy val host: MessageSelector[Request[F, H]]
+   lazy val signature: DictSelector[Message[F, H]]
 
-   lazy val `content-type`: MessageSelector[Message[H]]
-   lazy val `content-length`: MessageSelector[Message[H]]
-   lazy val digest: MessageSelector[Message[H]]
-   lazy val forwarded: MessageSelector[Message[H]]
-   lazy val `client-cert`: MessageSelector[Message[H]]
+   lazy val `content-type`: MessageSelector[Message[F, H]]
+   lazy val `content-length`: MessageSelector[Message[F, H]]
+   lazy val digest: MessageSelector[Message[F, H]]
+   lazy val forwarded: MessageSelector[Message[F, H]]
+   lazy val `client-cert`: MessageSelector[Message[F, H]]
 
-   lazy val `@request-target`: MessageSelector[Request[H]]
-   lazy val `@method`: MessageSelector[Request[H]]
-   lazy val `@target-uri`: MessageSelector[Request[H]]
-   lazy val `@authority`: MessageSelector[Request[H]]
-   lazy val `@scheme`: MessageSelector[Request[H]]
-   lazy val `@path`: MessageSelector[Request[H]]
-   lazy val `@status`: MessageSelector[Response[H]]
-   lazy val `@query`: MessageSelector[Request[H]]
-   lazy val `@query-params`: MessageSelector[Request[H]]
-   lazy val `@request-response`: MessageSelector[Request[H]]
+   lazy val `@request-target`: MessageSelector[Request[F, H]]
+   lazy val `@method`: MessageSelector[Request[F, H]]
+   lazy val `@target-uri`: MessageSelector[Request[F, H]]
+   lazy val `@authority`: MessageSelector[Request[F, H]]
+   lazy val `@scheme`: MessageSelector[Request[F, H]]
+   lazy val `@path`: MessageSelector[Request[F, H]]
+   lazy val `@status`: MessageSelector[Response[F, H]]
+   lazy val `@query`: MessageSelector[Request[F, H]]
+   lazy val `@query-params`: MessageSelector[Request[F, H]]
+   lazy val `@request-response`: MessageSelector[Request[F, H]]
 
    /** Note: @target-uri and @scheme can only be set by application code as a choice needs to be
      * made
      */
-   given requestSelectorOps: SelectorOps[Request[H]] = SelectorOps[Request[H]](
+   given requestSelectorOps: SelectorOps[Request[F, H]] = SelectorOps[Request[F, H]](
      authorization,
      host,
      forwarded,
@@ -75,8 +75,8 @@ trait MessageSelectors[H <: Http]:
 
    // both: digest, `content-length`, `content-type`, signature, date, `cache-control`
 
-   given responseSelectorOps: SelectorOps[Response[H]] =
-     SelectorOps[Response[H]](
+   given responseSelectorOps: SelectorOps[Response[F, H]] =
+     SelectorOps[Response[F, H]](
        `@status`,
        etag,
        // all these are good for requests too
@@ -87,3 +87,5 @@ trait MessageSelectors[H <: Http]:
        date,
        `cache-control`
      )
+
+end MessageSelectors

@@ -19,28 +19,31 @@ package run.cosy.http.auth
 import bobcats.AsymmetricKeyAlg.Signature
 import bobcats.PKCS8KeySpec
 import cats.effect.Async
-import run.cosy.http.{Http, HttpOps}
+import _root_.run.cosy.http.{Http, HttpOps}
 //todo: SignatureBytes is less likely to class with objects like Signature
 import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
-import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, SigningHttpMessages}
-import munit.CatsEffectSuite
-import run.cosy.http.headers.*
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, HttpMessageSignaturesV07 }
+import _root_.run.cosy.http.headers.*
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.utils.StringUtils.*
+import _root_.run.cosy.http.auth.MessageSignature
+import _root_.run.cosy.http.headers.SelectorOps
 import scodec.bits.ByteVector
-import cats.effect.IO
-import run.cosy.http.utils.StringUtils.*
+
+import cats.syntax.all.*
+import munit.CatsEffectSuite
+import cats.effect.{IO, SyncIO}
 
 import java.nio.charset.StandardCharsets
 import java.security.spec.{PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, MessageDigest, Signature as JSignature}
 import java.time.Clock
 import java.util.Base64
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import _root_.scala.language.implicitConversions
+import _root_.scala.util.{Failure, Success, Try}
 
-trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
+trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 
    given ops: HttpOps[H]
    given sigSuite: SigningSuiteHelpers
@@ -48,20 +51,20 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
    import Http.*
 
    type HttpMessage = String
-   val selectorsSecure: MessageSelectors[H]
-   val selectorsInSecure: MessageSelectors[H]
-   val messageSignature: run.cosy.http.auth.MessageSignature[H]
-
+   val selectorsSecure: MessageSelectors[F, H]
+   val selectorsInSecure: MessageSelectors[F, H]
+   val messageSignature: MessageSignature[H]
+   
    import messageSignature.{*, given}
    import selectorsSecure.*
    // special headers used in the spec that we won't find elsewhere
-   val `x-example`: MessageSelector[Request[H]]
-   val `x-empty-header`: MessageSelector[Request[H]]
-   val `x-ows-header`: MessageSelector[Request[H]]
-   val `x-obs-fold-header`: MessageSelector[Request[H]]
-   val `x-dictionary`: DictSelector[Message[H]]
+   val `x-example`: MessageSelector[Request[F, H]]
+   val `x-empty-header`: MessageSelector[Request[F, H]]
+   val `x-ows-header`: MessageSelector[Request[F, H]]
+   val `x-obs-fold-header`: MessageSelector[Request[F, H]]
+   val `x-dictionary`: DictSelector[Message[F, H]]
 
-   given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
+//   given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
    given clock: Clock =
      Clock.fixed(java.time.Instant.ofEpochSecond(16188845000L), java.time.ZoneOffset.UTC).nn
 
@@ -72,7 +75,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
    def `request-target`(value: String): Success[String] = expectedHeader("@request-target", value)
    def expectedHeader(name: String, value: String)      = Success("\"" + name + "\": " + value)
 
-   given specialRequestSelectorOps: run.cosy.http.headers.SelectorOps[Request[H]] =
+   given specialRequestSelectorOps: SelectorOps[Request[F, H]] =
      selectorsSecure.requestSelectorOps.append(
        `x-example`,
        `x-empty-header`,
@@ -80,13 +83,13 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `x-obs-fold-header`,
        `x-dictionary`
      )
-   given specialResponseSelectorOps: run.cosy.http.headers.SelectorOps[Response[H]] =
+   given specialResponseSelectorOps: SelectorOps[Response[F, H]] =
      selectorsSecure.responseSelectorOps.append(`x-dictionary`)
 
    @throws[Exception]
-   def toRequest(request: HttpMessage): Request[H]
+   def toRequest(request: HttpMessage): Request[F, H]
    @throws[Exception]
-   def toResponse(response: HttpMessage): Response[H]
+   def toResponse(response: HttpMessage): Response[F, H]
 
    // helper method
    extension (bytes: Try[ByteVector])
@@ -112,17 +115,19 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 
    test("§2.1.2 HTTP Field Examples") {
      import messageSignature.signingString
-     val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
+     val rfcCanonReq: Request[F, H] = toRequest(`§2.1.2_HeaderField`)
      assertEquals(
        `cache-control`.signingString(rfcCanonReq),
        expectedHeader("cache-control", "max-age=60, must-revalidate")
      )
+
      // note: It is Saturday, not Tuesday: either that is an error in the spec, or example of header with wrong date
      //   we fixed it here, because it is difficult to get broken dates past akka
      assertEquals(
        `date`.signingString(rfcCanonReq),
        expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT")
      )
+
      assertEquals(`host`.signingString(rfcCanonReq), expectedHeader("host", "www.example.com"))
      assertEquals(`x-empty-header`.signingString(rfcCanonReq), expectedHeader("x-empty-header", ""))
      assertEquals(
@@ -133,6 +138,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `x-ows-header`.signingString(rfcCanonReq),
        expectedHeader("x-ows-header", "Leading and trailing whitespace.")
      )
+
      assertEquals(
        `x-dictionary`.signingString(rfcCanonReq),
        expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
@@ -149,7 +155,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
      )(Token("keyid") -> sf"some-key")
      val Some(signatureInput) = SigInput(il): @unchecked
      assertEquals(
-       rfcCanonReq.signingString(signatureInput).toAscii,
+       rfcCanonReq.signingStr(signatureInput).toAscii,
        Success(
          """"cache-control": max-age=60, must-revalidate
 			  |"date": Sat, 07 Jun 2014 20:51:35 GMT
@@ -163,6 +169,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |"x-obs-fold-header" "x-ows-header" "x-dictionary");keyid="some-key"""".rfc8792single
        )
      )
+
      // should fail because there is a header we don't know how to interpret
      val il2 = IList(
        `cache-control`.sf,
@@ -175,12 +182,12 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `x-dictionary`.sf
      )(Token("keyid") -> sf"some-key")
      val Some(signatureInputFail) = SigInput(il2): @unchecked
-     rfcCanonReq.signingString(signatureInputFail) match
+     rfcCanonReq.signingStr(signatureInputFail) match
         case Failure(InvalidSigException(msg)) if msg.contains("x-not-implemented") => assert(true)
         case x => fail("this should have failed because header x-not-implemented is not supported")
 
-        // fail because one of the headers is missing
-     rfcCanonReq.removeHeader("X-Empty-Header").signingString(signatureInput) match
+     // fail because one of the headers is missing
+     rfcCanonReq.removeHeader("X-Empty-Header").signingStr(signatureInput) match
         case Failure(UnableToCreateSigHeaderException(msg)) if msg.contains("x-empty-header") =>
           assert(true)
         case x => fail("not failing in the right way? received:" + x.toString)
@@ -188,15 +195,19 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
         // fail because keyid is not specified (note: this is no longer required in the spec,..., check)
      val ilNoKeyId                   = IList(date.sf, host.sf)()
      val Some(signatureInputNoKeyId) = SigInput(ilNoKeyId): @unchecked
-     assert(rfcCanonReq.signingString(signatureInputNoKeyId).isSuccess)
+
+     assert(rfcCanonReq.signingStr(signatureInputNoKeyId).isSuccess)
+
    }
 
    test("§2.1.3 Dictionary Structured Field Members") {
-     val rfcCanonReq: Request[H] = toRequest(`§2.1.2_HeaderField`)
+
+     val rfcCanonReq: Request[F, H] = toRequest(`§2.1.2_HeaderField`)
      assertEquals(
        `x-dictionary`.signingStringFor(rfcCanonReq),
        expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
      )
+
      assertEquals(
        `x-dictionary`.signingString(rfcCanonReq),
        expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
@@ -216,6 +227,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        ),
        expectedKeyedHeader("x-dictionary", "a", "1")
      )
+
      assertEquals(
        `x-dictionary`.signingStringFor(rfcCanonReq, SfString("b")),
        expectedKeyedHeader("x-dictionary", "b", "2;x=1;y=2")
@@ -250,6 +262,8 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 				  |  created=1618884475;expires=1618884775""".rfc8792single
           )
         case None => fail("SigInput is not available")
+
+
    }
 
    val `§2.2.x_Request`: HttpMessage =
@@ -257,7 +271,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        |Host: www.example.com""".stripMargin
 
    test("§2.2.2 Method") {
-     val `req_2.2.2`: Request[H] = toRequest(`§2.1.2_HeaderField`)
+     val `req_2.2.2`: Request[F, H] = toRequest(`§2.1.2_HeaderField`)
      assertEquals(
        `@method`.signingString(`req_2.2.2`),
        expectedHeader("@method", "GET")
@@ -267,6 +281,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `@method`.signingString(`req_2.2.x`),
        expectedHeader("@method", "POST")
      )
+
    }
 
    val `§2.2.3_Request_AbsoluteURI`: HttpMessage =
@@ -295,6 +310,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `@target-uri`.signingString(toRequest(`§2.2.3_Request_AbsoluteURI_2`)),
        expectedHeader(`@target-uri`.lowercaseName, "http://www.example.com/a")
      )
+
    }
 
    test("§2.2.4 Authority") {
@@ -307,6 +323,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `@authority`.signingString(`req_2.2.4`.removeHeader("Host")),
        expectedHeader("@authority", "bblfish.net")
      )
+
    }
 
    test("§2.2.5 Scheme") {
@@ -441,6 +458,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `@query-params`.signingString(`req_2.2.9`, Params(Token("name") -> SfString("param"))),
        expectedNameHeader("@query-params", "param", "value")
      )
+
    }
 
    val `§2.2.10_Response`: HttpMessage =
@@ -452,6 +470,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        `@status`.signingString(toResponse(`§2.2.10_Response`)),
        Success("\"@status\": 200")
      )
+
    }
 
    val `§2.2.11_Request`: HttpMessage =
@@ -492,7 +511,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |{"busy": true, "message": "Your call is very important to us"}""".rfc8792single
 
    test("§2.2.11 Request-Response Signature Binding") {
-     val `req_2.2.11`: Request[H] = toRequest(`§2.2.11_Request`)
+     val `req_2.2.11`: Request[F, H] = toRequest(`§2.2.11_Request`)
      assertEquals(
        `@request-response`.signingString(`req_2.2.11`, Params(Token("key") -> SfString("sig1"))),
        expectedKeyedHeader(
@@ -512,7 +531,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 			  |  ;keyid="test-key-ecc-p256"""".rfc8792single
      ).get
 
-     val `res_2.2.11`: Response[H] = toResponse(`§2.2.11_UnsignedResponse`)
+     val `res_2.2.11`: Response[F, H] = toResponse(`§2.2.11_UnsignedResponse`)
      assertEquals(
        `res_2.2.11`.signingString(siginput, `req_2.2.11`).toAscii,
        Success(
@@ -530,6 +549,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 				  |  ;keyid="test-key-ecc-p256"""".rfc8792single
        )
      )
+
    }
 
    val `§2.3_Request`: HttpMessage =
@@ -579,7 +599,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
      val rfcSigInreq          = toRequest(`§2.3_Request`)
      val Some(sigInHandBuilt) = SigInput(sigInIlist): @unchecked
      val Some(sigin)          = SigInput(siginStr): @unchecked
-     assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
+     assertEquals(rfcSigInreq.signingStr(sigin).toAscii, Success(expectedSigInStr))
    }
 
    test("§2.3 Creating the Signature Input String (spec 07)") {
@@ -612,10 +632,11 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        Token("keyid")   -> sf"test-key-rsa-pss"
      )
      assert(SigInput.valid(sigInIlist))
-     val rfcSigInreq: Request[H] = toRequest(`§2.3_Request`)
-     val Some(sigInHandBuilt)    = SigInput(sigInIlist): @unchecked
-     val Some(sigin)             = SigInput(siginStr): @unchecked
-     assertEquals(rfcSigInreq.signingString(sigin).toAscii, Success(expectedSigInStr))
+     val rfcSigInreq: Request[F, H] = toRequest(`§2.3_Request`)
+     val Some(sigInHandBuilt)       = SigInput(sigInIlist): @unchecked
+     val Some(sigin)                = SigInput(siginStr): @unchecked
+     assertEquals(rfcSigInreq.signingStr(sigin).toAscii, Success(expectedSigInStr))
+
    }
 
    val `§3.2_Request`: HttpMessage =
@@ -638,10 +659,13 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |  r5S9IXf2fYJK+eyW4AiGVMvMcOg==:""".rfc8792single
 
    test("§3.2 Verifying a Signature") {
-     val req: Request[H] = toRequest(`§3.2_Request`)
+     val req: Request[F, H] = toRequest(`§3.2_Request`)
+     val auth: HttpSig => IO[KeyIdentified] = req.signatureAuthN(sigSuite.keyidFetcher)
+     val resIO: IO[KeyIdentified] = auth(HttpSig(Rfc8941.Token("sig1")))
      assertIO(
-       req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-       PureKeyId("test-key-rsa-pss")
+       resIO,
+       PureKeyId("test-key-rsa-pss"),
+       req
      )
    }
 
@@ -694,15 +718,18 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |    j8kSydKoFg6EbVuGbrQijth6I0dDX2/HYcJg==:""".rfc8792single
 
    test("§4.3 Multiple Signatures") {
-     val req: Request[H] = toRequest(`§4.3_Enhanced`)
+     val req: Request[F, H] = toRequest(`§4.3_Enhanced`)
      assertIO(
        req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
-       PureKeyId("test-key-rsa-pss")
+       PureKeyId("test-key-rsa-pss"),
+       req
      ) *>
        assertIO(
          req.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("proxy_sig"))),
-         PureKeyId("test-key-rsa")
+         PureKeyId("test-key-rsa"),
+         req
        )
+
    }
 
    val B2_test_request: HttpMessage =
@@ -725,13 +752,13 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        |""".stripMargin
 
    test("B.2.1 Minimal Signature Using rsa-pss-sha512") {
-     val req: Request[H] = toRequest(B2_test_request)
+     val req: Request[F, H] = toRequest(B2_test_request)
      val Some(sigInput) = SigInput(
        """();created=1618884475\
 			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
      ): @unchecked
      assertEquals(
-       req.signingString(sigInput).toAscii,
+       req.signingStr(sigInput).toAscii,
        Success(
          """"@signature-params": ();created=1618884475\
 			  |  ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"""".rfc8792single
@@ -767,16 +794,17 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
        reqSignedFromSpec.signatureAuthN(sigSuite.keyidFetcher)(HttpSig(Rfc8941.Token("sig1"))),
        PureKeyId("test-key-rsa-pss")
      )
+
    }
 
    test("B.2.2 Selective Covered Components using rsa-pss-sha512") {
-     val req: Request[H] = toRequest(B2_test_request)
+     val req: Request[F, H] = toRequest(B2_test_request)
      val Some(sigInput) = SigInput(
        """("@authority" "content-type")\
 			  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
      ): @unchecked
      assertEquals(
-       req.signingString(sigInput).toAscii,
+       req.signingStr(sigInput).toAscii,
        Success(
          """"@authority": example.com
 			  |"content-type": application/json
@@ -817,13 +845,13 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
    }
 
    test("B.2.3 Full Coverage using rsa-pss-sha512") {
-     val req: Request[H] = toRequest(B2_test_request)
+     val req: Request[F, H] = toRequest(B2_test_request)
      val siginputStr = """("date" "@method" "@path" "@query" \
 								  |  "@authority" "content-type" "digest" "content-length")\
 								  |  ;created=1618884475;keyid="test-key-rsa-pss"""".rfc8792single
      val Some(sigInput) = SigInput(siginputStr): @unchecked
      assertEquals(
-       req.signingString(sigInput).toAscii,
+       req.signingStr(sigInput).toAscii,
        Success(
          """"date": Tue, 20 Apr 2021 02:07:56 GMT
 			  |"@method": POST
@@ -868,7 +896,7 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
    }
 
    test("B.2.4 Signing a Response using ecdsa-p256-sha256") {
-     val req: Request[H] = toRequest(B2_test_request)
+     val req: Request[F, H] = toRequest(B2_test_request)
      val siginputStr =
        """("content-type" "digest" "content-length")\
          |  ;created=1618884475;keyid="test-key-ecc-p256"""".stripMargin.rfc8792single
@@ -898,9 +926,9 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
      )
    }
 
-   test("Signing a Request using hmac-sha256") {
-     // todo! Symmetric key signature
-   }
+//   test("Signing a Request using hmac-sha256"). {
+//     // todo! Symmetric key signature
+//   }
 
    val B3_Request: HttpMessage =
      """POST /foo?Param=value&pet=Dog HTTP/1.1
@@ -929,11 +957,11 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 		  |{"hello": "world"}""".rfc8792single
 
    test("B.3. TLS-Terminating Proxy") {
-     val req: Request[H] = toRequest(B3_ProxyEnhanced_Request)
+     val req: Request[F, H] = toRequest(B3_ProxyEnhanced_Request)
      val siginputStr = """("@path" "@query" "@method" "@authority" \
 								  |  "client-cert");created=1618884475;keyid="test-key-ecc-p256"""".rfc8792single
      val Some(sigInput) = SigInput(siginputStr): @unchecked
-     val sigStr         = req.signingString(sigInput)
+     val sigStr         = req.signingStr(sigInput)
 //  the current 07 spec wrongly has it that the @query line does not start with `?`
 //  see https://github.com/httpwg/http-extensions/issues/1901#issuecomment-1024075718
 //		assertEquals(sigStr.toAscii,
@@ -985,9 +1013,9 @@ trait HttpMessageSigningSuite[H <: Http] extends CatsEffectSuite:
 end HttpMessageSigningSuite
 
 class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
-   import run.cosy.http.auth.MessageSignature as MS
-   import bobcats.SigningHttpMessages.`test-key-rsa-pss`
+   import bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`
    import bobcats.util.PEMUtils.PKCS8_PEM
+   import run.cosy.http.auth.MessageSignature as MS
    def verifierFor(
        spec: Try[SPKIKeySpec[AsymmetricKeyAlg]],
        sig: Signature,
@@ -1008,19 +1036,19 @@ class SigningSuiteHelpers(using pemutils: bobcats.util.PEMUtils):
      pemutils.getPrivateKeySpec(keyinfo.privatePk8Key, keyinfo.keyAlg)
 
    lazy val rsaPSSPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`)
 
    lazy val rsaPubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-rsa`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa`)
 
    lazy val rsaPSSPrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
-     privateKeySpec(bobcats.SigningHttpMessages.`test-key-rsa-pss`)
+     privateKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-rsa-pss`)
 
    lazy val ecc_256_PubKey: Try[SPKIKeySpec[AsymmetricKeyAlg]] =
-     publicKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+     publicKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-ecc-p256`)
 
    lazy val ecc_256_PrivKey: Try[PKCS8KeySpec[AsymmetricKeyAlg]] =
-     privateKeySpec(bobcats.SigningHttpMessages.`test-key-ecc-p256`)
+     privateKeySpec(bobcats.HttpMessageSignaturesV07.`test-key-ecc-p256`)
 
    lazy val rsaPSSSigner: IO[ByteVector => IO[ByteVector]] =
      for

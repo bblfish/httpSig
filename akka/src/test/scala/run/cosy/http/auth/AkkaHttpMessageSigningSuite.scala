@@ -30,35 +30,35 @@ import akka.http.scaladsl.model.{
   StatusCodes,
   Uri
 }
-import run.cosy.akka.http.AkkaTp
-import run.cosy.akka.http.headers.{
+import _root_.run.cosy.akka.http.AkkaTp
+import _root_.run.cosy.akka.http.headers.{
   AkkaDictSelector,
   AkkaMessageSelectors,
   Signature,
   UntypedAkkaSelector,
   `Signature-Input`
 }
-import run.cosy.http.headers.{DictSelector, Rfc8941, SigInput, SigInputs, Signatures}
-import run.cosy.http.auth.HttpMessageSigningSuite
-import run.cosy.http.Http
-import run.cosy.http.Http.{Message, Request, Response}
-import run.cosy.http.utils.StringUtils.*
-import run.cosy.akka.http.headers.`Signature-Input`
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.MessageSelector
+import _root_.run.cosy.http.headers.{DictSelector, Rfc8941, SigInput, SigInputs, Signatures}
+import _root_.run.cosy.http.auth.HttpMessageSigningSuite
+import _root_.run.cosy.http.Http
+import _root_.run.cosy.http.Http.{Message, Request, Response}
+import _root_.run.cosy.http.utils.StringUtils.*
+import _root_.run.cosy.akka.http.headers.`Signature-Input`
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.MessageSelector
 
 import scala.language.implicitConversions
-import run.cosy.akka.http.AkkaTp.HT as AH
+import _root_.run.cosy.akka.http.AkkaTp.HT as AH
 
 import cats.effect.{Async, IO}
 
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
-   given pem: bobcats.util.PEMUtils                       = bobcats.util.BouncyJavaPEMUtils
-   given ops: run.cosy.http.HttpOps[AH]                   = run.cosy.akka.http.AkkaTp.hOps
-   given sigSuite: run.cosy.http.auth.SigningSuiteHelpers = new SigningSuiteHelpers
+   given pem: bobcats.util.PEMUtils            = bobcats.util.BouncyJavaPEMUtils
+   given ops: _root_.run.cosy.http.HttpOps[AH] = _root_.run.cosy.akka.http.AkkaTp.hOps
+   given sigSuite: _root_.run.cosy.http.auth.SigningSuiteHelpers = new SigningSuiteHelpers
    val selectorsSecure   = AkkaMessageSelectors(true, Uri.Host("bblfish.net"), 443)
    val selectorsInSecure = AkkaMessageSelectors(false, Uri.Host("bblfish.net"), 80)
-   val messageSignature: run.cosy.http.auth.MessageSignature[AH] = AkkaHttpMessageSignature
+   val messageSignature: _root_.run.cosy.http.auth.MessageSignature[AH] = AkkaHttpMessageSignature
    import selectorsSecure.*
 
    /** todo: with Akka it is possible to automatically convert a String to an HttpMessage, but it
@@ -129,7 +129,11 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
         case `§2.2.9_Request` =>
           HttpRequest(HttpMethods.GET, Uri("/path?param=value&foo=bar&baz=batman&qux="))
             .withHeaders(Host(Uri.Host("www.example.com")))
-        case `§2.2.11_Request` => HttpRequest(
+        case `§2.2.9_plus_Request` =>
+          HttpRequest(HttpMethods.GET, Uri("/path?param=value&foo=bar&baz=batman&qux=&foo=robin"))
+            .withHeaders(Host(Uri.Host("www.example.com")))
+        case `§2.2.11_Request` =>
+          HttpRequest(
             POST,
             Uri("/foo?param=value&pet=dog"),
             headers = Seq(
@@ -145,7 +149,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
                   Param("keyid", SfString("test-key-rsa-pss"))
                 )).get
               )),
-              run.cosy.akka.http.headers.Signature(Signatures(
+              _root_.run.cosy.akka.http.headers.Signature(Signatures(
                 Token("sig1"),
                 """KuhJjsOKCiISnKHh2rln5ZNIrkRvue0DSu5rif3g7ckTbbX7C4\
 					  |  Jp3bcGmi8zZsFRURSQTcjbHdJtN8ZXlRptLOPGHkUa/3Qov79gBeqvHNUO4bhI27p\
@@ -175,7 +179,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
               HttpEntity(MediaTypes.`application/json`.toContentType, """{"hello": "world"}""")
           )
         case `§3.2_Request` =>
-          val Success(sigIn) = run.cosy.akka.http.headers.`Signature-Input`
+          val Success(sigIn) = _root_.run.cosy.akka.http.headers.`Signature-Input`
             .parse("""sig1=("@method" "@path" "@authority" \
 							|  "cache-control" "x-empty-header" "x-example");created=1618884475\
 							|  ;keyid="test-key-rsa-pss"""".rfc8792single): @unchecked

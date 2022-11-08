@@ -195,7 +195,7 @@ class Http4sMessageSelectors[F[_]](
            val m = msg.asInstanceOf[H4Request[?]]
            val q = m.uri.query
            Success {
-             if q == Query.empty then ""
+             if q == Query.empty then "?"
              else if q == Query.blank then "?"
              else
                 val qs = m.uri.query.renderString
@@ -203,52 +203,58 @@ class Http4sMessageSelectors[F[_]](
            }
    end `@query`
 
-   override lazy val `@query-params`: MessageSelector[Http.Request[F, H4]] =
+   override lazy val `@query-param`: MessageSelector[Http.Request[F, H4]] =
      new MessageSelector[Http.Request[F, H4]]:
         val nameParam: Rfc8941.Token             = Rfc8941.Token("name")
-        override def lowercaseName: String       = "@query-params"
+        override def lowercaseName: String       = "@query-param"
         override def specialForRequests: Boolean = true
 
         override def signingString(msg: Http.Request[F, H4], params: Rfc8941.Params): Try[String] =
-           val m = msg.asInstanceOf[H4Request[?]]
-           params.toSeq match
-              case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
-                  val queryStr = m.uri.query.params.get(value.asciiStr).getOrElse("")
-                  s""""$lowercaseName";name=${value.canon}: $queryStr"""
-                }
+           val m: H4Request[?] = msg.asInstanceOf[H4Request[?]]
+           params.get(nameParam) match
+              case Some(value: Rfc8941.SfString) =>
+                val prefix = s""""$lowercaseName";name=${value.canon}: """
+                val values: Option[String] =
+                  m.uri.query.multiParams.get(value.asciiStr).map { vals =>
+                    vals.map(v => prefix + v).mkString("\n")
+                  }
+                values.toRight(SelectorException(
+                  s"No query parameter named ${value.canon} found. Suspicious."
+                )).toTry
               case _ => Failure(
                   SelectorException(
-                    s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
+                    s"selector $lowercaseName only takes one >${nameParam.canon}< parameter. Received " + params
                   )
                 )
-   end `@query-params`
+   end `@query-param`
 
-   override lazy val `@request-response`: MessageSelector[Http.Request[F, H4]] =
-     new MessageSelector[Http.Request[F, H4]]:
-        val keyParam: Rfc8941.Token              = Rfc8941.Token("key")
-        override def lowercaseName: String       = "@request-response"
-        override def specialForRequests: Boolean = true
-
-        override def signingString(msg: Http.Request[F, H4], params: Rfc8941.Params): Try[String] =
-          params.toSeq match
-             case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
-             case _ => Failure(
-                 SelectorException(
-                   s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
-                 )
-               )
-
-        protected def signingStringFor(
-            msg: Http.Request[F, H4],
-            key: Rfc8941.SfString
-        ): Try[String] =
-          for
-             sigsDict <- signature.sfDictParse(msg)
-             keyStr   <- Try(Rfc8941.Token(key.asciiStr))
-             signature <- sigsDict.get(keyStr)
-               .toRight(AttributeMissingException(s"could not find signature '$keyStr'"))
-               .toTry
-          yield s""""$lowercaseName";key=${key.canon}: ${signature.canon}"""
-   end `@request-response`
+//todo: this was removed but replaced with something else
+//   override lazy val `@request-response`: MessageSelector[Http.Request[F, H4]] =
+//     new MessageSelector[Http.Request[F, H4]]:
+//        val keyParam: Rfc8941.Token              = Rfc8941.Token("key")
+//        override def lowercaseName: String       = "@request-response"
+//        override def specialForRequests: Boolean = true
+//
+//        override def signingString(msg: Http.Request[F, H4], params: Rfc8941.Params): Try[String] =
+//          params.toSeq match
+//             case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+//             case _ => Failure(
+//                 SelectorException(
+//                   s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
+//                 )
+//               )
+//
+//        protected def signingStringFor(
+//            msg: Http.Request[F, H4],
+//            key: Rfc8941.SfString
+//        ): Try[String] =
+//          for
+//             sigsDict <- signature.sfDictParse(msg)
+//             keyStr   <- Try(Rfc8941.Token(key.asciiStr))
+//             signature <- sigsDict.get(keyStr)
+//               .toRight(AttributeMissingException(s"could not find signature '$keyStr'"))
+//               .toTry
+//          yield s""""$lowercaseName";key=${key.canon}: ${signature.canon}"""
+//   end `@request-response`
 
 end Http4sMessageSelectors

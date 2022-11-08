@@ -51,21 +51,27 @@ class AkkaMessageSelectors[F[_]](
    override lazy val authorization: MessageSelector[Http.Request[F, HT]] =
      new TypedAkkaSelector[Http.Request[F, HT], Authorization]:
         def akkaCompanion = Authorization
+
    override lazy val `cache-control`: MessageSelector[Http.Message[F, HT]] =
      new TypedAkkaSelector[Http.Message[F, HT], `Cache-Control`]:
         def akkaCompanion = `Cache-Control`
+
    override lazy val date: MessageSelector[Http.Message[F, HT]] =
      new TypedAkkaSelector[Http.Message[F, HT], Date]:
         def akkaCompanion = Date
+
    override lazy val etag: MessageSelector[Http.Response[F, HT]] =
      new TypedAkkaSelector[Http.Response[F, HT], ETag]:
         def akkaCompanion = ETag
+
    override lazy val host: MessageSelector[Http.Request[F, HT]] =
      new TypedAkkaSelector[Http.Request[F, HT], Host]:
         def akkaCompanion = Host
+
    override lazy val signature: DictSelector[Http.Message[F, HT]] =
      new AkkaDictSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "signature"
+
    override lazy val `content-type`: MessageSelector[Http.Message[F, HT]] =
      new UntypedAkkaSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "content-type"
@@ -81,6 +87,7 @@ class AkkaMessageSelectors[F[_]](
              Failure(SelectorException(
                s"selector $lowercaseName does not take parameters. Received " + params
              ))
+
    override lazy val `content-length`: MessageSelector[Http.Message[F, HT]] =
      new UntypedAkkaSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "content-length"
@@ -96,6 +103,7 @@ class AkkaMessageSelectors[F[_]](
               Failure(SelectorException(
                 s"selector $lowercaseName does not take parameters. Received " + params
               ))
+
    override lazy val `client-cert`: MessageSelector[Http.Message[F, HT]] =
      new UntypedAkkaSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "client-cert"
@@ -103,9 +111,11 @@ class AkkaMessageSelectors[F[_]](
    override lazy val digest: MessageSelector[Http.Message[F, HT]] =
      new UntypedAkkaSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "digest"
+
    override lazy val forwarded: MessageSelector[Http.Message[F, HT]] =
      new UntypedAkkaSelector[Http.Message[F, HT]]:
         override val lowercaseName: String = "forwarded"
+
    override lazy val `@request-target`: BasicMessageSelector[Http.Request[F, HT]] =
      new BasicMessageSelector[Http.Request[F, HT]]:
         override val lowercaseName: String       = "@request-target"
@@ -117,6 +127,7 @@ class AkkaMessageSelectors[F[_]](
         //		req.method match
         //		case HttpMethods.CONNECT => Failure(UnableToCreateSigHeaderException("Akka cannot correctly prcess @request-target on CONNECT requests"))
         //		case _ => Success(s""""$lowercaseName": ${req.uri}""")
+
    override lazy val `@method`: BasicMessageSelector[Http.Request[F, HT]] =
      new BasicMessageSelector[Http.Request[F, HT]]:
         override def lowercaseName: String       = "@method"
@@ -125,6 +136,7 @@ class AkkaMessageSelectors[F[_]](
         override protected def signingStringValue(req: Http.Request[F, HT]): Try[String] =
            val r = req.asInstanceOf[HttpRequest]
            Success(r.method.value) // already uppercase
+
    override lazy val `@target-uri`: BasicMessageSelector[Http.Request[F, HT]] =
      new BasicMessageSelector[Http.Request[F, HT]]:
         override def lowercaseName: String       = "@target-uri"
@@ -144,6 +156,7 @@ class AkkaMessageSelectors[F[_]](
            Try(r.effectiveUri(true, defaultHostHeader)
              .authority.toString().toLowerCase(Locale.US).nn // is locale correct?
            )
+
    private lazy val defaultHostHeader =
       val p =
         if defaultPort == 0 then 0
@@ -161,6 +174,7 @@ class AkkaMessageSelectors[F[_]](
         override protected def signingStringValue(msg: Http.Request[F, HT]): Try[String] = Success(
           if securedConnection then "https" else "http"
         )
+
    override lazy val `@path`: BasicMessageSelector[Http.Request[F, HT]] =
      new BasicMessageSelector[Http.Request[F, HT]]:
         override def lowercaseName: String       = "@path"
@@ -169,6 +183,7 @@ class AkkaMessageSelectors[F[_]](
         override protected def signingStringValue(req: Http.Request[F, HT]): Try[String] =
            val r = req.asInstanceOf[HttpRequest]
            Try(r.uri.path.toString())
+
    override lazy val `@status`: BasicMessageSelector[Http.Response[F, HT]] =
      new BasicMessageSelector[Http.Response[F, HT]]:
         override def lowercaseName: String = "@status"
@@ -185,51 +200,59 @@ class AkkaMessageSelectors[F[_]](
 
         override protected def signingStringValue(req: Http.Request[F, HT]): Try[String] =
            val r = req.asInstanceOf[HttpRequest]
-           Try(r.uri.queryString(ASCII).map("?" + _).getOrElse(""))
+           Try(r.uri.queryString(ASCII).map("?" + _).getOrElse("?"))
 
-   override lazy val `@query-params`: MessageSelector[Http.Request[F, HT]] =
+   override lazy val `@query-param`: MessageSelector[Http.Request[F, HT]] =
      new MessageSelector[Http.Request[F, HT]]:
         val nameParam: Rfc8941.Token             = Rfc8941.Token("name")
         val ASCII: Charset                       = Charset.forName("ASCII").nn
-        override def lowercaseName: String       = "@query-params"
+        override def lowercaseName: String       = "@query-param"
         override def specialForRequests: Boolean = true
 
         override def signingString(req: Http.Request[F, HT], params: Rfc8941.Params): Try[String] =
-          params.toSeq match
-             case Seq(nameParam -> (value: Rfc8941.SfString)) => Try {
-                 val r        = req.asInstanceOf[HttpRequest]
-                 val queryStr = r.uri.query().get(value.asciiStr).getOrElse("")
-                 s""""$lowercaseName";name=${value.canon}: $queryStr"""
-               }
+          params.get(nameParam) match
+             case Some(value: Rfc8941.SfString) =>
+               val r: HttpRequest = req.asInstanceOf[HttpRequest]
+               r.uri.query().getAll(value.asciiStr) match
+                  case Nil => Failure(
+                      SelectorException(
+                        s"No query parameter with key ${value.asciiStr} found. Suspicious."
+                      )
+                    )
+                  case nonEmptylist =>
+                    val hdrKey = s""""$lowercaseName";name=${value.canon}: """
+                    Success(nonEmptylist.reverse.map(hdrKey + _).mkString("\n"))
              case _ => Failure(
                  SelectorException(
-                   s"selector $lowercaseName only takes ${nameParam.canon} parameters. Received " + params
+                   s"selector $lowercaseName only takes one >${nameParam.canon}< parameter. Received " + params
                  )
                )
-   override lazy val `@request-response`: MessageSelector[Http.Request[F, HT]] =
-     new MessageSelector[Http.Request[F, HT]]:
-        val keyParam: Rfc8941.Token              = Rfc8941.Token("key")
-        override def lowercaseName: String       = "@request-response"
-        override def specialForRequests: Boolean = true
-
-        override def signingString(msg: Http.Request[F, HT], params: Rfc8941.Params): Try[String] =
-          params.toSeq match
-             case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
-             case _ => Failure(
-                 SelectorException(
-                   s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
-                 )
-               )
-
-        protected def signingStringFor(
-            msg: Http.Request[F, HT],
-            key: Rfc8941.SfString
-        ): Try[String] =
-          for
-             sigsDict <- signature.sfDictParse(msg)
-             keyStr   <- Try(Rfc8941.Token(key.asciiStr))
-             signature <- sigsDict.get(keyStr)
-               .toRight(AttributeMissingException(s"could not find signature '$keyStr'"))
-               .toTry
-          yield s""""$lowercaseName";key=${key.canon}: ${signature.canon}"""
+// todo: this was replaced by something else
+//
+//   override lazy val `@request-response`: MessageSelector[Http.Request[F, HT]] =
+//     new MessageSelector[Http.Request[F, HT]]:
+//        val keyParam: Rfc8941.Token              = Rfc8941.Token("key")
+//        override def lowercaseName: String       = "@request-response"
+//        override def specialForRequests: Boolean = true
+//
+//        override def signingString(msg: Http.Request[F, HT], params: Rfc8941.Params): Try[String] =
+//          params.toSeq match
+//             case Seq(keyParam -> (value: Rfc8941.SfString)) => signingStringFor(msg, value)
+//             case _ => Failure(
+//                 SelectorException(
+//                   s"selector $lowercaseName only takes ${keyParam.canon} paramters. Received " + params
+//                 )
+//               )
+//
+//        protected def signingStringFor(
+//            msg: Http.Request[F, HT],
+//            key: Rfc8941.SfString
+//        ): Try[String] =
+//          for
+//             sigsDict <- signature.sfDictParse(msg)
+//             keyStr   <- Try(Rfc8941.Token(key.asciiStr))
+//             signature <- sigsDict.get(keyStr)
+//               .toRight(AttributeMissingException(s"could not find signature '$keyStr'"))
+//               .toTry
+//          yield s""""$lowercaseName";key=${key.canon}: ${signature.canon}"""
 end AkkaMessageSelectors

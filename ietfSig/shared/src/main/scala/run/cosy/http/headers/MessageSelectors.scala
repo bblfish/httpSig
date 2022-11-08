@@ -38,16 +38,15 @@ trait MessageSelectors[F[_], H <: Http]:
    lazy val forwarded: MessageSelector[Message[F, H]]
    lazy val `client-cert`: MessageSelector[Message[F, H]]
 
-   lazy val `@request-target`: MessageSelector[Request[F, H]]
    lazy val `@method`: MessageSelector[Request[F, H]]
    lazy val `@target-uri`: MessageSelector[Request[F, H]]
    lazy val `@authority`: MessageSelector[Request[F, H]]
    lazy val `@scheme`: MessageSelector[Request[F, H]]
+   lazy val `@request-target`: MessageSelector[Request[F, H]]
    lazy val `@path`: MessageSelector[Request[F, H]]
-   lazy val `@status`: MessageSelector[Response[F, H]]
    lazy val `@query`: MessageSelector[Request[F, H]]
-   lazy val `@query-params`: MessageSelector[Request[F, H]]
-   lazy val `@request-response`: MessageSelector[Request[F, H]]
+   lazy val `@query-param`: MessageSelector[Request[F, H]]
+   lazy val `@status`: MessageSelector[Response[F, H]]
 
    /** Note: @target-uri and @scheme can only be set by application code as a choice needs to be
      * made
@@ -61,8 +60,7 @@ trait MessageSelectors[F[_], H <: Http]:
      `@method`,
      `@path`,
      `@query`,
-     `@query-params`,
-     `@request-response`,
+     `@query-param`,
      `@authority`,
      // all the below are good for responses too
      digest,

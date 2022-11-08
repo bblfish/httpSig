@@ -70,7 +70,7 @@ trait AkkaHeaderSelector[HM <: Http.Message[IO, AH]] extends HeaderSelector[HM]:
       val m = msg.asInstanceOf[ak.HttpMessage]
       val headersValues: Seq[String] = m.headers
         .filter(_.lowercaseName() == lowercaseHeaderName)
-        .map(_.value())
+        .map(_.value().trim().nn)
       headersValues match
          case Seq() => Failure(UnableToCreateSigHeaderException(
              s"No headers »$lowercaseHeaderName« in http message"

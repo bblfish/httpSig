@@ -19,10 +19,10 @@ package run.cosy.http.auth
 import cats.MonadError
 import cats.effect.kernel.{Clock, MonadCancel}
 import cats.syntax.all.*
-import run.cosy.http.{Http, HttpOps}
-import run.cosy.http.auth.Agent
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.{SelectorOps, *}
+import _root_.run.cosy.http.{Http, HttpOps}
+import _root_.run.cosy.http.auth.Agent
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.{SelectorOps, *}
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
@@ -32,7 +32,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import Http.*
+import _root_.run.cosy.http.Http.*
 
 trait SignatureInputMatcher[H <: Http]:
    type SI <: Header[H]

@@ -19,10 +19,10 @@ package run.cosy.http.headers
 import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.parse.Parser.{Expectation, Fail}
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.Rfc8941.Parser.*
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.headers.Rfc8941
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.Rfc8941.Parser.*
+import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
 
 import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}
@@ -331,7 +331,7 @@ class Rfc8941_Test extends munit.FunSuite:
 
      val `ex§4.1` =
        """sig1=("@request-target" "host" "date"   "cache-control" \
-			  |      "x-empty-header" "x-example"); keyid="test-key-a"; \
+			  |      "x-empty-header" "x-example" "x-example-dict";sf); keyid="test-key-a"; \
 			  |       alg="rsa-pss-sha512"; created=1402170695; expires=1402170995\
 			  |""".rfc8792single
 
@@ -344,7 +344,8 @@ class Rfc8941_Test extends munit.FunSuite:
            sf"date",
            sf"cache-control",
            sf"x-empty-header",
-           sf"x-example"
+           sf"x-example",
+           PItem(sf"x-example-dict")(Param("sf", true))
          )(
            Token("keyid")   -> sf"test-key-a",
            Token("alg")     -> sf"rsa-pss-sha512",

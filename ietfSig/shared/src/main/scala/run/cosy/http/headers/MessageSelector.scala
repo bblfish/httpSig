@@ -17,17 +17,17 @@
 package run.cosy.http.headers
 
 import cats.data.NonEmptyList
-import run.cosy.http.auth.{
+import _root_.run.cosy.http.auth.{
   HTTPHeaderParseException,
   InvalidSigException,
   SelectorException,
   UnableToCreateSigHeaderException
 }
-import run.cosy.http.headers.Rfc8941.SfDict
+import _root_.run.cosy.http.headers.Rfc8941.Serialise.given
+import _root_.run.cosy.http.headers.Rfc8941.SfDict
 
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
-import run.cosy.http.headers.Rfc8941.Serialise.given
 
 /** Header info specifying properties of a header for Signing Http Messages, and how to create them
   *
@@ -80,33 +80,43 @@ end HeaderSelector
 
 trait BasicMessageHeaderSelector[M] extends BasicMessageSelector[M] with HeaderSelector[M]
 
+/** trait for headers recognised as being capable of being interpreted as a dictionary. Unless the
+  * right parameters are passed thought, it need not be.
+  */
 trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
    val keyParam = Rfc8941.Token("key")
+   val sfParam  = Rfc8941.Token("sf")
 
    /** @param params
-     *   the parameters passed to this request
+     *   the parameters passed to this request. Can be "sf", "key", "req" or others. All parameters
+     *   passed must continue on to the output. todo: is that correct or should one fail on all non
+     *   undertsaod parameters?
      * @return
      *   a signing string for the selected entry of the sf-dictionary encoded header. Fail if the
      *   header does not exist or is malformed
      */
    override def signingString(msg: HM, params: Rfc8941.Params = ListMap()): Try[String] =
-     params.toSeq match
-        case Seq()                                   => signingStringFor(msg)
-        case Seq(keyParam -> (tk: Rfc8941.SfString)) => signingStringFor(msg, tk)
-        case _ =>
-          Failure(InvalidSigException(s"""Dictionary Selector params »${params}« is malformed """))
+      val strVal: Try[String] =
+        params.collectFirst {
+          case (`keyParam`, name: Rfc8941.SfString) => signingValueFor(msg, name)
+        } getOrElse {
+          if params.contains(sfParam) then sfDictParse(msg).map(_.canon)
+          else plainSigningValueFor(msg)
+        }
+      strVal.map(v => headerName(params) + v)
 
-   final def signingStringFor(msg: HM): Try[String] = sfDictParse(msg).map { dict =>
-     headerName + dict.canon
+   final def plainSigningValueFor(msg: HM): Try[String] = filterHeaders(msg).map { nonel =>
+     nonel.toList.mkString(", ")
    }
 
-   final def signingStringFor(msg: HM, key: Rfc8941.SfString): Try[String] =
+   final def signingValueFor(msg: HM, key: Rfc8941.SfString): Try[String] =
      for
-        dict <- sfDictParse(msg)
-        value <- dict.get(Rfc8941.Token(key.asciiStr)).toRight(UnableToCreateSigHeaderException(
-          s"could not find $key in header [$dict]"
-        )).toTry
-     yield headerName(key) + value.canon
+        dict  <- sfDictParse(msg)
+        token <- Try(Rfc8941.Token(key.asciiStr))
+        value <- dict.get(token).toRight(
+          UnableToCreateSigHeaderException(s"could not find $key in header [$dict]")
+        ).toTry
+     yield value.canon
 
    final def sfDictParse(msg: HM): Try[SfDict] =
      for
@@ -114,10 +124,19 @@ trait DictSelector[HM] extends MessageSelector[HM] with HeaderSelector[HM]:
         sfDict       <- parse(SelectorOps.collate(headerValues))
      yield sfDict
 
-   // note: the reason the token must be surrounded by quotes `"` is because a Token may end with `:`
-   final def headerName(key: Rfc8941.SfString): String =
-     s""""$lowercaseName";key=${key.canon}: """
-   final def headerName: String = s""""$lowercaseName": """
+   /** the header name given the params. This function can be used everywhere actually note: the
+     * reason the token must be surrounded by quotes `"` is because a Token may end with `:`
+     */
+   final def headerName(params: Rfc8941.Params): String =
+      val attrs =
+        if params.isEmpty then ""
+        else
+           params.toList
+             .map[String]((key, value) =>
+               if value.isInstanceOf[Boolean] then key.canon
+               else key.canon + "=" + value.canon
+             ).mkString(";", ";", "")
+      s""""$lowercaseName"$attrs: """
 
    def parse(headerValue: String): Try[SfDict] =
      Rfc8941.Parser.sfDictionary.parseAll(headerValue) match
@@ -138,8 +157,9 @@ object `@signature-params`:
   *   The Type of the HttpMessage for the platform
   */
 case class SelectorOps[HM] private (selectorDB: Map[Rfc8941.SfString, MessageSelector[HM]]):
-   import scala.language.implicitConversions
    import Rfc8941.Serialise.given
+
+   import scala.language.implicitConversions
 
    /** add new selectors to this one */
    def append(selectors: MessageSelector[HM]*): SelectorOps[HM] =

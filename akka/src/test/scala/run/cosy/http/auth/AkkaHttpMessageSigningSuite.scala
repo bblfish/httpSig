@@ -18,7 +18,7 @@ package run.cosy.http.auth
 
 import scala.util.Success
 import akka.http.scaladsl.model.HttpMethods.*
-import akka.http.scaladsl.model.headers.*
+import akka.http.scaladsl.model.headers.{`Cache-Control`, *}
 import akka.http.scaladsl.model.{
   ContentTypes,
   DateTime,
@@ -49,7 +49,6 @@ import _root_.run.cosy.http.headers.MessageSelector
 
 import scala.language.implicitConversions
 import _root_.run.cosy.akka.http.AkkaTp.HT as AH
-
 import cats.effect.{Async, IO}
 
 class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
@@ -70,7 +69,7 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
    @throws[Exception]
    def toRequest(request: HttpMessage): Request[IO, AH] =
      request match
-        case `§2.1.2_HeaderField` => HttpRequest(
+        case `§2.1_HeaderField` => HttpRequest(
             method = HttpMethods.GET,
             uri = Uri("/xyz"),
             headers = Seq(
@@ -90,7 +89,16 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
               `Cache-Control`(CacheDirectives.`max-age`(60)),
               RawHeader("X-Empty-Header", ""),
               `Cache-Control`(CacheDirectives.`must-revalidate`),
-              RawHeader("X-Dictionary", "   a=1,    b=2;x=1;y=2,   c=(a   b   c)")
+              RawHeader("Example-Dict", "   a=1,    b=2;x=1;y=2,   c=(a   b   c)")
+            )
+          )
+        case `§2.1.2_HeaderField` => HttpRequest(
+            method = HttpMethods.GET,
+            uri = Uri("/xyz"),
+            headers = Seq(
+              RawHeader("Example-Dict", "   a=1,    b=2;x=1;y=2,   c=(a   b   c)    "),
+              `Cache-Control`(CacheDirectives.`must-revalidate`),
+              RawHeader("Example-Dict", "   d     ")
             )
           )
         case `§2.2.x_Request` => HttpRequest(
@@ -301,8 +309,8 @@ class AkkaHttpMessageSigningSuite extends HttpMessageSigningSuite[IO, AH]:
    val `x-obs-fold-header`: MessageSelector[Request[IO, AH]] =
      new UntypedAkkaSelector[Request[IO, AH]]:
         override val lowercaseName: String = "x-obs-fold-header"
-   val `x-dictionary`: DictSelector[Message[IO, AH]] = new AkkaDictSelector[Message[IO, AH]]:
-      override val lowercaseName: String = "x-dictionary"
+   val `example-dict`: DictSelector[Message[IO, AH]] = new AkkaDictSelector[Message[IO, AH]]:
+      override val lowercaseName: String = "example-dict"
 
    test("§2.2.6. Request Target for CONNECT (does not work for Akka)".fail) {
      // this does not work for AKKA because akka returns //www.example.com:80

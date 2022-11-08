@@ -62,7 +62,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
    val `x-empty-header`: MessageSelector[Request[F, H]]
    val `x-ows-header`: MessageSelector[Request[F, H]]
    val `x-obs-fold-header`: MessageSelector[Request[F, H]]
-   val `x-dictionary`: DictSelector[Message[F, H]]
+   val `example-dict`: DictSelector[Message[F, H]]
 
 //   given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
    given clock: Clock =
@@ -84,10 +84,10 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
        `x-empty-header`,
        `x-ows-header`,
        `x-obs-fold-header`,
-       `x-dictionary`
+       `example-dict`
      )
    given specialResponseSelectorOps: SelectorOps[Response[F, H]] =
-     selectorsSecure.responseSelectorOps.append(`x-dictionary`)
+     selectorsSecure.responseSelectorOps.append(`example-dict`)
 
    @throws[Exception]
    def toRequest(request: HttpMessage): Request[F, H]
@@ -101,7 +101,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
    /** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html
      */
    // the example in the spec does not have the `GET`. Added here for coherence
-   val `§2.1.2_HeaderField`: HttpMessage =
+   val `§2.1_HeaderField`: HttpMessage =
      """GET /xyz HTTP/1.1
 	  |Host: www.example.com
 	  |Date: Sat, 07 Jun 2014 20:51:35 GMT
@@ -110,15 +110,15 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 	  |X-Obs-Fold-Header: Obsolete
 	  |    line folding. \
 	  |
+	  |Cache-Control: max-age=60
 	  |X-Empty-Header: \
 	  |
-	  |Cache-Control: max-age=60
 	  |Cache-Control:    must-revalidate
-	  |X-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
+	  |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
 
-   test("§2.1.2 HTTP Field Examples") {
+   test("§2.1 HTTP Field Examples") {
      import messageSignature.signingString
-     val rfcCanonReq: Request[F, H] = toRequest(`§2.1.2_HeaderField`)
+     val rfcCanonReq: Request[F, H] = toRequest(`§2.1_HeaderField`)
      assertEquals(
        `cache-control`.signingString(rfcCanonReq),
        expectedHeader("cache-control", "max-age=60, must-revalidate")
@@ -141,10 +141,10 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
        `x-ows-header`.signingString(rfcCanonReq),
        expectedHeader("x-ows-header", "Leading and trailing whitespace.")
      )
-
+ 
      assertEquals(
-       `x-dictionary`.signingString(rfcCanonReq),
-       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+       `example-dict`.signingString(rfcCanonReq),
+       expectedHeader("example-dict", "a=1,    b=2;x=1;y=2,   c=(a   b   c)")
      )
 
      val il = IList(
@@ -154,7 +154,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
        `x-empty-header`.sf,
        `x-obs-fold-header`.sf,
        `x-ows-header`.sf,
-       `x-dictionary`.sf
+       `example-dict`.sf
      )(Token("keyid") -> sf"some-key")
      val Some(signatureInput) = SigInput(il): @unchecked
      assertEquals(
@@ -167,9 +167,9 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 			  |
 			  |"x-obs-fold-header": Obsolete line folding.
 			  |"x-ows-header": Leading and trailing whitespace.
-			  |"x-dictionary": a=1, b=2;x=1;y=2, c=(a b c)
+			  |"example-dict": a=1,    b=2;x=1;y=2,   c=(a   b   c)
 			  |"@signature-params": ("cache-control" "date" "host" "x-empty-header" \
-			  |"x-obs-fold-header" "x-ows-header" "x-dictionary");keyid="some-key"""".rfc8792single
+			  |"x-obs-fold-header" "x-ows-header" "example-dict");keyid="some-key"""".rfc8792single
        )
      )
 
@@ -182,7 +182,7 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
        sf"x-not-implemented",
        `x-obs-fold-header`.sf,
        `x-ows-header`.sf,
-       `x-dictionary`.sf
+       `example-dict`.sf
      )(Token("keyid") -> sf"some-key")
      val Some(signatureInputFail) = SigInput(il2): @unchecked
      rfcCanonReq.signingStr(signatureInputFail) match
@@ -203,41 +203,56 @@ trait HttpMessageSigningSuite[F[_], H <: Http] extends CatsEffectSuite:
 
    }
 
-   test("§2.1.3 Dictionary Structured Field Members") {
+   test("§2.1.1 Strict Serialization of HTTP Structured Fields") {
+      val rfcCanonReq: Request[F, H] = toRequest(`§2.1_HeaderField`)
+      assertEquals(
+         `example-dict`.signingString(rfcCanonReq, Rfc8941.Params(`example-dict`.sfParam -> true)),
+         Success(""""example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c)""")
+      )
+   
+   }
+   
+   val `§2.1.2_HeaderField`: HttpMessage =
+      """GET /xyz HTTP/1.1
+         |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)    \
+         |
+         |Cache-Control:    must-revalidate
+         |Example-Dict:   d    \
+         |""".rfc8792single
+
+   test("§2.1.2 Dictionary Structured Field Members") {
+     import `example-dict`.{keyParam,sfParam}
+     import Rfc8941.Params
 
      val rfcCanonReq: Request[F, H] = toRequest(`§2.1.2_HeaderField`)
      assertEquals(
-       `x-dictionary`.signingStringFor(rfcCanonReq),
-       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+       `example-dict`.plainSigningValueFor(rfcCanonReq),
+       Success( "a=1,    b=2;x=1;y=2,   c=(a   b   c), d")
      )
 
      assertEquals(
-       `x-dictionary`.signingString(rfcCanonReq),
-       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+       `example-dict`.signingString(rfcCanonReq),
+       expectedHeader("example-dict", "a=1,    b=2;x=1;y=2,   c=(a   b   c), d")
      )
      assertEquals(
-       `x-dictionary`.signingString(rfcCanonReq, Rfc8941.Params()),
-       expectedHeader("x-dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+       `example-dict`.signingString(rfcCanonReq, Rfc8941.Params(sfParam -> true)),
+       Success(""""example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""")
      )
      assertEquals(
-       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("a")),
-       expectedKeyedHeader("x-dictionary", "a", "1")
+       `example-dict`.signingString(rfcCanonReq, Params(keyParam -> SfString("a"))),
+       expectedKeyedHeader("example-dict", "a", "1")
+     )
+      assertEquals(
+         `example-dict`.signingString(rfcCanonReq, Params(keyParam -> SfString("d"))),
+         expectedKeyedHeader("example-dict", "d", "?1")
+      )
+      assertEquals(
+       `example-dict`.signingString(rfcCanonReq,Params(keyParam -> SfString("b"))),
+       expectedKeyedHeader("example-dict", "b", "2;x=1;y=2")
      )
      assertEquals(
-       `x-dictionary`.signingString(
-         rfcCanonReq,
-         Rfc8941.Params(`x-dictionary`.keyParam -> SfString("a"))
-       ),
-       expectedKeyedHeader("x-dictionary", "a", "1")
-     )
-
-     assertEquals(
-       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("b")),
-       expectedKeyedHeader("x-dictionary", "b", "2;x=1;y=2")
-     )
-     assertEquals(
-       `x-dictionary`.signingStringFor(rfcCanonReq, SfString("c")),
-       expectedKeyedHeader("x-dictionary", "c", "(a b c)")
+       `example-dict`.signingString(rfcCanonReq, Params(keyParam -> SfString("c"))),
+       expectedKeyedHeader("example-dict", "c", "(a b c)")
      )
    }
 

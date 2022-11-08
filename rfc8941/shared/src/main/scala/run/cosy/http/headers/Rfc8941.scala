@@ -157,7 +157,6 @@ object Rfc8941:
                s"error paring token $t",
                s"failed at offset ${err.failedAtOffset}"
              )
-
       private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
    end Token
 

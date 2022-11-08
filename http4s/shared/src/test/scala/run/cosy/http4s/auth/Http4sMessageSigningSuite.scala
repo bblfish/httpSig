@@ -94,9 +94,9 @@ trait Http4sMessageSigningSuite[F[_]] extends HttpMessageSigningSuite[F, H4]:
      new BasicHeaderSelector[F, Request[F, H4]]:
         override val lowercaseName: String = "x-obs-fold-header"
 
-   override val `x-dictionary`: DictSelector[Message[F, H4]] =
+   override val `example-dict`: DictSelector[Message[F, H4]] =
      new Http4sDictSelector[F, Message[F, H4]]:
-        override val lowercaseName: String = "x-dictionary"
+        override val lowercaseName: String = "example-dict"
 
    test("§2.2.6. Request Target for CONNECT (works for Http4s but not Akka)") {
      // this does not work for AKKA because akka returns //www.example.com:80

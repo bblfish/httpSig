@@ -47,7 +47,7 @@ object Dependencies {
     lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.8")
     // https://oss.sonatype.org/content/repositories/snapshots/net/bblfish/crypto/bobcats_3/
     lazy val bobcats =
-      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-2b3834e-SNAPSHOT")
+      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.3-a876e48-SNAPSHOT")
 
     // https://index.scala-lang.org/typelevel/cats-effect/artifacts/cats-effect/3.3.14
     // todo: other libraries depend on cats effect, is this the right version?

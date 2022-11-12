@@ -26,7 +26,6 @@ import run.cosy.http.auth.{
   UnableToCreateSigHeaderException
 }
 import run.cosy.http.headers.{
-  BasicMessageHeaderSelector,
   BasicMessageSelector,
   DictSelector,
   MessageSelector,

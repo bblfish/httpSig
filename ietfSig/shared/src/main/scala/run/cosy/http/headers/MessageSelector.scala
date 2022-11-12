@@ -29,7 +29,7 @@ import _root_.run.cosy.http.headers.Rfc8941.SfDict
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-/** Header info specifying properties of a header for Signing Http Messages, and how to create them
+/** Selectors for specifying properties of a header for Signing Http Messages, and how to create them
   *
   * @tparam HttpMsg
   *   the type of the Http Message (req or response) to look at when constructing the signing
@@ -77,8 +77,6 @@ trait HeaderSelector[HM]:
    def lowercaseHeaderName: String
    def filterHeaders(msg: HM): Try[NonEmptyList[String]]
 end HeaderSelector
-
-trait BasicMessageHeaderSelector[M] extends BasicMessageSelector[M] with HeaderSelector[M]
 
 /** trait for headers recognised as being capable of being interpreted as a dictionary. Unless the
   * right parameters are passed thought, it need not be.

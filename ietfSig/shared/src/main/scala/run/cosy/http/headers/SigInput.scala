@@ -96,6 +96,7 @@ final case class SigInput private (val il: IList):
        expires.map(_ + shift >= i.toSeconds).getOrElse(true)
    def created: Option[Long] = il.params.get(createdTk).collect { case SfInt(time) => time }
    def expires: Option[Long] = il.params.get(expiresTk).collect { case SfInt(time) => time }
+   def tag: Option[String]   = il.params.get(tagTk).collect { case SfString(x) => x }
    def canon: String         = il.canon
 
 object SigInput:
@@ -107,8 +108,9 @@ object SigInput:
    val expiresTk = Token("expires")
    val keyidTk   = Token("keyid")
    val nonceTk   = Token("nonce")
+   val tagTk     = Token("tag")
 
-   val registeredParams = Seq(algTk, createdTk, expiresTk, keyidTk, nonceTk)
+   val registeredParams = Seq(algTk, createdTk, expiresTk, keyidTk, nonceTk, tagTk)
 
    val Empty = ListMap.empty[Token, Item]
 
@@ -132,7 +134,7 @@ object SigInput:
         pit.item.isInstanceOf[SfString] // todo: one could check the parameters follow a pattern...
       }
       def paramsOk = il.params.forall {
-        case (`keyidTk`, item: SfString)                       => true
+        case (`keyidTk`, _: SfString) | (`tagTk`, _: SfString)                      => true
         case (`createdTk`, _: SfInt) | (`expiresTk`, _: SfInt) => true
         case (`algTk`, _: SfString) | (`nonceTk`, _: SfString) => true
         // we are lenient on non-registered params

@@ -134,7 +134,7 @@ object SigInput:
         pit.item.isInstanceOf[SfString] // todo: one could check the parameters follow a pattern...
       }
       def paramsOk = il.params.forall {
-        case (`keyidTk`, _: SfString) | (`tagTk`, _: SfString)                      => true
+        case (`keyidTk`, _: SfString) | (`tagTk`, _: SfString) => true
         case (`createdTk`, _: SfInt) | (`expiresTk`, _: SfInt) => true
         case (`algTk`, _: SfString) | (`nonceTk`, _: SfString) => true
         // we are lenient on non-registered params

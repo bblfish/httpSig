@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import run.cosy.akka.http.headers.BetterCustomHeader
 import run.cosy.http.Http
 import run.cosy.http.auth.{
-  AttributeMissingException,
+  AttributeException,
   HTTPHeaderParseException,
   SelectorException,
   UnableToCreateSigHeaderException

@@ -32,7 +32,7 @@ import scala.util.{Failure, Success, Try}
 import org.typelevel.ci.*
 import run.cosy.http.Http
 import run.cosy.http.auth.{
-  AttributeMissingException,
+  AttributeException,
   AuthExc,
   SelectorException,
   UnableToCreateSigHeaderException

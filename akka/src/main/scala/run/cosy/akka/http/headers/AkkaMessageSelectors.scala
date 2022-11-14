@@ -20,11 +20,7 @@ import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.{Authorization, Date, ETag, Host, `Cache-Control`}
 import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
 import run.cosy.akka.http.AkkaTp
-import run.cosy.http.auth.{
-  AttributeMissingException,
-  SelectorException,
-  UnableToCreateSigHeaderException
-}
+import run.cosy.http.auth.{AttributeException, SelectorException, UnableToCreateSigHeaderException}
 import run.cosy.http.headers.{
   BasicMessageSelector,
   DictSelector,

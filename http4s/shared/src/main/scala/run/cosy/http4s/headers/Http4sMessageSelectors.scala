@@ -27,7 +27,7 @@ import org.http4s.headers.Host
 import org.http4s.Query
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.auth.{AttributeMissingException, SelectorException}
+import run.cosy.http.auth.{AttributeException, SelectorException}
 
 object Http4sMessageSelector:
    def request[F[_]](name: String): MessageSelector[Http.Request[F, H4]] =

@@ -31,6 +31,6 @@ case class UnableToCreateSigHeaderException(msg: String)         extends AuthExc
 case class SelectorException(msg: String)                        extends AuthExc(msg)
 case class InvalidSigException(msg: String)                      extends AuthExc(msg)
 case class KeyIdException(msg: String)                           extends AuthExc(msg)
-case class AttributeMissingException(msg: String)                extends AuthExc(msg)
+case class AttributeException(msg: String)                       extends AuthExc(msg)
 case class HTTPHeaderParseException(error: cats.parse.Parser.Error, httpHeader: String)
     extends AuthExc(httpHeader)

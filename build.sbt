@@ -132,6 +132,7 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
     description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
     libraryDependencies ++= Seq(
       tests.munitEffect.value,
+      tests.munit.value % Test,
       cats.bobcats.value classifier ("tests"),        // bobcats test examples,
       cats.bobcats.value classifier ("tests-sources") // bobcats test examples
     )

@@ -29,7 +29,8 @@ import _root_.run.cosy.http.headers.Rfc8941.SfDict
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-/** Selectors for specifying properties of a header for Signing Http Messages, and how to create them
+/** Selectors for specifying properties of a header for Signing Http Messages, and how to create
+  * them
   *
   * @tparam HttpMsg
   *   the type of the Http Message (req or response) to look at when constructing the signing
@@ -161,8 +162,10 @@ case class SelectorOps[HM] private (selectorDB: Map[Rfc8941.SfString, MessageSel
 
    /** add new selectors to this one */
    def append(selectors: MessageSelector[HM]*): SelectorOps[HM] =
-      val pairs = for (selector <- selectors)
-        yield (Rfc8941.SfString(selector.lowercaseName) -> selector)
+      val pairs =
+        for
+           selector <- selectors
+        yield Rfc8941.SfString(selector.lowercaseName) -> selector
       SelectorOps(selectorDB ++ pairs.toSeq)
 
 //	/**

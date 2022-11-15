@@ -38,14 +38,14 @@ import java.nio.charset.StandardCharsets.US_ASCII
   * signed.
   */
 sealed trait Component:
-   type Msg
+   type Msg // this is needed for the type of the returned Selector
 
    val name: String
    lazy val lowercaseName: String = run.cosy.platform.StringUtil.toLowerCaseInsensitive(name).nn
    def optionalParamKeys: Set[Rfc8941.Token] = Set(Component.reqTk)
 
    /** Create a selector with from this Component with the given parameters */
-   def apply(params: Rfc8941.Params = ListMap()): Try[Selector]
+   def apply(params: Rfc8941.Params = ListMap()): Try[Selector[Msg]]
 
 end Component
 
@@ -65,12 +65,13 @@ trait AtComponent extends Component:
      params.keySet.removedAll(optionalParamKeys) == requiredParamKeys
 
    /*  This is the key function that takes a Msg and parameters an returns the base value */
-   def apply(params: Rfc8941.Params = ListMap()): Try[Selector] =
-     if legalParams(params) then mkSelector(params)
+   def apply(params: Rfc8941.Params = ListMap()): Try[AtSelector[Msg]] =
+     if legalParams(params) then Success(mkSelector(params))
      else
         Failure(AttributeException(s"header $name does not contain legal params: $params"))
 
-   def mkSelector(params: Rfc8941.Params): Try[Selector]
+   // we can assume the parameters are valid
+   protected def mkSelector(params: Rfc8941.Params): AtSelector[Msg]
 end AtComponent
 
 object HeaderComponent:
@@ -84,36 +85,33 @@ class HeaderComponent private (val name: String) extends Component:
    override type Msg = NonEmptyList[String]
 
    override def apply(params: Rfc8941.Params = ListMap()): Try[HdrSelector] =
-      val ptk: Set[Rfc8941.Token] = params.keySet.removedAll(optionalParamKeys)
-      Try {
-        if ptk.contains(keyTk) && Set.empty == (ptk - keyTk) then
-           params(keyTk) match
-              case Rfc8941.SfString(v) =>
-                try DictNameSelector(name, Rfc8941.Token(v), params)
-                catch
-                   case e: ParsingException => throw AttributeException(
-                       s"value of name attribute >>$v<< cannot be transformed into a Rfc8941.SfToken"
-                     )
-              case x => throw AttributeException(
-                  "value of name attribute must be a Rfc8941.String. It is: " + x
-                )
-        else if ptk == Set(sfTk) then SfDictSelector(name, params)
-        else if ptk == Set(bsTk) then BinSelector(name, params)
-        else if ptk == Set.empty then RawSelector(name, params)
-        else throw AttributeException("Header component can not have parameters: " + params)
-      }
+     Try {
+       val ptk: Set[Rfc8941.Token] = params.keySet.removedAll(optionalParamKeys)
+       if ptk.contains(keyTk) && Set.empty == (ptk - keyTk) then
+          params(keyTk) match
+             case Rfc8941.SfString(v) =>
+               try DictNameSelector(name, Rfc8941.Token(v), params)
+               catch
+                  case e: ParsingException => throw AttributeException(
+                      s"value of name attribute >>$v<< cannot be transformed into a Rfc8941.SfToken"
+                    )
+             case x => throw AttributeException(
+                 "value of name attribute must be a Rfc8941.String. It is: " + x
+               )
+       else if ptk == Set(sfTk) then SfDictSelector(name, params)
+       else if ptk == Set(bsTk) then BinSelector(name, params)
+       else if ptk == Set.empty then RawSelector(name, params)
+       else throw AttributeException("Header component can not have parameters: " + params)
+     }
 end HeaderComponent
 
-sealed trait Selector:
-   type Msg
-   val params: Rfc8941.Params
-   val name: String
+sealed trait Selector[Msg]:
+   def params: Rfc8941.Params
+   def name: String
    lazy val lowercaseName = name.toLowerCase(java.util.Locale.US)
 
    /* This is the function to call on Message data */
-   def signingStr(msg: Msg): Try[String] = value(msg).map(identifier + _)
-
-   protected def value(msg: Msg): Try[String]
+   def signingStr(msg: Msg): Try[String]
 
    def identifier: String =
       val attrs =
@@ -127,11 +125,21 @@ sealed trait Selector:
    end identifier
 end Selector
 
+/** this is good for implementations that only return one line, ie. most. a notable exception is
+  * \@query-param which can return 1 or more lines
+  */
+trait SelectorOneLine[Msg] extends Selector[Msg]:
+   /* This is the function to call on Message data */
+   override def signingStr(msg: Msg): Try[String] = value(msg).map(identifier + _)
+
+   protected def value(msg: Msg): Try[String]
+end SelectorOneLine
+
 /** Selector for components starting with @ take whole messages as parameters In the spec they are
   * called These need to be written by hand for each framework, unless the Http Message layer can be
   * more full abstracted
   */
-trait AtSelector extends Selector
+trait AtSelector[Msg] extends Selector[Msg]
 
 /** These selectors are generic. We should provide implementations with reasonable default values.
   * Note:
@@ -141,12 +149,7 @@ trait AtSelector extends Selector
   * with old code)
   */
 sealed trait HdrSelector
-    extends Selector:
-   /* this is a nonEmptyList of headers for the given header
-    * we assume that line http1x line foldings have already been
-    * dealt with, since that depends on the message and framework calling this.
-  **/
-   type Msg = NonEmptyList[String]
+    extends SelectorOneLine[NonEmptyList[String]]
 
 object SfDictSelector:
    def parse(headerValue: String): Try[SfDict] =

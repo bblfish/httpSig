@@ -18,7 +18,7 @@ package run.cosy.http.auth
 
 import scala.util.Success
 import akka.http.scaladsl.model.HttpMethods.*
-import akka.http.scaladsl.model.headers.{`Cache-Control`, *}
+import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.{
   ContentTypes,
   DateTime,
@@ -31,9 +31,9 @@ import akka.http.scaladsl.model.{
   Uri
 }
 import _root_.run.cosy.akka.http.AkkaTp
+import _root_.run.cosy.akka.http.message.AkkaMessageSelectors
 import _root_.run.cosy.akka.http.headers.{
   AkkaDictSelector,
-  AkkaMessageSelectors,
   Signature,
   UntypedAkkaSelector,
   `Signature-Input`

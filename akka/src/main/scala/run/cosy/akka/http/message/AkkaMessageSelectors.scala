@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
-package run.cosy.akka.http.headers
+package run.cosy.akka.http.message
 
 import akka.http.scaladsl.model.ContentTypes.NoContentType
-import akka.http.scaladsl.model.headers.{Authorization, Date, ETag, Host, `Cache-Control`}
+import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
 import run.cosy.akka.http.AkkaTp
+import run.cosy.akka.http.AkkaTp.HT
+import run.cosy.akka.http.headers.{AkkaDictSelector, TypedAkkaSelector, UntypedAkkaSelector}
+import run.cosy.http.Http
 import run.cosy.http.auth.{AttributeException, SelectorException, UnableToCreateSigHeaderException}
-import run.cosy.http.headers.{
-  BasicMessageSelector,
-  DictSelector,
-  MessageSelector,
-  MessageSelectors,
-  Rfc8941
-}
 import run.cosy.http.headers.Rfc8941.Serialise.given
+import run.cosy.http.headers.*
 
 import java.nio.charset.Charset
 import java.util.Locale
 import scala.util.{Failure, Success, Try}
-import run.cosy.http.Http
-import run.cosy.akka.http.AkkaTp.HT
 
 class AkkaMessageSelectors[F[_]](
     val securedConnection: Boolean,

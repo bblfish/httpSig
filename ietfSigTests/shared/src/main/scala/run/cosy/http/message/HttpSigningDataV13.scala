@@ -1,7 +1,7 @@
-package run.cosy.http.auth
+package run.cosy.http.message
 
+import run.cosy.http.utils.StringUtils.*
 import bobcats.HttpMessageSignaturesV13
-import _root_.run.cosy.http.utils.StringUtils.*
 
 /** This class collects the data for each example from the spec including
   *

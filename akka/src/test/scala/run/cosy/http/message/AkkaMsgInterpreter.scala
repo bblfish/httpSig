@@ -42,8 +42,13 @@ object AkkaMsgInterpreter extends run.cosy.http.message.HttpMsgInterpreter[Id, A
    override def asRequest(header: DB.RequestStr): Request[Id, AkkaTp.HT] =
      header match
         case DB.`§2.1_HeaderField` => ???
-        case DB.`2.2.1_Method` => HttpRequest(
-            HttpMethods.POST,
+        case DB.`2.2.1_Method_POST` => HttpRequest(
+          HttpMethods.POST,
+          Uri("/path?param=value"),
+          headers = Seq(Host("www.example.com"))
+        )
+        case DB.`2.2.1_Method_GET` => HttpRequest(
+            HttpMethods.GET,
             Uri("/path?param=value"),
             headers = Seq(Host("www.example.com"))
           )

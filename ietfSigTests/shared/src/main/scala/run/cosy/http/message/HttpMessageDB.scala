@@ -3,6 +3,7 @@ package run.cosy.http.message
 import run.cosy.http.utils.StringUtils.*
 
 object HttpMessageDB:
+   
    // the example in the spec does not have the `GET`. Added here for coherence
    val `§2.1_HeaderField` = RequestStr(
      """GET /xyz HTTP/1.1
@@ -19,8 +20,18 @@ object HttpMessageDB:
    	  |Cache-Control:    must-revalidate
    	  |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
    )
-   val `2.2.1_Method` = RequestStr("""\
-        |POST /path?param=value HTTP/1.1
+   
+   val `2.2.1_Method_POST` = RequestStr(
+      """POST /path?param=value HTTP/1.1
         |Host: www.example.com""".rfc8792single)
+   
+   val `2.2.1_Method_GET` = RequestStr(
+      """GET /path?param=value HTTP/1.1
+        |Host: www.example.com""".rfc8792single
+   )
 
+   //we cannot test @scheme  or @target-uri as those require additional info
    case class RequestStr(str: String)
+   
+   
+end HttpMessageDB

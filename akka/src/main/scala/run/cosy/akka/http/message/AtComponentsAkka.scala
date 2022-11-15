@@ -19,14 +19,45 @@ package run.cosy.akka.http.message
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.http.Http.Request
-import run.cosy.http.headers.Rfc8941.Params
-import run.cosy.http.headers.{AtComponents, AtSelector, Rfc8941}
+import run.cosy.http.Http.{Request, Response}
+import run.cosy.http.headers.Component.{nameTk, reqTk}
+import run.cosy.http.headers.Rfc8941.{Item, Params, SfString}
+import run.cosy.http.headers.{AtComponents, AtSelector, Rfc8941, ServerContext}
 
-object AtComponentsAkka extends AtComponents[Id, AkkaTp.HT]:
-   import run.cosy.http.headers.Component.*
+class AtComponentsAkka(using ServerContext) extends AtComponents[Id, AkkaTp.HT]:
+  import scala.language.implicitConversions
+  
+  private given Conversion[Boolean, Rfc8941.Params] = toP
+  
+  private def toP(onReq: Boolean): Params =
+     if onReq == true then Params(reqTk -> true) else Params()
+  
+  override def method(onReq: Boolean = false): AtSelector[Request[Id, HT]] =
+      `@method`(onReq).get
+ 
+  override def authority(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@authority`()(onReq).get
 
-   override def method(onReq: Boolean): AtSelector[Request[Id, HT]] =
-      val p: Rfc8941.Params = if onReq == true then Params(reqTk -> true) else Params()
-      `@method`(p).get
+  override def requestTarget(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@request-target`(onReq).get
+
+  override def path(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@path`(onReq).get
+
+  override def query(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@query`(onReq).get
+
+  override def queryParam(name: String, onReq: Boolean): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@query-param`(toP(onReq) + (nameTk -> SfString(name))).get
+
+  override def scheme(onReq: Boolean)(ServerContext: ServerContext): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@scheme`()(onReq).get
+
+  override def targetUri(onReq: Boolean)(ServerContext: ServerContext): AtSelector[Request[Id, AkkaTp.HT]] =
+    `@target-uri`()(onReq)().get
+ 
+  /** this appears on response only */
+  override def status(): AtSelector[Response[cats.Id, AkkaTp.HT]] =
+    `@status`().get
+  
 end AtComponentsAkka

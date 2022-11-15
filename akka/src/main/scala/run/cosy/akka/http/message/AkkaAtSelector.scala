@@ -17,16 +17,12 @@
 package run.cosy.akka.http.message
 
 import akka.http.scaladsl.model
+import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.akka.http.message.{
-  AkkaAtComponent,
-  AkkaAtReqPlainComponent,
-  AkkaRequestAtComponent,
-  AtReqSelector
-}
+import run.cosy.akka.http.message.{AkkaAtComponent, AkkaAtReqPlainComponent, AkkaRequestAtComponent, AtReqSelector}
 import run.cosy.http.Http
 import run.cosy.http.Http.{Message, Request}
 import run.cosy.http.headers.*
@@ -59,25 +55,25 @@ object `@method` extends AkkaAtReqPlainComponent("@method")(req =>
       Success(req.method.value)
     )
 
-class `@target-uri`(defaultHost: model.headers.Host, secure: Boolean)
+case class `@target-uri`()(using sc : ServerContext)
     extends AkkaAtReqPlainComponent("@target-uri")((req: HttpRequest) =>
       Success(req.effectiveUri(
-        securedConnection = secure,
-        defaultHostHeader = defaultHost
+        securedConnection = sc.secure,
+        defaultHostHeader = Host(sc.defaultHost)
       ).toString())
     )
 
-class `@authority`(defaultHost: model.headers.Host)
+case class `@authority`()(using sc: ServerContext)
     extends AkkaAtReqPlainComponent("@authority")((req: HttpRequest) =>
       Try(
-        req.effectiveUri(true, defaultHost)
+        req.effectiveUri(true, Host(sc.defaultHost))
           .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
       )
     )
 
-class `@scheme`(securedConnection: Boolean)
+case class `@scheme`()(using sc: ServerContext)
     extends AkkaAtReqPlainComponent("@scheme")(_ =>
-      Success(if securedConnection then "https" else "http")
+      Success(if sc.secure then "https" else "http")
     )
 
 // This won't work for Options in Akka
@@ -100,14 +96,14 @@ object `@query`
       )
     )
 
-object `@query-params` extends AkkaRequestAtComponent:
+object `@query-param` extends AkkaRequestAtComponent:
    import run.cosy.http.headers.Component.nameTk
    override val name: String                          = "@query-param"
    override def requiredParamKeys: Set[Rfc8941.Token] = Set(nameTk)
 
    override def mkSelector(p: Params) = new AtSelector[Http.Request[Id, HT]]:
       def params: Params = p
-      def name: String   = `@query-params`.name
+      def name: String   = `@query-param`.name
       override def signingStr(req: Http.Request[Id, HT]): Try[String] = Try {
         val r: HttpRequest = req.asInstanceOf[HttpRequest]
         params(nameTk) match
@@ -123,7 +119,7 @@ object `@query-params` extends AkkaRequestAtComponent:
                s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
              )
       }
-end `@query-params`
+end `@query-param`
 
 object `@status` extends AkkaAtComponent:
    type Msg = Http.Response[Id, HT]

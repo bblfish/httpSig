@@ -22,16 +22,16 @@ import run.cosy.http.messages.{AtSelector, ServerContext}
 /** the server context may not know the default Host, but it cannot really not know if the server is
   * running http or https...
   */
-class ServerContext private (val defaultHost: Option[String], val secure: Boolean)
+class ServerContext private (val defaultHost: Option[String], val port: Option[Int], val secure: Boolean)
 
 object ServerContext:
-   def apply(defaultHost: String, secure: Boolean): ServerContext =
-     new ServerContext(Some(defaultHost), secure)
+   def apply(defaultHost: String, secure: Boolean, port: Option[Int] = None): ServerContext =
+     new ServerContext(Some(defaultHost), port, secure)
 
    /** If the server wishes the default host to remain unguessable then use this constructor
      */
    def apply(secure: Boolean): ServerContext =
-     new ServerContext(None, secure)
+     new ServerContext(None, None, secure)
 
 trait AtComponents[F[_], H <: Http](using ServerContext):
 

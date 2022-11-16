@@ -17,6 +17,9 @@
 package run.cosy.http.messages
 
 import run.cosy.http.Http
+import run.cosy.http.headers.Rfc8941
+import run.cosy.http.headers.Rfc8941.Params
+import run.cosy.http.messages.Component.reqTk
 import run.cosy.http.messages.{AtSelector, ServerContext}
 
 /** the server context may not know the default Host, but it cannot really not know if the server is
@@ -34,6 +37,11 @@ object ServerContext:
      new ServerContext(None, None, secure)
 
 trait AtComponents[F[_], H <: Http](using ServerContext):
+
+   protected given Conversion[Boolean, Rfc8941.Params] = toP
+
+   protected def toP(onReq: Boolean): Params =
+      if onReq == true then Params(reqTk -> true) else Params()
 
    def method(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def authority(onReq: Boolean = false): AtSelector[Http.Request[F, H]]

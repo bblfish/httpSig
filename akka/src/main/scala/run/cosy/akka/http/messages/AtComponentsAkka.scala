@@ -29,11 +29,6 @@ import run.cosy.http.messages.{AtComponents, ServerContext}
 class AtComponentsAkka(using ServerContext) extends AtComponents[Id, AkkaTp.HT]:
    import scala.language.implicitConversions
 
-   private given Conversion[Boolean, Rfc8941.Params] = toP
-
-   private def toP(onReq: Boolean): Params =
-     if onReq == true then Params(reqTk -> true) else Params()
-
    override def method(onReq: Boolean = false): AtSelector[Request[Id, HT]] =
      `@method`(onReq).get
 

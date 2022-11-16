@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package run.cosy.akka.http.messages
+package run.cosy.http4s.messages
 
 import org.http4s.headers.Host
 import org.http4s.{Query, Uri, Message as H4Message, Request as H4Request, Response as H4Response}

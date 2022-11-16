@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package run.cosy.akka.http.message
+package run.cosy.akka.http.messages
 
 import akka.http.scaladsl.model.ContentTypes.NoContentType
 import akka.http.scaladsl.model.headers.*

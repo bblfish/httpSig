@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package run.cosy.akka.http.message
+package run.cosy.akka.http.messages
 
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.Http.{Request, Response}
-import run.cosy.http.headers.Component.{nameTk, reqTk}
+import run.cosy.http.headers.Rfc8941
+import run.cosy.http.messages.Component.{nameTk, reqTk}
 import run.cosy.http.headers.Rfc8941.{Item, Params, SfString}
-import run.cosy.http.headers.{AtComponents, AtSelector, Rfc8941, ServerContext}
+import run.cosy.http.messages.AtSelector
+import run.cosy.http.messages.{AtComponents, ServerContext}
 
 class AtComponentsAkka(using ServerContext) extends AtComponents[Id, AkkaTp.HT]:
    import scala.language.implicitConversions

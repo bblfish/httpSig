@@ -31,7 +31,7 @@ import akka.http.scaladsl.model.{
   Uri
 }
 import _root_.run.cosy.akka.http.AkkaTp
-import _root_.run.cosy.akka.http.message.AkkaMessageSelectors
+import _root_.run.cosy.akka.http.messages.AkkaMessageSelectors
 import _root_.run.cosy.akka.http.headers.{
   AkkaDictSelector,
   Signature,

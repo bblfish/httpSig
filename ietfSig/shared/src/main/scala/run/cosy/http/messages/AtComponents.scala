@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package run.cosy.http.headers
+package run.cosy.http.messages
 
 import run.cosy.http.Http
+import run.cosy.http.messages.{AtSelector, ServerContext}
 
 /** the server context may not know the default Host, but it cannot really not know if the server is
   * running http or https...

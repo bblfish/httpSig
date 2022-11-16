@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package run.cosy.akka.http.message
+package run.cosy.akka.http.messages
 
 import akka.http.scaladsl.model
 import akka.http.scaladsl.model.headers.Host
@@ -22,17 +22,13 @@ import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.akka.http.message.{
-  AkkaAtComponent,
-  AkkaAtReqPlainComponent,
-  AkkaRequestAtComponent,
-  AtReqSelector
-}
+import run.cosy.akka.http.messages.{AkkaAtComponent, AkkaAtReqPlainComponent, AkkaRequestAtComponent, AtReqSelector}
 import run.cosy.http.Http
 import run.cosy.http.Http.{Message, Request}
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.Params
 import run.cosy.http.headers.Rfc8941.Serialise.given
+import run.cosy.http.messages.{AtComponent, AtSelector, SelectorOneLine, ServerContext}
 
 import scala.util.{Success, Try}
 
@@ -105,7 +101,7 @@ object `@query`
     )
 
 object `@query-param` extends AkkaRequestAtComponent:
-   import run.cosy.http.headers.Component.nameTk
+   import run.cosy.http.messages.Component.nameTk
    override val name: String                          = "@query-param"
    override def requiredParamKeys: Set[Rfc8941.Token] = Set(nameTk)
 

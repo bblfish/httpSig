@@ -25,39 +25,42 @@ import run.cosy.http.headers.Rfc8941.{Item, Params, SfString}
 import run.cosy.http.headers.{AtComponents, AtSelector, Rfc8941, ServerContext}
 
 class AtComponentsAkka(using ServerContext) extends AtComponents[Id, AkkaTp.HT]:
-  import scala.language.implicitConversions
-  
-  private given Conversion[Boolean, Rfc8941.Params] = toP
-  
-  private def toP(onReq: Boolean): Params =
+   import scala.language.implicitConversions
+
+   private given Conversion[Boolean, Rfc8941.Params] = toP
+
+   private def toP(onReq: Boolean): Params =
      if onReq == true then Params(reqTk -> true) else Params()
-  
-  override def method(onReq: Boolean = false): AtSelector[Request[Id, HT]] =
-      `@method`(onReq).get
- 
-  override def authority(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+
+   override def method(onReq: Boolean = false): AtSelector[Request[Id, HT]] =
+     `@method`(onReq).get
+
+   override def authority(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
      `@authority`()(onReq).get
 
-  override def requestTarget(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@request-target`(onReq).get
+   override def requestTarget(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@request-target`(onReq).get
 
-  override def path(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@path`(onReq).get
+   override def path(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@path`(onReq).get
 
-  override def query(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@query`(onReq).get
+   override def query(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@query`(onReq).get
 
-  override def queryParam(name: String, onReq: Boolean=false): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@query-param`(toP(onReq) + (nameTk -> SfString(name))).get
+   override def queryParam(
+       name: String,
+       onReq: Boolean = false
+   ): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@query-param`(toP(onReq) + (nameTk -> SfString(name))).get
 
-  override def scheme(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@scheme`()(onReq).get
+   override def scheme(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     `@scheme`()(onReq).get
 
-  override def targetUri(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
-    new `@target-uri`()(onReq).get
- 
-  /** this appears on response only */
-  override def status(): AtSelector[Response[cats.Id, AkkaTp.HT]] =
-    `@status`().get
-  
+   override def targetUri(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+     new `@target-uri`()(onReq).get
+
+   /** this appears on response only */
+   override def status(): AtSelector[Response[cats.Id, AkkaTp.HT]] =
+     `@status`().get
+
 end AtComponentsAkka

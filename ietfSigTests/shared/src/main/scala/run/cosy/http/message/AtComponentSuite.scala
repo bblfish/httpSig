@@ -1,7 +1,7 @@
 package run.cosy.http.message
 
 import munit.CatsEffectSuite
-import run.cosy.http.Http.Request
+import run.cosy.http.Http.{Request,Response}
 import run.cosy.http.headers.AtSelector
 import run.cosy.http.{Http, auth}
 import scala.util.Success
@@ -41,10 +41,10 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
    /** sometimes we want to test the full answer coming back, especially when the answer has
      * multiple lines
      */
-   def rawResponseSelector(selector: AtSelector[Request[F, H]], value: String)(using
-       req: Request[F, H]
+   def rawResponseSelector(selector: AtSelector[Response[F, H]], value: String)(using
+       res: Response[F, H]
    ): Unit =
-     assertEquals(selector.signingStr(req), Success(value))
+     assertEquals(selector.signingStr(res), Success(value))
 
    def resS(selector: AtSelector[Http.Response[F, H]], value: String)(using
        req: Http.Response[F, H]
@@ -223,7 +223,7 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
        at.queryParam(name = "param"),
        """"@query-param";name="param": value""".stripMargin
      )
-     4yyrawReqSelector(
+     rawReqSelector(
        at.queryParam(name = "param", true),
        """"@query-param";req;name="param": value""".stripMargin
      )
@@ -244,11 +244,10 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
 
      //because of typesafety we can only make one test here
      resS(at.status(), "200")
-     rawReqSelector(
-       at.queryParam(name = "param"),
-       """"@query-param";name="param": value""".stripMargin
+     rawResponseSelector(
+       at.status(),
+       """"@status": 200"""
      )
-
 
    }
 

@@ -22,7 +22,12 @@ import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.akka.http.message.{AkkaAtComponent, AkkaAtReqPlainComponent, AkkaRequestAtComponent, AtReqSelector}
+import run.cosy.akka.http.message.{
+  AkkaAtComponent,
+  AkkaAtReqPlainComponent,
+  AkkaRequestAtComponent,
+  AtReqSelector
+}
 import run.cosy.http.Http
 import run.cosy.http.Http.{Message, Request}
 import run.cosy.http.headers.*
@@ -55,7 +60,7 @@ object `@method` extends AkkaAtReqPlainComponent("@method")(req =>
       Success(req.method.value)
     )
 
-case class `@target-uri`()(using sc : ServerContext)
+case class `@target-uri`()(using sc: ServerContext)
     extends AkkaAtReqPlainComponent("@target-uri")((req: HttpRequest) =>
       Success(req.effectiveUri(
         securedConnection = sc.secure,

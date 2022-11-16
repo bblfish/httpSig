@@ -18,32 +18,35 @@ package run.cosy.http.headers
 
 import run.cosy.http.Http
 
-/** the server context may not know the default Host, but it cannot really
- * not know if the server is running http or https... */
+/** the server context may not know the default Host, but it cannot really not know if the server is
+  * running http or https...
+  */
 class ServerContext private (val defaultHost: Option[String], val secure: Boolean)
 
 object ServerContext:
-   def apply(defaultHost: String, secure: Boolean): ServerContext = 
-      new ServerContext(Some(defaultHost), secure)
-   /** If the server wishes the default host to remain unguessable 
-    * then use this constructor */
+   def apply(defaultHost: String, secure: Boolean): ServerContext =
+     new ServerContext(Some(defaultHost), secure)
+
+   /** If the server wishes the default host to remain unguessable then use this constructor
+     */
    def apply(secure: Boolean): ServerContext =
-      new ServerContext(None, secure)   
+     new ServerContext(None, secure)
 
 trait AtComponents[F[_], H <: Http](using ServerContext):
 
    def method(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def authority(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
+
    /** best not used if not HTTP1.1 */
    def requestTarget(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def path(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def query(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def queryParam(name: String, onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   
+
    // requiring knowing context info on server
    def scheme(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def targetUri(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-  
+
    // on responses
    def status(): AtSelector[Http.Response[F, H]]
 

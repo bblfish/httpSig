@@ -39,44 +39,47 @@ import HttpMessageDB as DB
 import run.cosy.http.message.MessageInterpreterError
 object AkkaMsgInterpreter extends run.cosy.http.message.HttpMsgInterpreter[Id, AkkaTp.HT]:
 
-   override def asRequest(header: DB.RequestStr): Http.Request[Id,AkkaTp.HT] =
+   override def asRequest(header: DB.RequestStr): Http.Request[Id, AkkaTp.HT] =
      header match
         case DB.`§2.1_HeaderField` => ???
         case DB.`2.2.1_Method_POST` => HttpRequest(
-          HttpMethods.POST,
-          Uri("/path?param=value"),
-          headers = Seq(Host("www.example.com"))
-        )
+            HttpMethods.POST,
+            Uri("/path?param=value"),
+            headers = Seq(Host("www.example.com"))
+          )
         case DB.`2.2.1_Method_GET` => HttpRequest(
             HttpMethods.GET,
             Uri("/path?param=value"),
             headers = Seq(Host("www.example.com"))
           )
         case DB.`2.2.5_GET_with_LongURL` => HttpRequest(
-          HttpMethods.GET, 
-          Uri("https://test.example.com/path?param=value&param=another")
-        )  
+            HttpMethods.GET,
+            Uri("https://test.example.com/path?param=value&param=another")
+          )
         case DB.`2.2.5_OPTIONS_4akka` => HttpRequest(
-          HttpMethods.OPTIONS,
-          Uri("https://www.example.com:443")
-        )
-        case DB.`2.2.5_OPTIONS` => throw MessageInterpreterError(Platform.Akka, "OPTIONS * cannot be built in Akka")
-        case DB.`2.2.5_CONNECT` => throw MessageInterpreterError(Platform.Akka, "CONNECT example.com:80 cannot be built in Akka")
+            HttpMethods.OPTIONS,
+            Uri("https://www.example.com:443")
+          )
+        case DB.`2.2.5_OPTIONS` =>
+          throw MessageInterpreterError(Platform.Akka, "OPTIONS * cannot be built in Akka")
+        case DB.`2.2.5_CONNECT` => throw MessageInterpreterError(
+            Platform.Akka,
+            "CONNECT example.com:80 cannot be built in Akka"
+          )
         case DB.`2.2.7_Query_String` => HttpRequest(
-          HttpMethods.HEAD,
-          Uri("/path?queryString")
-        )
+            HttpMethods.HEAD,
+            Uri("/path?queryString")
+          )
         case DB.`2.2.8_Query_Parameters` => HttpRequest(
-          HttpMethods.GET,
-          Uri("/path?param=value&foo=bar&baz=batman&qux=")
-        )
-   
-   override def asResponse(header: DB.ResponseStr): Http.Response[Id,AkkaTp.HT] = 
-    header match
-      case DB.`2.2.9_Status_Code` => HttpResponse(
-         StatusCodes.OK,
-         Seq(RawHeader("Date","Fri, 26 Mar 2010 00:05:00 GMT"))
-      )
-    
+            HttpMethods.GET,
+            Uri("/path?param=value&foo=bar&baz=batman&qux=")
+          )
+
+   override def asResponse(header: DB.ResponseStr): Http.Response[Id, AkkaTp.HT] =
+     header match
+        case DB.`2.2.9_Status_Code` => HttpResponse(
+            StatusCodes.OK,
+            Seq(RawHeader("Date", "Fri, 26 Mar 2010 00:05:00 GMT"))
+          )
 
 end AkkaMsgInterpreter

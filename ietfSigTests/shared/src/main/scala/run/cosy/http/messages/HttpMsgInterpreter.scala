@@ -1,4 +1,4 @@
-package run.cosy.http.message
+package run.cosy.http.messages
 
 import run.cosy.http.Http
 import scala.util.Either
@@ -11,7 +11,7 @@ case class MessageInterpreterError(platform: Platform, message: String) extends 
 
 trait HttpMsgInterpreter[F[_], H <: Http]:
 
-   import run.cosy.http.message.HttpMessageDB.{RequestStr,ResponseStr}
+   import run.cosy.http.messages.HttpMessageDB.{RequestStr,ResponseStr}
 
    def asRequest(header: RequestStr): Http.Request[F, H]
 

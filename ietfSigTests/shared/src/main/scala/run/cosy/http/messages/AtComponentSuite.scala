@@ -1,4 +1,4 @@
-package run.cosy.http.message
+package run.cosy.http.messages
 
 import munit.CatsEffectSuite
 import run.cosy.http.Http.{Request, Response}

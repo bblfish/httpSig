@@ -1,4 +1,4 @@
-package run.cosy.http.message
+package run.cosy.http.messages
 
 import run.cosy.http.utils.StringUtils.*
 

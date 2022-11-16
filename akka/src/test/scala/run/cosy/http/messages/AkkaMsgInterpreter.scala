@@ -26,8 +26,8 @@ import akka.http.scaladsl.model.headers.*
 import akka.http.scaladsl.model.{ContentTypes, DateTime, HttpEntity, HttpMethods, HttpRequest, HttpResponse, MediaTypes, StatusCodes, Uri}
 
 import scala.language.implicitConversions
-import run.cosy.http.message.{MessageInterpreterError, Platform}
-object AkkaMsgInterpreter extends run.cosy.http.message.HttpMsgInterpreter[Id, AkkaTp.HT]:
+import run.cosy.http.messages.{MessageInterpreterError, Platform, HttpMessageDB as DB}
+object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, AkkaTp.HT]:
 
    override def asRequest(header: DB.RequestStr): Http.Request[Id, AkkaTp.HT] =
      header match

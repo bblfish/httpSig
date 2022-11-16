@@ -25,23 +25,27 @@ import run.cosy.http.messages.{AtSelector, ServerContext}
 /** the server context may not know the default Host, but it cannot really not know if the server is
   * running http or https...
   */
-class ServerContext private (val defaultHost: Option[String], val port: Option[Int], val secure: Boolean)
+class ServerContext private (val defaultHost: Option[String], val secure: Boolean, val port: Int)
 
 object ServerContext:
-   def apply(defaultHost: String, secure: Boolean, port: Option[Int] = None): ServerContext =
-     new ServerContext(Some(defaultHost), port, secure)
+   def apply(defaultHost: String, secure: Boolean): ServerContext =
+     new ServerContext(Some(defaultHost), secure, if secure then 443 else 80)
 
    /** If the server wishes the default host to remain unguessable then use this constructor
      */
    def apply(secure: Boolean): ServerContext =
-     new ServerContext(None, None, secure)
+     new ServerContext(None, secure, if secure then 443 else 80)
+
+   def apply(defaultHost: String, secure: Boolean, port: Int) =
+     new ServerContext(Some(defaultHost), secure, port)
+end ServerContext
 
 trait AtComponents[F[_], H <: Http](using ServerContext):
 
    protected given Conversion[Boolean, Rfc8941.Params] = toP
 
    protected def toP(onReq: Boolean): Params =
-      if onReq == true then Params(reqTk -> true) else Params()
+     if onReq == true then Params(reqTk -> true) else Params()
 
    def method(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
    def authority(onReq: Boolean = false): AtSelector[Http.Request[F, H]]

@@ -23,7 +23,17 @@ import cats.Id
 import run.cosy.http.Http.Request
 import akka.http.scaladsl.model.HttpMethods.*
 import akka.http.scaladsl.model.headers.*
-import akka.http.scaladsl.model.{ContentTypes, DateTime, HttpEntity, HttpMethods, HttpRequest, HttpResponse, MediaTypes, StatusCodes, Uri}
+import akka.http.scaladsl.model.{
+  ContentTypes,
+  DateTime,
+  HttpEntity,
+  HttpMethods,
+  HttpRequest,
+  HttpResponse,
+  MediaTypes,
+  StatusCodes,
+  Uri
+}
 
 import scala.language.implicitConversions
 import run.cosy.http.messages.{MessageInterpreterError, Platform, HttpMessageDB as DB}

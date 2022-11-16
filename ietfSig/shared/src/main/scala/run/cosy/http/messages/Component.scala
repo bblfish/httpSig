@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021 Henry Story
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package run.cosy.http.messages
 
 import cats.data.NonEmptyList
@@ -42,83 +58,82 @@ object Component:
    val nameTk = Rfc8941.Token("name")
 end Component
 
-
 trait AtComponent extends Component:
 
-  def requiredParamKeys: Set[Rfc8941.Token] = Set.empty
+   def requiredParamKeys: Set[Rfc8941.Token] = Set.empty
 
-  def legalParams(params: Rfc8941.Params): Boolean =
-    params.keySet.removedAll(optionalParamKeys) == requiredParamKeys
+   def legalParams(params: Rfc8941.Params): Boolean =
+     params.keySet.removedAll(optionalParamKeys) == requiredParamKeys
 
-  /*  This is the key function that takes a Msg and parameters an returns the base value */
-  def apply(params: Rfc8941.Params = ListMap()): Try[AtSelector[Msg]] =
-    if legalParams(params) then Success(mkSelector(params))
-    else
-      Failure(AttributeException(s"header $name does not contain legal params: $params"))
+   /*  This is the key function that takes a Msg and parameters an returns the base value */
+   def apply(params: Rfc8941.Params = ListMap()): Try[AtSelector[Msg]] =
+     if legalParams(params) then Success(mkSelector(params))
+     else
+        Failure(AttributeException(s"header $name does not contain legal params: $params"))
 
-  // we can assume the parameters are valid
-  protected def mkSelector(params: Rfc8941.Params): AtSelector[Msg]
+   // we can assume the parameters are valid
+   protected def mkSelector(params: Rfc8941.Params): AtSelector[Msg]
 end AtComponent
 
 object HeaderComponent:
-  def apply(name: String): Option[HeaderComponent] =
-    if name.size > 0 && (name(0) != '@') then
-      Some(new HeaderComponent(name)) // todo: check that it has a legal header syntax.
-    else None
+   def apply(name: String): Option[HeaderComponent] =
+     if name.size > 0 && (name(0) != '@') then
+        Some(new HeaderComponent(name)) // todo: check that it has a legal header syntax.
+     else None
 
 // The name cannot start with @ so a constructor needs to take care of that
 class HeaderComponent private (val name: String) extends Component:
-  override type Msg = NonEmptyList[String]
+   override type Msg = NonEmptyList[String]
 
-  override def apply(params: Rfc8941.Params = ListMap()): Try[HdrSelector] =
-    Try {
-      val ptk: Set[Rfc8941.Token] = params.keySet.removedAll(optionalParamKeys)
-      if ptk.contains(keyTk) && Set.empty == (ptk - keyTk) then
-        params(keyTk) match
-          case Rfc8941.SfString(v) =>
-            try DictNameSelector(name, Rfc8941.Token(v), params)
-            catch
-              case e: ParsingException => throw AttributeException(
-                s"value of name attribute >>$v<< cannot be transformed into a Rfc8941.SfToken"
-              )
-          case x => throw AttributeException(
-            "value of name attribute must be a Rfc8941.String. It is: " + x
-          )
-      else if ptk == Set(sfTk) then SfDictSelector(name, params)
-      else if ptk == Set(bsTk) then BinSelector(name, params)
-      else if ptk == Set.empty then RawSelector(name, params)
-      else throw AttributeException("Header component can not have parameters: " + params)
-    }
+   override def apply(params: Rfc8941.Params = ListMap()): Try[HdrSelector] =
+     Try {
+       val ptk: Set[Rfc8941.Token] = params.keySet.removedAll(optionalParamKeys)
+       if ptk.contains(keyTk) && Set.empty == (ptk - keyTk) then
+          params(keyTk) match
+             case Rfc8941.SfString(v) =>
+               try DictNameSelector(name, Rfc8941.Token(v), params)
+               catch
+                  case e: ParsingException => throw AttributeException(
+                      s"value of name attribute >>$v<< cannot be transformed into a Rfc8941.SfToken"
+                    )
+             case x => throw AttributeException(
+                 "value of name attribute must be a Rfc8941.String. It is: " + x
+               )
+       else if ptk == Set(sfTk) then SfDictSelector(name, params)
+       else if ptk == Set(bsTk) then BinSelector(name, params)
+       else if ptk == Set.empty then RawSelector(name, params)
+       else throw AttributeException("Header component can not have parameters: " + params)
+     }
 end HeaderComponent
 
 sealed trait Selector[Msg]:
-  def params: Rfc8941.Params
-  def name: String
-  lazy val lowercaseName = name.toLowerCase(java.util.Locale.US)
+   def params: Rfc8941.Params
+   def name: String
+   lazy val lowercaseName = name.toLowerCase(java.util.Locale.US)
 
-  /* This is the function to call on Message data */
-  def signingStr(msg: Msg): Try[String]
+   /* This is the function to call on Message data */
+   def signingStr(msg: Msg): Try[String]
 
-  def identifier: String =
-    val attrs =
-      if params.isEmpty then ""
-      else
-        params.map[String]((key, value) =>
-          if value.isInstanceOf[Boolean] then key.canon
-          else key.canon + "=" + value.canon
-        ).mkString(";", ";", "")
-    s""""$lowercaseName"$attrs: """
-  end identifier
+   def identifier: String =
+      val attrs =
+        if params.isEmpty then ""
+        else
+           params.map[String]((key, value) =>
+             if value.isInstanceOf[Boolean] then key.canon
+             else key.canon + "=" + value.canon
+           ).mkString(";", ";", "")
+      s""""$lowercaseName"$attrs: """
+   end identifier
 end Selector
 
 /** this is good for implementations that only return one line, ie. most. a notable exception is
   * \@query-param which can return 1 or more lines
   */
 trait SelectorOneLine[Msg] extends Selector[Msg]:
-  /* This is the function to call on Message data */
-  override def signingStr(msg: Msg): Try[String] = value(msg).map(identifier + _)
+   /* This is the function to call on Message data */
+   override def signingStr(msg: Msg): Try[String] = value(msg).map(identifier + _)
 
-  protected def value(msg: Msg): Try[String]
+   protected def value(msg: Msg): Try[String]
 end SelectorOneLine
 
 /** Selector for components starting with @ take whole messages as parameters In the spec they are
@@ -135,44 +150,44 @@ trait AtSelector[Msg] extends Selector[Msg]
   * with old code)
   */
 sealed trait HdrSelector
-  extends SelectorOneLine[NonEmptyList[String]]
+    extends SelectorOneLine[NonEmptyList[String]]
 
 object SfDictSelector:
-  def parse(headerValue: String): Try[SfDict] =
-    Rfc8941.Parser.sfDictionary.parseAll(headerValue) match
-      case Left(err)   => Failure(HTTPHeaderParseException(err, headerValue))
-      case Right(dict) => Success(dict)
+   def parse(headerValue: String): Try[SfDict] =
+     Rfc8941.Parser.sfDictionary.parseAll(headerValue) match
+        case Left(err)   => Failure(HTTPHeaderParseException(err, headerValue))
+        case Right(dict) => Success(dict)
 
 /** Dict selector with only the "sf" paramater */
 case class SfDictSelector(name: String, params: Rfc8941.Params)
-  extends HdrSelector:
+    extends HdrSelector:
 
-  override protected def value(headers: NonEmptyList[String]): Try[String] =
-    val combinedHeaders = headers.toList.mkString(", ")
-    SfDictSelector.parse(combinedHeaders).map(_.canon)
+   override protected def value(headers: NonEmptyList[String]): Try[String] =
+      val combinedHeaders = headers.toList.mkString(", ")
+      SfDictSelector.parse(combinedHeaders).map(_.canon)
 
 /** Dict selector with name param */
 case class DictNameSelector(
-  name: String,
-  nameSelector: Rfc8941.Token,
-  params: Rfc8941.Params
+    name: String,
+    nameSelector: Rfc8941.Token,
+    params: Rfc8941.Params
 ) extends HdrSelector:
-  override protected def value(headers: NonEmptyList[String]): Try[String] =
-    val combinedHeaders = headers.toList.mkString(", ")
-    for
-      dict <- SfDictSelector.parse(combinedHeaders)
-      value <- dict.get(nameSelector)
-        .toRight(SelectorException(
-          s"No dictionary element >$nameSelector< in headers >$name< with value >$combinedHeaders"
-        )).toTry
-    yield value.canon
+   override protected def value(headers: NonEmptyList[String]): Try[String] =
+      val combinedHeaders = headers.toList.mkString(", ")
+      for
+         dict <- SfDictSelector.parse(combinedHeaders)
+         value <- dict.get(nameSelector)
+           .toRight(SelectorException(
+             s"No dictionary element >$nameSelector< in headers >$name< with value >$combinedHeaders"
+           )).toTry
+      yield value.canon
 
 case class RawSelector(name: String, params: Rfc8941.Params) extends HdrSelector:
-  override protected def value(headers: NonEmptyList[String]): Try[String] =
-    Success(headers.map(_.trim).toList.mkString(", "))
+   override protected def value(headers: NonEmptyList[String]): Try[String] =
+     Success(headers.map(_.trim).toList.mkString(", "))
 
 case class BinSelector(name: String, params: Rfc8941.Params) extends HdrSelector:
-  override protected def value(headers: NonEmptyList[String]): Try[String] = Try {
-    headers.map(h => ArraySeq.ofByte(h.trim.nn.getBytes(US_ASCII).nn).canon)
-      .toList.mkString(", ")
-  }
+   override protected def value(headers: NonEmptyList[String]): Try[String] = Try {
+     headers.map(h => ArraySeq.ofByte(h.trim.nn.getBytes(US_ASCII).nn).canon)
+       .toList.mkString(", ")
+   }

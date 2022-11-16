@@ -26,6 +26,7 @@ import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.*
 import run.cosy.http.messages.{AtComponent, AtSelector, SelectorOneLine, ServerContext}
 import run.cosy.http4s.Http4sTp.HT as H4
+import run.cosy.platform
 
 import scala.util.{Failure, Success, Try}
 
@@ -61,16 +62,35 @@ trait Http4sAt[F[_]]:
          Success(req.method.name)
        )
 
-   def defaultAuthorityOpt(using sc: ServerContext): Option[Uri.Authority] = sc.defaultHost.map(h =>
-     Uri.Authority(None, Uri.RegName(h), sc.port.orElse(Some(if sc.secure then 443 else 80)))
+   def defaultAuthorityOpt(scheme: Option[Uri.Scheme])(
+       using sc: ServerContext
+   ): Option[Uri.Authority] = sc.defaultHost.map(h =>
+     Uri.Authority(
+       None,
+       Uri.RegName(h),
+       // we assume that if the ports are the default one then we have the corresponding security values
+       // otherwise we just don't know... (a bit awkward. It may be better to fail)
+       if sc.secure && sc.port == 443 then None
+       else if (!sc.secure) && sc.port == 80 then None
+       else Some(sc.port)
+     )
    )
 
+   def normaliseAuthority(auth: Uri.Authority, schema: Option[Uri.Scheme]): Uri.Authority =
+     schema match
+        case Some(Uri.Scheme.https) if auth.port == Some(443) => auth.copy(port = None)
+        case Some(Uri.Scheme.http) if auth.port == Some(80)   => auth.copy(port = None)
+        case _                                                => auth
+   end normaliseAuthority
+
    def authorityFor(req: H4Request[F])(using sc: ServerContext): Option[Uri.Authority] =
-     req.uri.authority.orElse {
-       req.headers.get[Host]
-         .map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
-         .orElse(defaultAuthorityOpt)
-     }
+     req.uri.authority
+       .map(a => normaliseAuthority(a, req.uri.scheme))
+       .orElse {
+         req.headers.get[Host]
+           .map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
+           .orElse(defaultAuthorityOpt(req.uri.scheme))
+       }
 
    def defaultScheme(using sc: ServerContext): Uri.Scheme =
      if sc.secure then Uri.Scheme.https else Uri.Scheme.http
@@ -91,23 +111,34 @@ trait Http4sAt[F[_]]:
 
    case class `@target-uri`()(using sc: ServerContext)
        extends AtReqPlainComponent("@target-uri")((req: H4Request[F]) =>
-         effectiveUriFor(req).map(_.renderString)
+         effectiveUriFor(req).map(uri =>
+            val normed =
+              uri.copy(authority = uri.authority.map(a => normaliseAuthority(a, uri.scheme)))
+            normed.renderString
+         )
        )
 
+   /** The @authority derived component SHOULD be used instead of signing the Host header directly
+     */
    case class `@authority`()(using sc: ServerContext)
        extends AtReqPlainComponent("@authority")((req: H4Request[F]) =>
-         Success(defaultScheme.value)
+         for
+            auth <- authorityFor(req)
+              .toRight(SelectorException("could not construct authority for request"))
+              .toTry
+         yield platform.StringUtil.toLowerCaseInsensitive(auth.renderString)
        )
 
    case class `@scheme`()(using sc: ServerContext)
        extends AtReqPlainComponent("@scheme")(req =>
+//         (defaultScheme.value) <- would just that do?
          effectiveUriFor(req).map(_.scheme.get.value)
        )
 
    // This won't work for Options in Akka
    object `@request-target`
        extends AtReqPlainComponent("@request-target")((req: H4Request[F]) =>
-         Success(req.uri.toString())
+         Success(req.uri.renderString)
        )
 
    object `@path`
@@ -142,19 +173,17 @@ trait Http4sAt[F[_]]:
 
          override def signingStr(req: Http.Request[F, H4]): Try[String] = Try {
            val r: H4Request[F] = req.asInstanceOf[H4Request[F]]
-           params.get(nameTk) match
-              case Some(value: Rfc8941.SfString) =>
-                  val prefix = s""""$lowercaseName";name=${value.canon}: """
-                  r.uri.query.multiParams.get(value.asciiStr).map { vals =>
-                    vals.map(v => prefix + v).mkString("\n")
-                  } match
-                    case Some(x) => x
-                    case None => throw SelectorException(
-                      s"No query parameter named ${value.canon} found. Suspicious."
-                    )
+           params(nameTk) match
+              case value: Rfc8941.SfString =>
+                r.uri.query.multiParams.get(value.asciiStr) match
+                   case None => throw SelectorException(
+                       s"No query parameter with key ${value.asciiStr} found. Suspicious."
+                     )
+                   case Some(Nil) => identifier
+                   case Some(nel) => nel.map(identifier + _).mkString("\n")
               case _ => throw SelectorException(
-                    s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
-                  )
+                  s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
+                )
          }
    end `@query-param`
 

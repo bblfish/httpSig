@@ -141,8 +141,8 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
 
      reqS(at.method(), "OPTIONS")
      reqS(at.method(true), "OPTIONS")
-     reqS(at.requestTarget(), "https://www.example.com")
-     reqS(at.requestTarget(true), "https://www.example.com")
+     reqS(at.requestTarget(), "https://www.example.com:443")
+     reqS(at.requestTarget(true), "https://www.example.com:443")
      reqS(at.path(), "") // todo: is this correct? it probably is, if the following is
      reqS(at.path(true), "")
      reqS(at.query(), "?")
@@ -161,16 +161,25 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
 
    test("2.2.5_CONNECT") {
      try
-        interp.asRequest(HttpMessageDB.`2.2.5_CONNECT`)
-        fail("todo")
+       given Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_CONNECT`)
+       given ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
+       reqS(at.method(), "CONNECT")
+       reqS(at.method(true), "CONNECT")
+       reqS(at.requestTarget(), "www.example.com:80")
+       reqS(at.requestTarget(true), "www.example.com:80")
+
      catch case MessageInterpreterError(Platform.Akka, msg) => println(msg)
 
    }
 
    test("2.2.5_Options") {
      try
-        interp.asRequest(HttpMessageDB.`2.2.5_OPTIONS`)
-        fail("todo")
+        given Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_OPTIONS`)
+        given ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
+        reqS(at.method(), "OPTIONS")
+        reqS(at.method(true), "OPTIONS")
+        reqS(at.requestTarget(), "*")
+        reqS(at.requestTarget(true), "*")
      catch case MessageInterpreterError(Platform.Akka, msg) => println(msg)
 
    }
@@ -229,7 +238,7 @@ trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
        """"@query-param";req;name="param": value""".stripMargin
      )
      // we use the server context
-     reqS(at.authority(), "bblfish.net") 
+     reqS(at.authority(), "bblfish.net")
      reqS(at.authority(true), "bblfish.net")
      reqS(at.scheme(), "http")
      reqS(at.scheme(true), "http")

@@ -59,21 +59,24 @@ case class `@target-uri`()(using sc : ServerContext)
     extends AkkaAtReqPlainComponent("@target-uri")((req: HttpRequest) =>
       Success(req.effectiveUri(
         securedConnection = sc.secure,
-        defaultHostHeader = Host(sc.defaultHost)
+        defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
       ).toString())
     )
 
 case class `@authority`()(using sc: ServerContext)
     extends AkkaAtReqPlainComponent("@authority")((req: HttpRequest) =>
       Try(
-        req.effectiveUri(true, Host(sc.defaultHost))
+        req.effectiveUri(true, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
           .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
       )
     )
 
 case class `@scheme`()(using sc: ServerContext)
-    extends AkkaAtReqPlainComponent("@scheme")(_ =>
-      Success(if sc.secure then "https" else "http")
+    extends AkkaAtReqPlainComponent("@scheme")(req =>
+      Try(req.effectiveUri(
+        securedConnection = sc.secure,
+        defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
+      ).scheme)
     )
 
 // This won't work for Options in Akka
@@ -113,8 +116,7 @@ object `@query-param` extends AkkaRequestAtComponent:
                     s"No query parameter with key ${value.asciiStr} found. Suspicious."
                   )
                 case nonEmptylist =>
-                  val hdrKey = s""""$lowercaseName";name=${value.canon}: """
-                  nonEmptylist.reverse.map(hdrKey + _).mkString("\n")
+                  nonEmptylist.reverse.map(identifier + _).mkString("\n")
            case _ => throw run.cosy.http.auth.SelectorException(
                s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
              )

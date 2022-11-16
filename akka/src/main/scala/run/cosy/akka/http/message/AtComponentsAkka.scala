@@ -47,14 +47,14 @@ class AtComponentsAkka(using ServerContext) extends AtComponents[Id, AkkaTp.HT]:
   override def query(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
     `@query`(onReq).get
 
-  override def queryParam(name: String, onReq: Boolean): AtSelector[Request[Id, AkkaTp.HT]] =
+  override def queryParam(name: String, onReq: Boolean=false): AtSelector[Request[Id, AkkaTp.HT]] =
     `@query-param`(toP(onReq) + (nameTk -> SfString(name))).get
 
-  override def scheme(onReq: Boolean)(ServerContext: ServerContext): AtSelector[Request[Id, AkkaTp.HT]] =
+  override def scheme(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
     `@scheme`()(onReq).get
 
-  override def targetUri(onReq: Boolean)(ServerContext: ServerContext): AtSelector[Request[Id, AkkaTp.HT]] =
-    `@target-uri`()(onReq)().get
+  override def targetUri(onReq: Boolean = false): AtSelector[Request[Id, AkkaTp.HT]] =
+    new `@target-uri`()(onReq).get
  
   /** this appears on response only */
   override def status(): AtSelector[Response[cats.Id, AkkaTp.HT]] =

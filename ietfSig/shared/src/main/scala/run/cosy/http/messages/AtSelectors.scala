@@ -42,16 +42,16 @@ object ServerContext:
      new ServerContext(Some(defaultHost), secure, port)
 end ServerContext
 
-class AtSelectors[F[_], H <: Http](at: AtComponents[F,H])(using
-    sc: ServerContext,
+class AtSelectors[F[_], H <: Http](at: AtComponents[F, H])(using
+    sc: ServerContext
 ):
    import scala.language.implicitConversions
 
    def method(onReq: Boolean = false): AtSelector[Http.Request[F, H]] =
-      at.`@method`(onReq).get
+     at.`@method`(onReq).get
 
    def authority(onReq: Boolean = false): AtSelector[Http.Request[F, H]] =
-      at.`@authority`(onReq).get
+     at.`@authority`(onReq).get
 
    /** best not used if not HTTP1.1 */
    def requestTarget(onReq: Boolean = false): AtSelector[Http.Request[F, H]] =

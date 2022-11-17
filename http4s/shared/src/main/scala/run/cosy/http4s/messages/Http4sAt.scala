@@ -112,7 +112,7 @@ class Http4sAt[F[_]] extends run.cosy.http.messages.AtComponents[F, H4]:
             normed.renderString
          )
        )
-   
+
    override def `@authority`(using sc: ServerContext): OnRequest = new authority()
 
    /** The @authority derived component SHOULD be used instead of signing the Host header directly
@@ -200,4 +200,3 @@ class Http4sAt[F[_]] extends run.cosy.http.messages.AtComponents[F, H4]:
             val hres: H4Response[F] = res.asInstanceOf[H4Response[F]]
             Success("" + hres.status.code)
    end `@status`
-

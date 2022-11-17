@@ -31,127 +31,126 @@ import run.cosy.http.messages.{AtComponent, AtSelector, SelectorOneLine, ServerC
 
 import scala.util.{Success, Try}
 
+class AtAkka extends run.cosy.http.messages.AtComponents[cats.Id, HT]:
 
-class AtAkka extends run.cosy.http.messages.AtComponents[cats.Id, HT] {
+   trait AtReqSelector extends AtSelector[Http.Request[Id, HT]]
+       with SelectorOneLine[Http.Request[Id, HT]]
 
+   /* Plain requests selectors with no need for attributes other than "req" */
+   class AkkaAtReqPlainComponent(override val name: String)(select: HttpRequest => Try[String])
+       extends OnRequest:
+      override def mkSelector(p: Params) = new AtReqSelector:
+         def params: Params = p
 
-  trait AtReqSelector extends AtSelector[Http.Request[Id, HT]]
-    with SelectorOneLine[Http.Request[Id, HT]]
+         def name: String = AkkaAtReqPlainComponent.this.name
 
-  /* Plain requests selectors with no need for attributes other than "req" */
-  class AkkaAtReqPlainComponent(override val name: String)(select: HttpRequest => Try[String])
-    extends OnRequest:
-    override def mkSelector(p: Params) = new AtReqSelector :
-      def params: Params = p
+         override protected def value(req: Http.Request[Id, HT]): Try[String] =
+            val r = req.asInstanceOf[HttpRequest]
+            select(r)
+   end AkkaAtReqPlainComponent
 
-      def name: String = AkkaAtReqPlainComponent.this.name
+   object `@method` extends AkkaAtReqPlainComponent("@method")(req =>
+         Success(req.method.value)
+       )
 
-      override protected def value(req: Http.Request[Id, HT]): Try[String] =
-        val r = req.asInstanceOf[HttpRequest]
-        select(r)
-  end AkkaAtReqPlainComponent
+   override def `@target-uri`(using ServerContext): OnRequest = new `target-uri`()
 
-  object `@method` extends AkkaAtReqPlainComponent("@method")(req =>
-    Success(req.method.value)
-  )
+   class `target-uri`()(using sc: ServerContext)
+       extends AkkaAtReqPlainComponent("@target-uri")((req: HttpRequest) =>
+         Success(req.effectiveUri(
+           securedConnection = sc.secure,
+           defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
+         ).toString())
+       )
 
-  override def `@target-uri`(using ServerContext): OnRequest = new `target-uri`()
+   override def `@authority`(using sc: ServerContext): OnRequest = new authority()
 
-  class `target-uri`()(using sc: ServerContext)
-    extends AkkaAtReqPlainComponent("@target-uri")((req: HttpRequest) =>
-      Success(req.effectiveUri(
-        securedConnection = sc.secure,
-        defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
-      ).toString())
-    )
+   class authority()(using sc: ServerContext)
+       extends AkkaAtReqPlainComponent("@authority")((req: HttpRequest) =>
+         Try(
+           req.effectiveUri(true, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
+             .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
+         )
+       )
 
-  override def `@authority`(using sc: ServerContext): OnRequest = new authority()
-  
-  class authority()(using sc: ServerContext)
-    extends AkkaAtReqPlainComponent("@authority")((req: HttpRequest) =>
-      Try(
-        req.effectiveUri(true, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
-          .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
-      )
-    )
-  
-  override def `@scheme`(using ServerContext): OnRequest = new scheme()
-  case class scheme()(using sc: ServerContext)
-    extends AkkaAtReqPlainComponent("@scheme")(req =>
-      Try(req.effectiveUri(
-        securedConnection = sc.secure,
-        defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
-      ).scheme)
-    )
+   override def `@scheme`(using ServerContext): OnRequest = new scheme()
+   case class scheme()(using sc: ServerContext)
+       extends AkkaAtReqPlainComponent("@scheme")(req =>
+         Try(req.effectiveUri(
+           securedConnection = sc.secure,
+           defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
+         ).scheme)
+       )
 
-  // This won't work for Options in Akka
-  object `@request-target`
-    extends AkkaAtReqPlainComponent("@request-target")((req: HttpRequest) =>
-      Success(req.uri.toString())
-    )
+   // This won't work for Options in Akka
+   object `@request-target`
+       extends AkkaAtReqPlainComponent("@request-target")((req: HttpRequest) =>
+         Success(req.uri.toString())
+       )
 
-  object `@path`
-    extends AkkaAtReqPlainComponent("@path")((req: HttpRequest) =>
-      Success(req.uri.path.toString())
-    )
+   object `@path`
+       extends AkkaAtReqPlainComponent("@path")((req: HttpRequest) =>
+         Success(req.uri.path.toString())
+       )
 
-  object `@query`
-    extends AkkaAtReqPlainComponent("@query")((req: HttpRequest) =>
-      Success(
-        req.uri.queryString(java.nio.charset.StandardCharsets.US_ASCII.nn).map("?" + _).getOrElse(
-          "?"
-        )
-      )
-    )
+   object `@query`
+       extends AkkaAtReqPlainComponent("@query")((req: HttpRequest) =>
+         Success(
+           req.uri.queryString(java.nio.charset.StandardCharsets.US_ASCII.nn).map(
+             "?" + _
+           ).getOrElse(
+             "?"
+           )
+         )
+       )
 
-  object `@query-param` extends OnRequest:
+   object `@query-param` extends OnRequest:
 
-    import run.cosy.http.messages.Component.nameTk
+      import run.cosy.http.messages.Component.nameTk
 
-    override val name: String = "@query-param"
+      override val name: String = "@query-param"
 
-    override def requiredParamKeys: Set[Rfc8941.Token] = Set(nameTk)
+      override def requiredParamKeys: Set[Rfc8941.Token] = Set(nameTk)
 
-    override def mkSelector(p: Params) = new AtSelector[Http.Request[Id, HT]] :
-      def params: Params = p
+      override def mkSelector(p: Params) = new AtSelector[Http.Request[Id, HT]]:
+         def params: Params = p
 
-      def name: String = `@query-param`.name
+         def name: String = `@query-param`.name
 
-      override def signingStr(req: Http.Request[Id, HT]): Try[String] = Try {
-        val r: HttpRequest = req.asInstanceOf[HttpRequest]
-        params(nameTk) match
-          case value: Rfc8941.SfString =>
-            r.uri.query().getAll(value.asciiStr) match
-              case Nil => throw run.cosy.http.auth.SelectorException(
-                s"No query parameter with key ${value.asciiStr} found. Suspicious."
-              )
-              case nonEmptylist =>
-                nonEmptylist.reverse.map(identifier + _).mkString("\n")
-          case _ => throw run.cosy.http.auth.SelectorException(
-            s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
-          )
-      }
-  end `@query-param`
+         override def signingStr(req: Http.Request[Id, HT]): Try[String] = Try {
+           val r: HttpRequest = req.asInstanceOf[HttpRequest]
+           params(nameTk) match
+              case value: Rfc8941.SfString =>
+                r.uri.query().getAll(value.asciiStr) match
+                   case Nil => throw run.cosy.http.auth.SelectorException(
+                       s"No query parameter with key ${value.asciiStr} found. Suspicious."
+                     )
+                   case nonEmptylist =>
+                     nonEmptylist.reverse.map(identifier + _).mkString("\n")
+              case _ => throw run.cosy.http.auth.SelectorException(
+                  s"selector $lowercaseName only takes one >${nameTk.canon}< parameter. Received " + params
+                )
+         }
+   end `@query-param`
 
-  object `@status` extends OnResponse:
-    type Msg = Http.Response[Id, HT]
+   object `@status` extends OnResponse:
+      type Msg = Http.Response[Id, HT]
 
-    // since this can only appear on the response it cannot have a req parameter
-    override def optionalParamKeys: Set[Rfc8941.Token] = Set.empty
+      // since this can only appear on the response it cannot have a req parameter
+      override def optionalParamKeys: Set[Rfc8941.Token] = Set.empty
 
-    override val name: String = "@status"
+      override val name: String = "@status"
 
-    override def mkSelector(p: Params) = new AtSelector[Http.Response[Id, HT]]
-      with SelectorOneLine[Http.Response[Id, HT]] :
-      def params: Params = p
+      override def mkSelector(p: Params) = new AtSelector[Http.Response[Id, HT]]
+        with SelectorOneLine[Http.Response[Id, HT]]:
+         def params: Params = p
 
-      def name: String = `@status`.name
+         def name: String = `@status`.name
 
-      override protected def value(res: Http.Response[Id, HT]): Try[String] =
-        val hres: HttpResponse = res.asInstanceOf[HttpResponse]
-        Success("" + hres.status.intValue)
-  end `@status`
-}
+         override protected def value(res: Http.Response[Id, HT]): Try[String] =
+            val hres: HttpResponse = res.asInstanceOf[HttpResponse]
+            Success("" + hres.status.intValue)
+   end `@status`
 
 //  new BasicMessageSelector[Http.Request[F, HT]] :
 //    override def lowercaseName: String = "@method"

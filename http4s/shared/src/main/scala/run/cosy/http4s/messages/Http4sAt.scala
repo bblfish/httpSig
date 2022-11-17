@@ -34,20 +34,14 @@ import scala.util.{Failure, Success, Try}
   * the constructs in a class. All these classes and objects will be used together so this is fine.
   */
 
-trait Http4sAt[F[_]]:
-
-   trait Http4sAtComponent extends AtComponent:
-      override type Msg <: Http.Message[F, H4]
-
-   trait Http4sRequestAtComponent extends Http4sAtComponent:
-      override type Msg = Http.Request[F, H4]
+class Http4sAt[F[_]] extends run.cosy.http.messages.AtComponents[F, H4]:
 
    trait AtReqSelector extends AtSelector[Http.Request[F, H4]]
        with SelectorOneLine[Http.Request[F, H4]]
 
    /* Plain requests selectors with no need for attributes other than "req" */
    class AtReqPlainComponent(override val name: String)(select: H4Request[F] => Try[String])
-       extends Http4sRequestAtComponent:
+       extends OnRequest:
       override def mkSelector(p: Params) = new AtReqSelector:
          def params: Params = p
 
@@ -109,7 +103,8 @@ trait Http4sAt[F[_]]:
          else Failure(SelectorException(s"cannot create effective Uri for req. Got: <$newUri>"))
    end effectiveUriFor
 
-   case class `@target-uri`()(using sc: ServerContext)
+   def `@target-uri`(using ServerContext): OnRequest = new `target-uri`()
+   class `target-uri`()(using sc: ServerContext)
        extends AtReqPlainComponent("@target-uri")((req: H4Request[F]) =>
          effectiveUriFor(req).map(uri =>
             val normed =
@@ -117,10 +112,12 @@ trait Http4sAt[F[_]]:
             normed.renderString
          )
        )
+   
+   override def `@authority`(using sc: ServerContext): OnRequest = new authority()
 
    /** The @authority derived component SHOULD be used instead of signing the Host header directly
      */
-   case class `@authority`()(using sc: ServerContext)
+   class `authority`()(using sc: ServerContext)
        extends AtReqPlainComponent("@authority")((req: H4Request[F]) =>
          for
             auth <- authorityFor(req)
@@ -129,7 +126,8 @@ trait Http4sAt[F[_]]:
          yield platform.StringUtil.toLowerCaseInsensitive(auth.renderString)
        )
 
-   case class `@scheme`()(using sc: ServerContext)
+   override def `@scheme`(using ServerContext): OnRequest = new scheme()
+   class `scheme`()(using sc: ServerContext)
        extends AtReqPlainComponent("@scheme")(req =>
 //         (defaultScheme.value) <- would just that do?
          effectiveUriFor(req).map(_.scheme.get.value)
@@ -158,7 +156,7 @@ trait Http4sAt[F[_]]:
           }
        )
 
-   object `@query-param` extends Http4sRequestAtComponent:
+   object `@query-param` extends OnRequest:
 
       import run.cosy.http.messages.Component.nameTk
 
@@ -187,9 +185,7 @@ trait Http4sAt[F[_]]:
          }
    end `@query-param`
 
-   object `@status` extends AtComponent:
-      type Msg = Http.Response[F, H4]
-
+   object `@status` extends OnResponse:
       // since this can only appear on the response it cannot have a req parameter
       override def optionalParamKeys: Set[Rfc8941.Token] = Set.empty
 
@@ -205,11 +201,3 @@ trait Http4sAt[F[_]]:
             Success("" + hres.status.code)
    end `@status`
 
-   //  new BasicMessageSelector[Http.Request[F, H4]] :
-   //    override def lowercaseName: String = "@method"
-   //
-   //    override def specialForRequests: Boolean = true
-   //
-   //    override protected def signingStringValue(req: Http.Request[F, H4]): Try[String] =
-   //      val r = req.asInstanceOf[HttpRequest]
-   //      Success(r.method.value) // already uppercase

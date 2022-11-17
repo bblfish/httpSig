@@ -17,14 +17,13 @@
 package run.cosy.http4s.messages
 
 import run.cosy.http.Http
-import run.cosy.http.messages.{AtComponentSuite, AtComponents, HttpMsgInterpreter, ServerContext}
+import run.cosy.http.messages.{AtComponentSuite, AtSelectors, HttpMsgInterpreter, ServerContext}
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT as H4
-import run.cosy.http4s.messages.{AtComponents4S, Http4sMsgInterpreter}
+import run.cosy.http4s.messages.{Http4sAt, Http4sMsgInterpreter}
 
 class Http4sAtComponentSuite[F[_]] extends AtComponentSuite[F, H4]:
+  def at(using ServerContext): AtSelectors[F, H4] =
+    new AtSelectors(new Http4sAt[F])
 
-   def at(using ServerContext): AtComponents[F, H4] =
-     new AtComponents4S[F]
-
-   def interp: HttpMsgInterpreter[F, H4] = new Http4sMsgInterpreter[F]
+  def interp: HttpMsgInterpreter[F, H4] = new Http4sMsgInterpreter[F]

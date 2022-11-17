@@ -20,11 +20,12 @@ import run.cosy.http.Http
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.akka.http.AkkaTp
 import cats.Id
+import run.cosy.akka.http.messages.AtAkka
 import run.cosy.http.messages.{AtComponentSuite, HttpMsgInterpreter}
-import run.cosy.http.messages.{AtComponents, ServerContext}
+import run.cosy.http.messages.{AtSelectors, ServerContext}
 
 class AkkaAtComponentSuite extends AtComponentSuite[Id, AkkaTp.HT]:
 
-   def at(using ServerContext): AtComponents[cats.Id, AkkaTp.HT] =
-     new run.cosy.akka.http.messages.AtComponentsAkka
+   def at(using ServerContext): AtSelectors[cats.Id, AkkaTp.HT] =
+     new AtSelectors(new AtAkka())
    def interp: HttpMsgInterpreter[cats.Id, AkkaTp.HT] = AkkaMsgInterpreter

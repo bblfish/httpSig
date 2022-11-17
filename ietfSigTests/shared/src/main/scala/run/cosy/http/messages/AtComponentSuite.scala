@@ -3,14 +3,14 @@ package run.cosy.http.messages
 import munit.CatsEffectSuite
 import run.cosy.http.Http.{Request, Response}
 import run.cosy.http.messages.AtSelector
-import run.cosy.http.messages.{AtComponents, ServerContext}
+import run.cosy.http.messages.{AtSelectors, ServerContext}
 import run.cosy.http.{Http, auth}
 
 import scala.util.Success
 import scala.util.Try
 
 trait AtComponentSuite[F[_], H <: Http] extends CatsEffectSuite:
-   def at(using ServerContext): AtComponents[F, H]
+   def at(using ServerContext): AtSelectors[F, H]
    def interp: HttpMsgInterpreter[F, H]
 
    test("@method") {

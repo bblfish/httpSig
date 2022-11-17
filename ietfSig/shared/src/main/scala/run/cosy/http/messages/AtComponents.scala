@@ -1,66 +1,30 @@
-/*
- * Copyright 2021 Henry Story
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package run.cosy.http.messages
 
 import run.cosy.http.Http
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.Params
-import run.cosy.http.messages.Component.reqTk
-import run.cosy.http.messages.{AtSelector, ServerContext}
+import run.cosy.http.Http.*
 
-/** the server context may not know the default Host, but it cannot really not know if the server is
-  * running http or https...
-  */
-class ServerContext private (val defaultHost: Option[String], val secure: Boolean, val port: Int)
+trait AtComponents[F[_], H <: Http] {
+  trait OnRequest extends AtComponent :
+    override type Msg = Http.Request[F, H]
 
-object ServerContext:
-   def apply(defaultHost: String, secure: Boolean): ServerContext =
-     new ServerContext(Some(defaultHost), secure, if secure then 443 else 80)
+  trait OnResponse extends AtComponent :
+      override type Msg = Http.Response[F, H]
 
-   /** If the server wishes the default host to remain unguessable then use this constructor
-     */
-   def apply(secure: Boolean): ServerContext =
-     new ServerContext(None, secure, if secure then 443 else 80)
+  def `@method` : OnRequest
+  
+  def `@request-target`: OnRequest
+  
+  def `@target-uri`(using ServerContext): OnRequest
 
-   def apply(defaultHost: String, secure: Boolean, port: Int) =
-     new ServerContext(Some(defaultHost), secure, port)
-end ServerContext
-
-trait AtComponents[F[_], H <: Http](using ServerContext):
-
-   protected given Conversion[Boolean, Rfc8941.Params] = toP
-
-   protected def toP(onReq: Boolean): Params =
-     if onReq == true then Params(reqTk -> true) else Params()
-
-   def method(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   def authority(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-
-   /** best not used if not HTTP1.1 */
-   def requestTarget(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   def path(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   def query(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   def queryParam(name: String, onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-
-   // requiring knowing context info on server
-   def scheme(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-   def targetUri(onReq: Boolean = false): AtSelector[Http.Request[F, H]]
-
-   // on responses
-   def status(): AtSelector[Http.Response[F, H]]
-
-end AtComponents
+  def `@authority`(using sc: ServerContext): OnRequest
+  
+  def `@scheme`(using sc: ServerContext): OnRequest
+  
+  def `@path`: OnRequest
+  
+  def `@query`: OnRequest
+  
+  def `@query-param`: OnRequest
+  
+  def `@status`: OnResponse
+}

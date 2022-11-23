@@ -17,29 +17,17 @@
 package run.cosy.http.messages
 
 import run.cosy.http.Http
-import run.cosy.http.Http.*
+import run.cosy.akka.http.AkkaTp.HT
+import run.cosy.akka.http.AkkaTp
+import cats.Id
+import run.cosy.akka.http.messages.SelectorFnsAkka
+import run.cosy.http.messages.{AtSelectorSuite, HttpMsgInterpreter}
+import run.cosy.http.messages.{AtSelectors, ServerContext}
 
-trait AtComponents[F[_], H <: Http]:
-   trait OnRequest extends AtComponent:
-      override type Msg = Http.Request[F, H]
+class AkkaAtSelectorSuite extends AtSelectorSuite[Id, AkkaTp.HT]:
 
-   trait OnResponse extends AtComponent:
-      override type Msg = Http.Response[F, H]
+   def sel(using ServerContext): AtSelectors[Id, HT] =
+     new AtSelectors[cats.Id, HT](using new SelectorFnsAkka()) {}
 
-   def `@method`: OnRequest
-
-   def `@request-target`: OnRequest
-
-   def `@target-uri`(using ServerContext): OnRequest
-
-   def `@authority`(using sc: ServerContext): OnRequest
-
-   def `@scheme`(using sc: ServerContext): OnRequest
-
-   def `@path`: OnRequest
-
-   def `@query`: OnRequest
-
-   def `@query-param`: OnRequest
-
-   def `@status`: OnResponse
+   def interp: HttpMsgInterpreter[cats.Id, HT] = AkkaMsgInterpreter
+   def platform: Platform                      = Platform.Akka

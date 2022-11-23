@@ -17,13 +17,20 @@
 package run.cosy.http4s.messages
 
 import run.cosy.http.Http
-import run.cosy.http.messages.{AtComponentSuite, AtSelectors, HttpMsgInterpreter, ServerContext}
+import run.cosy.http.messages.{
+  AtSelectorSuite,
+  AtSelectors,
+  HttpMsgInterpreter,
+  Platform,
+  ServerContext
+}
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT as H4
-import run.cosy.http4s.messages.{Http4sAt, Http4sMsgInterpreter}
+import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
-class Http4sAtComponentSuite[F[_]] extends AtComponentSuite[F, H4]:
-   def at(using ServerContext): AtSelectors[F, H4] =
-     new AtSelectors(new Http4sAt[F])
+class Http4sAtSelectorSuite[F[_]] extends AtSelectorSuite[F, H4]:
+   def sel(using ServerContext): AtSelectors[F, H4] =
+     new AtSelectors[F, H4](using new SelectorFnsH4[F]) {}
 
    def interp: HttpMsgInterpreter[F, H4] = new Http4sMsgInterpreter[F]
+   def platform: Platform                = Platform.Http4s

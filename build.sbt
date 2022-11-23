@@ -132,6 +132,7 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
     description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
     libraryDependencies ++= Seq(
       tests.munitEffect.value,
+      cats.caseInsensitive.value,
       tests.munit.value % Test,
       cats.bobcats.value classifier ("tests"),        // bobcats test examples,
       cats.bobcats.value classifier ("tests-sources") // bobcats test examples
@@ -196,7 +197,7 @@ lazy val scala3Options = Seq(
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
   "-unchecked",   // Enable additional warnings where generated code depends on assumptions.
   "-feature", // Emit warning and location for usages of features that should be imported explicitly.
-  //	"-explain",                          // Explain errors in more detail.
+  // "-explain",                          // Explain errors in more detail.
   // "-explain-types",                    // Explain type errors in more detail.
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   // "-no-indent",                        // Require classical {...} syntax, indentation is not significant.

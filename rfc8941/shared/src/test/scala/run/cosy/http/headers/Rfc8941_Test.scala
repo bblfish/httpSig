@@ -22,7 +22,7 @@ import cats.parse.Parser.{Expectation, Fail}
 import _root_.run.cosy.http.headers.Rfc8941
 import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.headers.Rfc8941.Parser.*
-import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.headers.Rfc8941.Syntax.*
 
 import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}

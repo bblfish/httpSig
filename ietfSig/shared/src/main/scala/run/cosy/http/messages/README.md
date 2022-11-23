@@ -266,7 +266,7 @@ We have a try for the parameters because they may not be the parameters for that
 The function's domain specifies how to interpret the arguments. 
 Those arguments tune the resulting function between http messages and resulting strings. 
 
-And that is actually what we have. 
+And that is actually what we have. Well perhaps it topsy turvy. We have the interface [AtComponents](AtComponents.scala) that must be implemented by the frameworks, and which is used by [AtSelectors](AtSelectors.scala) which specifies the constructor functions. 
 
 
 

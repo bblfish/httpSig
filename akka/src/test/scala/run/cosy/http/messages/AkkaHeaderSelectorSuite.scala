@@ -15,17 +15,13 @@
  */
 
 package run.cosy.http.messages
+import run.cosy.akka.http.messages.SelectorFnsAkka
+import run.cosy.http.messages.{HeaderSuite, ServerContext}
 
-import run.cosy.http.Http
-import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.akka.http.AkkaTp
-import cats.Id
-import run.cosy.akka.http.messages.AtAkka
-import run.cosy.http.messages.{AtComponentSuite, HttpMsgInterpreter}
-import run.cosy.http.messages.{AtSelectors, ServerContext}
-
-class AkkaAtComponentSuite extends AtComponentSuite[Id, AkkaTp.HT]:
-
-   def at(using ServerContext): AtSelectors[cats.Id, AkkaTp.HT] =
-     new AtSelectors(new AtAkka())
-   def interp: HttpMsgInterpreter[cats.Id, AkkaTp.HT] = AkkaMsgInterpreter
+class AkkaHeaderSelectorSuite extends HeaderSuite(
+      // todo: no need for server context here in a header suite. use HeaderSelectorFns instead...
+      new run.cosy.http.messages.Selectors(
+        using new SelectorFnsAkka(using ServerContext("bblfish.net", true))
+      ),
+      AkkaMsgInterpreter
+    )

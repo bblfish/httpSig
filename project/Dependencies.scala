@@ -51,7 +51,8 @@ object Dependencies {
 
     // https://index.scala-lang.org/typelevel/cats-effect/artifacts/cats-effect/3.3.14
     // todo: other libraries depend on cats effect, is this the right version?
-    lazy val catsEffect = Def.setting("org.typelevel" %% "cats-effect" % "3.3.14")
+    lazy val catsEffect      = Def.setting("org.typelevel" %% "cats-effect" % "3.3.14")
+    lazy val caseInsensitive = Def.setting("org.typelevel" %% "case-insensitive" % "1.3.0")
   }
 
   object akka {

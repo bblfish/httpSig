@@ -18,7 +18,12 @@ object HttpMessageDB:
    	  |X-Empty-Header: \
    	  |
    	  |Cache-Control:    must-revalidate
-   	  |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)""".rfc8792single
+   	  |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)  \
+      |
+      |Example-Header: value, with, lots
+      |Example-Dict: d
+      |Example-Header: of, commas
+      |""".rfc8792single
    )
    
    val `2.2.1_Method_POST` = RequestStr(
@@ -46,6 +51,11 @@ object HttpMessageDB:
    //this example cannot be constructed in Akka
    val `2.2.5_OPTIONS` = RequestStr(
       """OPTIONS *  HTTP/1.1"""
+   )
+   
+   val `2.2.7_Query` = RequestStr(
+     """POST /path?param=value&foo=bar&baz=bat%2Dman HTTP/1.1
+       |Host: www.example.com""".rfc8792single
    )
 
    /* Altered example from book, as it resembles others so much, and

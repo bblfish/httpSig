@@ -25,7 +25,7 @@ import bobcats.Verifier.{SigningString, Signature as SignatureBytes}
 import bobcats.{AsymmetricKeyAlg, SPKIKeySpec, HttpMessageSignaturesV07}
 import _root_.run.cosy.http.headers.*
 import _root_.run.cosy.http.headers.Rfc8941.*
-import _root_.run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.headers.Rfc8941.Syntax.*
 import _root_.run.cosy.http.utils.StringUtils.*
 import _root_.run.cosy.http.auth.MessageSignature
 import _root_.run.cosy.http.headers.SelectorOps

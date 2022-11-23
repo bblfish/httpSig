@@ -22,7 +22,7 @@ import org.http4s.Header.Raw
 import org.http4s.dsl.io.*
 import org.http4s.implicits.{*, given}
 import org.typelevel.ci.CIStringSyntax
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.sf
+import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{IList, Parameterized, SfDict, SfInt, Token, token2PI}
 import run.cosy.http.headers.{Rfc8941, SigInput, SigInputs, Signatures}
 import run.cosy.http.utils.StringUtils.rfc8792single

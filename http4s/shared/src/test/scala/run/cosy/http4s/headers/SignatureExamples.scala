@@ -17,7 +17,7 @@
 package run.cosy.http4s.headers
 
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.sf
+import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{IList, PItem, Parameterized, SfDict, SfInt, Token}
 import run.cosy.http.utils.StringUtils.{base64Decode, rfc8792single}
 

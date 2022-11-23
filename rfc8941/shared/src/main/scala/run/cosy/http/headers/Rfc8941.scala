@@ -27,7 +27,8 @@ import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
 import run.cosy.http.headers.NumberOutOfBoundsException
 
-/** Structured Field Values for HTTP */
+/** Structured Field Values for HTTP [[https://www.rfc-editor.org/rfc/rfc8941.html RFC8941]]
+  */
 object Rfc8941:
    //
    // types used by RFC8941
@@ -73,7 +74,7 @@ object Rfc8941:
          sb.append('"')
          sb.toString()
    // class is abstract to remove copy operation
-   final case class Token private (t: String)
+   final case class Token private (val t: String)
 
    /** dict-member = member-key ( parameters / ( "=" member-value )) member-value = sf-item /
      * inner-list
@@ -172,7 +173,7 @@ object Rfc8941:
 
    implicit val paramConv: Conversion[Seq[Param], Params] = paramConversion
 
-   object SyntaxHelper:
+   object Syntax:
       extension (sc: StringContext)
         def sf(args: Any*): SfString =
            val strings     = sc.parts.iterator
@@ -328,6 +329,13 @@ object Rfc8941:
            def canon: String = o match
               case l: IList => l.items.map(i => i.canon).mkString("(", " ", ")") + l.params.canon
               case pi: PItem[?] => pi.item.canon + pi.params.canon
+
+      given sfListSer(using
+          Serialise[Params]
+      ): Serialise[SfList] with
+         extension (o: SfList)
+           def canon: String =
+             o.map(p => p.canon).mkString(", ")
 
       given sfDictSer(using
           Serialise[Item],

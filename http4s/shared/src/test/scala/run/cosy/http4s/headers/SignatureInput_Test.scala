@@ -24,7 +24,7 @@ import org.http4s.implicits.{*, given}
 import run.cosy.http.utils.StringUtils.rfc8792single
 import run.cosy.http4s.headers.`Signature-Input`.{*, given}
 import org.typelevel.ci.CIStringSyntax
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.sf
+import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{IList, Parameterized, SfDict, SfInt, Token}
 import run.cosy.http.headers.Rfc8941.token2PI
 import run.cosy.http.headers.{Rfc8941, SigInput, SigInputs}

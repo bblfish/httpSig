@@ -25,22 +25,22 @@ import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{Params, SfDict, SfList, SfString}
 import run.cosy.http.messages.Selectors.Sf
-import run.cosy.http.messages.{AtSelectorFns, Component}
+import run.cosy.http.messages.{AtSelectorFns, Parameters}
 
-import scala.collection.immutable.{ArraySeq, ListMap}
+import scala.collection.immutable.{ArraySeq, ListMap, HashMap}
 import scala.util.{Failure, Success, Try}
 
 class Selectors[F[_], H <: Http](using SelectorFns[F, H])
     extends AtSelectors[F, H] with HeaderSelectors[F, H]
 
 /** These selectors can all be used to build a Signature-Input */
-class RequeS[F[_], H <: Http](
+open class RequestSel[F[_], H <: Http](
     val name: SfString,
     val selectorFn: SelectorFn[Http.Request[F, H]],
     override val params: Rfc8941.Params = ListMap()
 ) extends RequestSelector[F, H]
 
-class ReSp[F[_], H <: Http](
+open class ResponseSel[F[_], H <: Http](
     val name: SfString,
     val selectorFn: SelectorFn[Http.Response[F, H]],
     override val params: Rfc8941.Params = ListMap()
@@ -50,45 +50,56 @@ trait AtSelectors[F[_], H <: Http](using sf: AtSelectorFns[F, H]):
 
    import Rfc8941.Syntax.*
    val `@method`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@method", sf.method)
+     RequestSel[F, H](sf"@method", sf.method)
 
    val `@request-target`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@request-target", sf.requestTarget)
+     RequestSel[F, H](sf"@request-target", sf.requestTarget)
 
    val `@target-uri`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@target-uri", sf.targetUri)
+     RequestSel[F, H](sf"@target-uri", sf.targetUri)
 
    val `@authority`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@authority", sf.authority)
+     RequestSel[F, H](sf"@authority", sf.authority)
 
    val `@scheme`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@scheme", sf.scheme)
+     RequestSel[F, H](sf"@scheme", sf.scheme)
 
    val `@path`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@path", sf.path)
+     RequestSel[F, H](sf"@path", sf.path)
 
    val `@query`: RequestSelector[F, H] =
-     RequeS[F, H](sf"@query", sf.query)
+     RequestSel[F, H](sf"@query", sf.query)
 
    /** todo: arguably the paramName should be an Rfc8941.Token, because it will be used as the key
      * in a dict, and that is a token. But then one has to be careful to render that token as a
      * string in the `"@query-param";key="q":` header
      */
    def `@query-param`(paramName: SfString): RequestSelector[F, H] =
-     RequeS[F, H](sf"@query-param", sf.queryParam(paramName), Params(Component.nameTk -> paramName))
+     RequestSel[F, H](
+       sf"@query-param",
+       sf.queryParam(paramName),
+       Params(Parameters.nameTk -> paramName)
+     )
 
    val `@status`: ResponseSelector[F, H] =
-     ReSp[F, H](sf"@status", sf.status)
+     ResponseSel[F, H](sf"@status", sf.status)
 
 end AtSelectors
 
 trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
    import Selectors.CollationTp
+
+   /** todo: this does not quite work as a function for 2 reasons:
+     * 1. `name`'s type is too general: the name could be illegal (and the response does not return a Try, so one
+     * could create an illegal header.
+     * 2. collTp could be illegal for the given header. Eg. CollTp sf for a header that is not known
+     *    to be interpretable as an sfDict.
+     */
    def requestHeader(
        name: Rfc8941.SfString,
        collTp: CollationTp = CollationTp.Raw
    ): RequestSelector[F, H] =
-     new RequeS[F, H](
+     new RequestSel[F, H](
        name,
        sf.requestHeaders(name),
        collTp.toParam
@@ -101,7 +112,7 @@ trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
        name: Rfc8941.SfString,
        collTp: CollationTp = CollationTp.Raw
    ): ResponseSelector[F, H] =
-     new ReSp[F, H](
+     new ResponseSel[F, H](
        name,
        sf.responseHeaders(name),
        collTp.toParam
@@ -163,8 +174,9 @@ trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
 end HeaderSelectors
 
 object Selectors:
-   import Component.*
+   import Parameters.*
 
+   /** Strict Format types, can be one of three */
    enum Sf:
       case List
       case Item // a parameterized item
@@ -183,7 +195,7 @@ object Selectors:
 
    def render(
        tp: CollationTp,
-       headerName: String
+       headerName: String //todo: the header name should be a special type
    )(headerValues: NonEmptyList[String]): Try[String] =
       import CollationTp.*
       tp match
@@ -247,3 +259,82 @@ object Selectors:
      )
        .toList.mkString(", ")
    }
+
+   import run.cosy.http.messages.Selectors.CollationTp as Ct
+
+   /**
+     * When a header is named sf this means it can be interpreted as a structured header.
+     * This map specifies how to interpret them.
+     * for information on how existing headers can be understood as working with rfc8941 see
+     * [[https://greenbytes.de/tech/webdav/draft-ietf-httpbis-retrofit-latest.html Retrofit Structured Fields for HTTP]]
+     * olso some good overview documentation on
+     * [[https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers HTTP Headers]]
+     */
+   val knownHeaders: Map[String, Selectors.Sf] = HashMap(
+     "accept"                           -> Sf.List,
+     "accept-encoding"                  -> Sf.List,
+     "accept-language"                  -> Sf.List,
+     "accept-patch"                     -> Sf.List,
+     "accept-post"                      -> Sf.List,
+     "accept-ranges"                    -> Sf.List,
+     "access-control-allow-credentials" -> Sf.Item,
+     "access-control-allow-headers"     -> Sf.List,
+     "access-control-allow-methods"     -> Sf.List,
+     "access-control-allow-origin"      -> Sf.Item,
+     "access-control-expose-headers"    -> Sf.List,
+     "access-control-max-age"           -> Sf.Item,
+     "access-control-request-headers"   -> Sf.List,
+     "access-control-request-method"    -> Sf.Item,
+     "age"                              -> Sf.Item,
+     "allow"                            -> Sf.List,
+     "alpn"                             -> Sf.List,
+     "alt-svc"                          -> Sf.Dictionary,
+     "alt-used"                         -> Sf.Item,
+     "cache-control"                    -> Sf.Dictionary,
+     "cdn-loop"                         -> Sf.List,
+     "clear-site-data"                  -> Sf.List,
+     "connection"                       -> Sf.List,
+     "content-encoding"                 -> Sf.List,
+     "content-language"                 -> Sf.List,
+     "content-length"                   -> Sf.List,
+     "content-type"                     -> Sf.Item,
+     "cross-origin-resource-policy"     -> Sf.Item,
+     "dnt"                              -> Sf.Item,
+     "expect"                           -> Sf.Dictionary,
+     "expect-ct"                        -> Sf.Dictionary,
+     "host"                             -> Sf.Item,
+     "keep-alive"                       -> Sf.Dictionary,
+     "max-forwards"                     -> Sf.Item,
+     "origin"                           -> Sf.Item,
+     "pragma"                           -> Sf.Dictionary,
+     "prefer"                           -> Sf.Dictionary,
+     "preference-applied"               -> Sf.Dictionary,
+     "retry-after"                      -> Sf.Item,
+     "sec-websocket-extensions"         -> Sf.List,
+     "sec-websocket-protocol"           -> Sf.List,
+     "sec-websocket-version"            -> Sf.Item,
+     "server-timing"                    -> Sf.List,
+     "surrogate-control"                -> Sf.Dictionary,
+     "te"                               -> Sf.List,
+     "timing-allow-origin"              -> Sf.List,
+     "trailer"                          -> Sf.List,
+     "transfer-encoding"                -> Sf.List,
+     "upgrade-insecure-requests"        -> Sf.Item,
+     "vary"                             -> Sf.List,
+     "x-content-type-options"           -> Sf.Item,
+     "x-frame-options"                  -> Sf.Item,
+     "x-xss-protection"                 -> Sf.List
+   )
+//
+//     /** a list because sometimes multiple lengths are sent! */
+//     "content-length" -> Ct.Strict(Sf.List),
+//     "signature"      -> Ct.Strict(Sf.Dictionary),
+//     "content-digest" -> Ct.Strict(Sf.Dictionary),
+//
+//     /** Defined in:
+//       * [[https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-client-cert-field-03#section-2 httpbis-client-cert]]
+//       */
+//     "client-cert" -> Ct.Strict(Sf.Item),
+//     "client-cert" -> Ct.Strict(Sf.List),
+//     "forwarded"   -> Ct.Raw
+//   )

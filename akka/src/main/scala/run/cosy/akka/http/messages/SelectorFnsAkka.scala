@@ -27,7 +27,6 @@ import run.cosy.http.auth.{AttributeException, HTTPHeaderParseException, Selecto
 import run.cosy.http.headers.Rfc8941.{Param, Params}
 import run.cosy.http.headers.{ParsingException, Rfc8941}
 import run.cosy.http.messages.*
-import run.cosy.http.messages.Component.{bsTk, keyTk, reqTk, sfTk}
 
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.ListMap

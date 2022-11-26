@@ -32,7 +32,7 @@ or even simpler
 ```scala
 type Msg = Seq[String]
 ```
-There are good reasons to keep the simpler definition as we will see.
+But as we will see, there are good reason to keep the uniformaty of functions going through `Request` and `Response` objects.
 
 ## Refinements
 

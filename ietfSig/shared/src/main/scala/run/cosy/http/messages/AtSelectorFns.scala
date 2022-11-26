@@ -21,7 +21,7 @@ import run.cosy.http.Http
 import run.cosy.http.auth.SelectorException
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.{Params, SfString}
-import run.cosy.http.messages.Component.{nameTk, reqTk}
+import run.cosy.http.messages.Parameters.{nameTk, reqTk}
 import run.cosy.http.messages.SelectorFn
 
 import scala.util.{Failure, Success, Try}

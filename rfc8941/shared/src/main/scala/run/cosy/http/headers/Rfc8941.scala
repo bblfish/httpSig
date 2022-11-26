@@ -74,7 +74,7 @@ object Rfc8941:
          sb.append('"')
          sb.toString()
    // class is abstract to remove copy operation
-   final case class Token private (val t: String)
+   final case class Token private (val tk: String)
 
    /** dict-member = member-key ( parameters / ( "=" member-value )) member-value = sf-item /
      * inner-list
@@ -300,7 +300,7 @@ object Rfc8941:
               // todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
               case d: SfDec    => d.double.toString
               case s: SfString => s.formattedString
-              case tk: Token   => tk.t
+              case tk: Token   => tk.tk
               case as: Bytes => ":" + Base64.getEncoder.nn
                   .encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
               case b: Boolean => if b then "?1" else "?0"

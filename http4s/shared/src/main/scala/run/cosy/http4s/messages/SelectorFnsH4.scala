@@ -21,7 +21,7 @@ import run.cosy.http.messages.{AtSelectorFns, SelectorFn, SelectorFns, ServerCon
 import org.http4s.headers.Host
 import org.http4s.{Query, Uri, Message as H4Message, Request as H4Request, Response as H4Response}
 import run.cosy.http.Http
-import run.cosy.http.messages.Component.nameTk
+import run.cosy.http.messages.Parameters.nameTk
 import run.cosy.http4s.Http4sTp.HT as H4
 import run.cosy.platform
 import run.cosy.http.headers.Rfc8941

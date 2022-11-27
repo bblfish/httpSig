@@ -31,7 +31,6 @@ import run.cosy.http.utils.StringUtils
 
 import java.nio.charset.StandardCharsets.US_ASCII
 
-
 /** A container for a function that selects in a Msg (Request or Response) the data and returns a
   * sequence of Signing Values
   */
@@ -71,18 +70,17 @@ trait Selector:
      */
    def params: Rfc8941.Params = ListMap()
 
-   /** todo: This should be a subtype of SfString that is limited to the vocab of
-     * an optional `@` char followed by a lowercase rfc8941.Token. The canonical
-     * representation of it is surrounded by quotes " as with SfString. The reason
-     * it is a token is that that is what the structure of an http header is. */
-   def name: Rfc8941.SfString
+   /** todo: This should be a subtype of SfString that is limited to the vocab of an optional `@`
+     * char followed by a lowercase rfc8941.Token. The canonical representation of it is surrounded
+     * by quotes " as with SfString. The reason it is a token is that that is what the structure of
+     * an http header is.
+     */
+   def name: ComponentId
 
-   final lazy val lowercaseName: String = name.asciiStr.toLowerCase(java.util.Locale.US).nn
    val selectorFn: SelectorFn[Msg]
 
    /** this is the implementation for @query-param, only. Override on headers. */
-   def renderNel(nel: NonEmptyList[String]): Try[String] =
-     Success(nel.map(identifier + _).toList.mkString("\n"))
+   def renderNel(nel: NonEmptyList[String]): Try[String]
 
    def signingStr(msg: Msg): Try[String] =
      selectorFn.signingValues(msg).flatMap {
@@ -98,7 +96,7 @@ trait Selector:
              if value.isInstanceOf[Boolean] then key.canon
              else key.canon + "=" + value.canon
            ).mkString(";", ";", "")
-      s""""$lowercaseName"$attrs: """
+      s"""${name.canon}$attrs: """
    end identifier
 
 end Selector

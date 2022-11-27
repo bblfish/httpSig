@@ -17,7 +17,7 @@
 package run.cosy.http4s.messages
 
 import cats.data.NonEmptyList
-import run.cosy.http.messages.{AtSelectorFns, SelectorFn, SelectorFns, ServerContext}
+import run.cosy.http.messages.{AtSelectorFns, HeaderId, SelectorFn, SelectorFns, ServerContext}
 import org.http4s.headers.Host
 import org.http4s.{Query, Uri, Message as H4Message, Request as H4Request, Response as H4Response}
 import run.cosy.http.Http
@@ -87,12 +87,12 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
 
    override def status: ResponseFn = ResponseSelH4(req => Success("" + req.status.code))
 
-   override def requestHeaders(name: Rfc8941.SfString): RequestFn = RequestSelH4(req =>
-     SF.getHeaders(req, name.asciiStr)
+   override def requestHeaders(name: HeaderId): RequestFn = RequestSelH4(req =>
+     SF.getHeaders(req, name)
    )
 
-   override def responseHeaders(name: Rfc8941.SfString): ResponseFn = ResponseSelH4(res =>
-     SF.getHeaders(res, name.asciiStr)
+   override def responseHeaders(name: HeaderId): ResponseFn = ResponseSelH4(res =>
+     SF.getHeaders(res, name)
    )
 
    case class RequestSelH4(
@@ -111,8 +111,8 @@ end SelectorFnsH4
 
 object SelectorFnsH4:
 
-   def getHeaders[F[_]](msg: H4Message[F], name: String) =
-     msg.headers.get(CIString(name)).map(_.map(_.value)) match
+   def getHeaders[F[_]](msg: H4Message[F], name: HeaderId) =
+     msg.headers.get(CIString(name.specName)).map(_.map(_.value)) match
         case None      => Failure(SelectorException(s"no header in request named $name"))
         case Some(nel) => Success(nel)
 

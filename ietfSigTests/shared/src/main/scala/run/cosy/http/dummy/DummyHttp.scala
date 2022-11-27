@@ -3,12 +3,13 @@ package run.cosy.http.dummy
 import cats.Id
 import run.cosy.http.dummy.DummyHttp
 import run.cosy.http.Http.{Header, Message, Request}
-import run.cosy.http.messages.SelectorFn
+import run.cosy.http.messages.{HeaderId, SelectorFn}
 import run.cosy.http.{Http, HttpOps}
 
 import scala.util.Try
 import cats.data.NonEmptyList
-import scala.util.{Success,Failure}
+
+import scala.util.{Failure, Success}
 import run.cosy.http.auth.SelectorException
 import _root_.org.typelevel.ci.CIString
 
@@ -60,25 +61,25 @@ object DummyHeaderSelectorFns extends messages.HeaderSelectorFns[Id,DHT]:
 
   import DummyHttp.given
 
-  def requestHeaders(name: Rfc8941.SfString): RequestFn =
+  override def requestHeaders(name: HeaderId): RequestFn =
     new messages.SelectorFn[Http.Request[Id,DHT]]:
       override val signingValues: Request[Id, DHT] => Try[String|NonEmptyList[String]] =
-        req => msgSel(name.asciiStr, req.asInstanceOf[Seq[(String,String)]])
+        req => msgSel(name, req.asInstanceOf[Seq[(String,String)]])
         
   end requestHeaders 
 
-  def msgSel(name: String, msg: Seq[(String, String)]): Try[String|NonEmptyList[String]] = 
-     msg.groupBy(_._1).get(CIString(name)) match
+  def msgSel(name: HeaderId, msg: Seq[(String, String)]): Try[String|NonEmptyList[String]] =
+     msg.groupBy(_._1).get(CIString(name.specName)) match
             case None => Failure(SelectorException("no header named: "+name))
             case Some(pairs) => 
               val v: Seq[String] =  pairs.map(_._2)
               Success(NonEmptyList(v.head,v.tail.toList))
   end msgSel
 
-  def responseHeaders(name: Rfc8941.SfString): ResponseFn = 
+  override def responseHeaders(name: HeaderId): ResponseFn =
     new messages.SelectorFn[Http.Response[Id,DHT]]:
       override val signingValues: Response[Id, DHT] => Try[String | NonEmptyList[String]] = 
-        res => msgSel(name.asciiStr, res.asInstanceOf[Seq[(String,String)]]) 
+        res => msgSel(name, res.asInstanceOf[Seq[(String,String)]])
 
 end DummyHeaderSelectorFns
 

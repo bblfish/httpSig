@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-//package run.cosy.http4s.auth
-//
-//import run.cosy.http.HttpOps
-//import run.cosy.http.auth.SigningSuiteHelpers
-//import run.cosy.http4s.Http4sTp
-//import run.cosy.http4s.Http4sTp.HT
-//import cats.effect.IO
-//
-//class Http4sMessageSigningSuiteJS[F[_]] extends run.cosy.http4s.auth.Http4sMessageSigningSuite[F]:
-//   given pem: bobcats.util.PEMUtils             = bobcats.util.WebCryptoPEMUtils
-//   override given ops: HttpOps[HT]              = Http4sTp.hOps
-//   override given sigSuite: SigningSuiteHelpers = new SigningSuiteHelpers
+package run.cosy.http.messages
+import run.cosy.http.messages.AtId.*
+
+object AtIds:
+   val `method`         = AtId("@method").get
+   val `request-target` = AtId("@request-target").get
+   val `target-uri`     = AtId("@target-uri").get
+   val `authority`      = AtId("@authority").get
+   val `scheme`         = AtId("@scheme").get
+   val `path`           = AtId("@path").get
+   val `query`          = AtId("@query").get
+   val `query-param`    = AtId("@query-param").get
+   val `status`         = AtId("@status").get
+end AtIds

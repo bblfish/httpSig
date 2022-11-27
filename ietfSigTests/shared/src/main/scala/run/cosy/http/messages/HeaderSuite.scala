@@ -22,7 +22,7 @@ import _root_.run.cosy.http.Http
 import _root_.run.cosy.http.Http.Request
 import _root_.run.cosy.http.headers.Rfc8941
 import _root_.run.cosy.http.headers.Rfc8941.Token
-import _root_.run.cosy.http.messages.{HeaderSelectors, HttpMsgInterpreter, RequestSelector, Selectors, HttpMessageDB as DB}
+import _root_.run.cosy.http.messages.{HeaderSelectors, HttpMsgInterpreter, RequestSelector, HttpMessageDB as DB, Selectors}
 import _root_.run.cosy.platform
 import cats.data.NonEmptyList
 import cats.effect.Async
@@ -33,9 +33,22 @@ import java.util.Locale
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-/** Becayse this test does not depend on any other HTTP lib implementations, we only need to run it
-  * in the test project. Here we test just the header selectors, since they don't depend on any
-  * underlying HTTP Framework.
+object HeaderSuite:
+  import HeaderId.*
+    // special headers used in the spec that we won't find elsewhere
+   val `x-example`: OldId = HeaderId("x-example").get
+   val `x-empty-header`: OldId = HeaderId("x-empty-header").get
+   val `x-ows-header`: OldId = HeaderId("x-ows-header").get
+   val `x-obs-fold-header`: OldId = HeaderId("x-obs-fold-header").get
+   val `example-dict`: DictId = HeaderId.dict("example-dict").get
+   val `example-header`: OldId = HeaderId("example-header").get
+   val VerticalTAB: Char           = "\u000B".head
+
+
+/**
+  * This tests headers, which can be run without an underlying http implementation.
+  * Running on underlying implementations is still useful because those may or may not
+  * interpret the headers before the client receives them.
   */
 open class HeaderSuite[F[_], H <: Http](
     selectr: HeaderSelectors[F, H],
@@ -44,21 +57,24 @@ open class HeaderSuite[F[_], H <: Http](
 
    import _root_.run.cosy.http.headers.Rfc8941
    import Rfc8941.Syntax.*
-   import Selectors.CollationTp as Ctp
-   type ReqSel = Ctp => RequestSelector[F, H]
-
+   import Selectors as Ctp
+   
+   val exHd = HeaderSuite
+   val hds = HeaderIds
+   import HeaderId.{OldId,DictId,ListId,ItemId}
+   
    // special headers used in the spec that we won't find elsewhere
-   val `x-example`: ReqSel         = c => selectr.requestHeader(sf"x-example", c)
-   val `x-empty-header`: ReqSel    = c => selectr.requestHeader(sf"x-empty-header", c)
-   val `x-ows-header`: ReqSel      = c => selectr.requestHeader(sf"x-ows-header", c)
-   val `x-obs-fold-header`: ReqSel = c => selectr.requestHeader(sf"x-obs-fold-header", c)
-   val `example-dict`: ReqSel      = c => selectr.requestHeader(sf"example-dict", c)
-   val `example-header`: ReqSel    = c => selectr.requestHeader(sf"example-header", c)
-   val `cache-control`: ReqSel     = c => selectr.requestHeader(sf"cache-control", c)
-   val `date`: ReqSel              = c => selectr.requestHeader(sf"date", c)
-   val `host`: ReqSel              = c => selectr.requestHeader(sf"host", c)
-   val VerticalTAB: Char           = "\u000B".head
-
+   val `x-example` = selectr.requestHeader(exHd.`x-example`)
+   val `x-empty-header` = selectr.requestHeader(exHd.`x-empty-header`)
+   val `x-ows-header` = selectr.requestHeader(exHd.`x-ows-header`)
+   val `x-obs-fold-header` = selectr.requestHeader(exHd.`x-obs-fold-header`)
+   val `example-dict` = selectr.requestHeader(exHd.`example-dict`)
+   val `example-header` = selectr.requestHeader(exHd.`example-header`)
+   val `cache-control` = selectr.requestHeader(hds.retrofit.`cache-control`)
+   val date =  selectr.requestHeader(hds.Response.`date`)
+   val host = selectr.requestHeader(hds.retrofit.`host`)
+   import exHd.VerticalTAB
+   
    val sfTk   = Rfc8941.Token("sf")
    val nameTk = Rfc8941.Token("name")
    val reqTk  = Rfc8941.Token("req")
@@ -102,7 +118,7 @@ open class HeaderSuite[F[_], H <: Http](
 
    test("§2.1 HTTP Raw Field Examples") {
      assertEquals(
-       `cache-control`(Ctp.Raw).signingStr(`§2.1_HF`),
+       `cache-control`(Selectors.Raw).signingStr(`§2.1_HF`),
        expectedHeader("cache-control", "max-age=60, must-revalidate")
      )
 
@@ -111,58 +127,40 @@ open class HeaderSuite[F[_], H <: Http](
      // The header may already have been rejected by the frameworks... We will need
      // to test that for each framework
      assertEquals(
-       date(Ctp.Raw).signingStr(`§2.1_HF`),
-       expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT")
+        // the next comment line won't compile, which is good.
+        //date(Selectors.DictSel).signingStr(`§2.1_HF`)
+        date(Selectors.Raw).signingStr(`§2.1_HF`),
+        expectedHeader("date", "Sat, 07 Jun 2014 20:51:35 GMT")
+     )
+     
+     assertEquals(
+        date(Selectors.Bin).signingStr(`§2.1_HF`),
+        expectedParamHeader("date",";bs", ":U2F0LCAwNyBKdW4gMjAxNCAyMDo1MTozNSBHTVQ=:")
      )
 
      assertEquals(
-       host(Ctp.Raw).signingStr(`§2.1_HF`),
+       host(Selectors.Raw).signingStr(`§2.1_HF`),
        expectedHeader("host", "www.example.com")
      )
 
      // obviously the above simplifies a lot
      assertEquals(
-       `x-empty-header`(Ctp.Raw).signingStr(`§2.1_HF`),
+       `x-empty-header`(Selectors.Raw).signingStr(`§2.1_HF`),
        expectedHeader("x-empty-header", "")
      )
      // here we really need the headers after obs line folding has been removed
      // we continue using that from here.
      assertEquals(
-       `x-obs-fold-header`(Ctp.Raw).signingStr(`§2.1_HF`),
+       `x-obs-fold-header`(Selectors.Raw).signingStr(`§2.1_HF`),
        expectedHeader("x-obs-fold-header", "Obsolete line folding.")
      )
    }
-//    // request tokens make no difference
-//    //actually they should not be allowed on requests (or at least not on production) -- they should perhaps
-//    // be allowed on reception (lenient in what you accept). But that requires
-//    assertEquals(
-//      baseFor(`x-obs-fold-header`, `§2.1_HeadersWihoutObsLF`, Params(reqTk -> true)),
-//      expectedParamHeader("x-obs-fold-header", ";req", "Obsolete line folding")
-//    )
-//    assertEquals(
-//      baseFor(`x-ows-header`, `§2.1_HeadersWihoutObsLF`),
-//      expectedHeader("x-ows-header", "Leading and trailing whitespace.")
-//    )
-//    assertEquals(
-//      baseFor(`example-dict`, `§2.1_HeadersWihoutObsLF`),
-//      expectedHeader("example-dict", "a=1,    b=2;x=1;y=2,   c=(a   b   c), d")
-//    )
-//    // request tokens make no difference (at this level)
-//    assertEquals(
-//      baseFor(`example-dict`, `§2.1_HeadersWihoutObsLF`, Params(reqTk -> true)),
-//      expectedParamHeader(
-//        "example-dict",
-//        ";req",
-//        "a=1,    b=2;x=1;y=2,   c=(a   b   c), d"
-//      )
-//    )
-//  }
 
-   import Selectors.Sf
+   import Selectors.SelFormat
 
    test("§2.1.1 Strict Serialization of Dictionary Structured Header Request") {
      assertEquals(
-       `example-dict`(Ctp.Strict(Sf.Dictionary)).signingStr(`§2.1_HF`),
+       `example-dict`(Selectors.Strict).signingStr(`§2.1_HF`),
        Success(""""example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""")
      )
    }
@@ -177,73 +175,42 @@ open class HeaderSuite[F[_], H <: Http](
    test("§2.1.2 Dictionary Structured Field Members") {
      import Rfc8941.Token as Tk
      assertEquals(
-       `example-dict`(Ctp.DictSel(sf"a")).signingStr(`§2.1_HF`),
+       `example-dict`(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`),
        expectedParamHeader("example-dict", kv("key", "a"), "1")
      )
      assertEquals(
-       `example-dict`(Ctp.DictSel(sf"d")).signingStr(`§2.1_HF`),
+       `example-dict`(Selectors.DictSel(sf"d")).signingStr(`§2.1_HF`),
        expectedParamHeader("example-dict", kv("key", "d"), "?1")
      )
      assertEquals(
-       `example-dict`(Ctp.DictSel(sf"b")).signingStr(`§2.1_HF`),
+       `example-dict`(Selectors.DictSel(sf"b")).signingStr(`§2.1_HF`),
        expectedParamHeader("example-dict", kv("key", "b"), "2;x=1;y=2")
      )
      assertEquals(
-       `example-dict`(Ctp.DictSel(sf"c")).signingStr(`§2.1_HF`),
+       `example-dict`(Selectors.DictSel(sf"c")).signingStr(`§2.1_HF`),
        expectedParamHeader("example-dict", kv("key", "c"), "(a b c)")
      )
-     //  assertEquals(
-     //    baseFor(
-     //      `example-dict`,
-     //      `§2.1_HF`,
-     //      Params(
-     //        keyTk -> SfString("c"),
-     //        reqTk -> true
-     //      )
-     //    ),
-     //    expectedParamHeader("example-dict", kv("key", "c") + ";req", "(a b c)")
-     //  )
-     //  assertEquals(
-     //    baseFor(
-     //      `example-dict`,
-     //      `§2.1_HF`,
-     //      Params(
-     //        reqTk -> true,
-     //        keyTk -> SfString("c")
-     //      )
-     //    ),
-     //    expectedParamHeader("example-dict", ";req" + kv("key", "c"), "(a b c)")
-     //  )
-     //  failureTest(
-     //      `example-dict`.,
-     //      `§2.1_HF`,
-     //      Params(Rfc8941.Token("blah") -> Rfc8941.SfInt(4))
-     //    )
-     //  )
-     //  failureTest(
-     //    baseFor(`example-dict`, `§2.1_HF`, Params(keyTk -> Rfc8941.SfInt(3)))
-     //  )
      failureTest(
-       `example-dict`(Ctp.DictSel(sf"q")).signingStr(`§2.1_HF`)
+       `example-dict`(Selectors.DictSel(sf"q")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(sf"dodo").signingStr(`§2.1_HF`)
+       selectr.requestHeader(HeaderId("dodo").get)(Selectors.Raw).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(sf"dodo", Ctp.DictSel(sf"a")).signingStr(`§2.1_HF`)
+       selectr.requestHeader(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(sf"dodo", Ctp.DictSel(sf"domino")).signingStr(`§2.1_HF`)
+       selectr.requestHeader(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"domino")).signingStr(`§2.1_HF`)
      )
    }
 
    test("§2.1.3. Binary-wrapped HTTP Fields") {
      assertEquals(
-       `example-header`(Ctp.Raw).signingStr(`§2.1_HF`),
+       `example-header`(Selectors.Raw).signingStr(`§2.1_HF`),
        expectedHeader("example-header", "value, with, lots, of, commas")
      )
      assertEquals(
-       `example-header`(Ctp.Bin).signingStr(`§2.1_HF`),
+       `example-header`(Selectors.Bin).signingStr(`§2.1_HF`),
        expectedParamHeader(
          "example-header",
          ";bs",

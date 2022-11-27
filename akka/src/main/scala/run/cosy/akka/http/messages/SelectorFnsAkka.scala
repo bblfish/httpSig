@@ -54,15 +54,15 @@ class SelectorFnsAkka(using sc: ServerContext)
      RequestAkka { req => Success(req.uri.toString()) }
 
    // raw headers, no interpretation
-   override def requestHeaders(headerName: Rfc8941.SfString): RequestFn =
+   override def requestHeaders(headerName: HeaderId): RequestFn =
      RequestAkka { (req: HttpRequest) =>
-       SelectorAkka.getHeaders(headerName.asciiStr)(req)
+       SelectorAkka.getHeaders(headerName)(req)
      }
 
    // raw headers, no interpretation
-   override def responseHeaders(headerName: Rfc8941.SfString): ResponseFn =
+   override def responseHeaders(headerName: HeaderId): ResponseFn =
      ResponseAkka {
-       SelectorAkka.getHeaders(headerName.asciiStr)
+       SelectorAkka.getHeaders(headerName)
      }
 
    override val path: RequestFn =
@@ -123,12 +123,10 @@ end SelectorFnsAkka
 object SelectorAkka:
    import run.cosy.http.headers.Rfc8941.Serialise.given
 
-   def getHeaders(name: String)(msg: HttpMessage): Try[NonEmptyList[String]] =
-      val lc =
-        run.cosy.platform.StringUtil.toLowerCaseInsensitive(
-          name
-        ) // <- would be useful if we did not have to do this
-      msg.headers.collect { case HttpHeader(`lc`, value) => value.trim.nn }.toList match
-         case Nil => Failure(SelectorException(s"No headers named $name selectable in request"))
+   def getHeaders(name: HeaderId)(msg: HttpMessage): Try[NonEmptyList[String]] =
+      val N = name.specName
+      msg.headers.collect { case HttpHeader(N, value) => value.trim.nn }.toList match
+         case Nil =>
+           Failure(SelectorException(s"No headers named ${name.canon} selectable in request"))
          case head :: tail => Success(NonEmptyList(head, tail))
 end SelectorAkka

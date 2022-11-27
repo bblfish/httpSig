@@ -155,7 +155,7 @@ object Rfc8941:
         Parser.sfToken.parseAll(t) match
            case Right(value) => value
            case Left(err) => throw ParsingException(
-               s"error paring token $t",
+               s"error parsing token $t",
                s"failed at offset ${err.failedAtOffset}"
              )
       private[Rfc8941] def unsafeParsed(name: String) = new Token(name)

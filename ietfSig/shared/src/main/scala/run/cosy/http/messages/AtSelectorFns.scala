@@ -59,7 +59,7 @@ end AtSelectorFns
 
 /** The functions that only need to look at the HTTP headers */
 trait HeaderSelectorFns[F[_], H <: Http] extends SelectorFnTyps[F, H]:
-   def requestHeaders(name: Rfc8941.SfString): RequestFn
+   def requestHeaders(name: HeaderId): RequestFn
 
-   def responseHeaders(name: Rfc8941.SfString): ResponseFn
+   def responseHeaders(name: HeaderId): ResponseFn
 end HeaderSelectorFns

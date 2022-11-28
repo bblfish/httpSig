@@ -92,6 +92,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
     name        := "rfc8941",
     description := "RFC8941 Structured Field Values parser",
     libraryDependencies += cats.parse.value,
+    libraryDependencies += scodec.bits.value,
     libraryDependencies += tests.munit.value % Test
   ).jsSettings(
     scalacOptions ++= scala3jsOptions // ++= is really important. Do NOT use `:=` - that will block testing

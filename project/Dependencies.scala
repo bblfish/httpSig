@@ -25,6 +25,11 @@ object Dependencies {
     val scala = "3.1.3"
   }
 
+  object scodec {
+    // https://github.com/scodec/scodec-bits
+    val bits = Def.setting("org.scodec" %%% "scodec-bits" % "1.1.34")
+  }
+
   // https://http4s.org/v1.0/client/
   object http4s {
     val Ver = "1.0.0-M37"

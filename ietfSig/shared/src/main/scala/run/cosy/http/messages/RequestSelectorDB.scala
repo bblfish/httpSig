@@ -38,7 +38,7 @@ import scala.util.{Failure, Success, Try}
   */
 class RequestSelectorDB[F[_], H <: Http](
     atSel: AtSelectors[F, H],
-    knownIds: Seq[ComponentId],
+    knownIds: Seq[HeaderId],
     selFns: HeaderSelectorFns[F, H]
 ):
    import Parameters.{bsTk, keyTk, nameTk, sfTk}
@@ -58,7 +58,7 @@ class RequestSelectorDB[F[_], H <: Http](
 
    // todo: this should be a map from a HeaderId type
    lazy val componentIds: Map[String, ComponentId] =
-     knownIds.map(id => id.specName -> id).toMap
+     (AtIds.requestIds.toSeq ++ knownIds).map(id => id.specName -> id).toMap
 
    // we get this info from the Signing-String header
    def get(id: String, params: Rfc8941.Params): Try[RequestSelector[F, H]] =
@@ -120,9 +120,9 @@ class RequestSelectorDB[F[_], H <: Http](
        val ct =
          if tps.contains(Selectors.Bin)
          then // a. is it binary? then check if it is inconsistent, or return
-            if !tps.filter(ct =>
+            if tps.exists(ct =>
                  ct.isInstanceOf[Selectors.DictSel] || ct == Selectors.Strict
-               ).isEmpty
+               )
             then
                throw AttributeException(
                  "We cannot have attributes 'sf' or 'key' together with 'sb' on a header component"

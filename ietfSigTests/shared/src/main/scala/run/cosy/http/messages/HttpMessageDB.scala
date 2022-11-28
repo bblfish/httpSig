@@ -73,7 +73,28 @@ object HttpMessageDB:
    val `2.2.9_Status_Code` = ResponseStr(
       """HTTP/1.1 200 OK
         |Date: Fri, 26 Mar 2010 00:05:00 GMT"""
-   ) 
+   )
+   
+   val `2.5_Post_Ex` = RequestStr(
+     """POST /foo?param=Value&Pet=dog HTTP/1.1
+       |Host: example.com
+       |Date: Tue, 20 Apr 2021 02:07:55 GMT
+       |Content-Type: application/json
+       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+       |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+       |Content-Length: 18
+       |Signature-Input: sig1=("@method" "@authority" "@path" \
+       |     "content-digest" "content-length" "content-type")\
+       |     ;created=1618884473;keyid="test-key-rsa-pss"
+       |Signature: sig1=:HIbjHC5rS0BYaa9v4QfD4193TORw7u9edguPh0AW3dMq9WImrl\
+       |  FrCGUDih47vAxi4L2YRZ3XMJc1uOKk/J0ZmZ+wcta4nKIgBkKq0rM9hs3CQyxXGxH\
+       |  LMCy8uqK488o+9jrptQ+xFPHK7a9sRL1IXNaagCNN3ZxJsYapFj+JXbmaI5rtAdSf\
+       |  SvzPuBCh+ARHBmWuNo1UzVVdHXrl8ePL4cccqlazIJdC4QEjrF+Sn4IxBQzTZsL9y\
+       |  9TP5FsZYzHvDqbInkTNigBcE9cKOYNFCn4D/WM7F6TNuZO9EgtzepLWcjTymlHzK7\
+       |  aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:
+       |
+       |{"hello": "world"}""".rfc8792single
+   )
 
 
    //we cannot test @scheme  or @target-uri as those require additional info

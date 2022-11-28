@@ -19,6 +19,72 @@ package run.cosy.http.messages
 import run.cosy.http.messages.Selectors.SelFormat as SF
 
 object HeaderIds:
+   lazy val all =
+      import retrofit.*
+      import Request.{`content-length` as _, `content-type` as _, *}
+      import Response.{`content-length` as _, `content-digest` as _, etag}
+      Seq(
+        `accept-encoding`,
+        `accept-language`,
+        `accept-patch`,
+        `accept-post`,
+        `accept-ranges`,
+        `accept`,
+        `access-control-allow-credentials`,
+        `access-control-allow-headers`,
+        `access-control-allow-methods`,
+        `access-control-allow-origin`,
+        `access-control-expose-headers`,
+        `access-control-max-age`,
+        `access-control-request-headers`,
+        `access-control-request-method`,
+        `age`,
+        `allow`,
+        `alpn`,
+        `alt-svc`,
+        `alt-used`,
+        `cache-control`,
+        `cdn-loop`,
+        `clear-site-data`,
+        `client-cert-chain`,
+        `client-cert`,
+        `connection`,
+        `content-digest`,
+        `content-encoding`,
+        `content-language`,
+        `content-length`,
+        `content-type`,
+        `cross-origin-resource-policy`,
+        `dnt`,
+        `expect-ct`,
+        `expect`,
+        `host`,
+        `keep-alive`,
+        `max-forwards`,
+        `origin`,
+        `pragma`,
+        `prefer`,
+        `preference-applied`,
+        `retry-after`,
+        `sec-websocket-extensions`,
+        `sec-websocket-protocol`,
+        `sec-websocket-version`,
+        `server-timing`,
+        `surrogate-control`,
+        `te`,
+        `timing-allow-origin`,
+        `trailer`,
+        `transfer-encoding`,
+        `upgrade-insecure-requests`,
+        `vary`,
+        `x-content-type-options`,
+        `x-frame-options`,
+        `x-xss-protection`,
+        authorization,
+        etag,
+        forwarded,
+        signature
+      )
 
    /** Header types as speccified
      * https://greenbytes.de/tech/webdav/draft-ietf-httpbis-retrofit-latest.html#compatible

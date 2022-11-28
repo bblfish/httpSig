@@ -26,6 +26,7 @@ import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
 import run.cosy.http.headers.NumberOutOfBoundsException
+import scodec.bits.ByteVector
 
 /** Structured Field Values for HTTP [[https://www.rfc-editor.org/rfc/rfc8941.html RFC8941]]
   */
@@ -36,7 +37,7 @@ object Rfc8941:
    /** see [[https://www.rfc-editor.org/rfc/rfc8941.html#section-3.3 §3.3 Items]] of RFC8941.
      */
    type Item   = SfInt | SfDec | SfString | Token | Bytes | Boolean
-   type Bytes  = ArraySeq[Byte]
+   type Bytes  = ByteVector
    type Param  = (Token, Item)
    type Params = ListMap[Token, Item]
    type SfList = List[Parameterized]
@@ -231,8 +232,8 @@ object Rfc8941:
         ((R5234.alpha | P.charIn('*')) ~ (Rfc7230.tchar | P.charIn(':', '/')).rep0)
           .map { (c, lc) => Token.unsafeParsed((c :: lc).mkString) }
       val base64: P[Char] = (R5234.alpha | R5234.digit | P.charIn('+', '/', '='))
-      val sfBinary: P[ArraySeq[Byte]] = (`:` *> base64.rep0 <* `:`).map { chars =>
-        ArraySeq.unsafeWrapArray(Base64.getDecoder.nn.decode(chars.mkString).nn)
+      val sfBinary: P[ByteVector] = (`:` *> base64.rep.string <* `:`).map { chars =>
+        ByteVector.fromValidBase64(chars, scodec.bits.Bases.Alphabets.Base64)
       }
       val bareItem: P[Item] =
         P.oneOf(sfNumber :: sfString :: sfToken :: sfBinary :: sfBoolean :: Nil)
@@ -298,12 +299,11 @@ object Rfc8941:
            def canon: String = o match
               case i: SfInt => i.long.toString
               // todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
-              case d: SfDec    => d.double.toString
-              case s: SfString => s.formattedString
-              case tk: Token   => tk.tk
-              case as: Bytes => ":" + Base64.getEncoder.nn
-                  .encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
-              case b: Boolean => if b then "?1" else "?0"
+              case d: SfDec       => d.double.toString
+              case s: SfString    => s.formattedString
+              case tk: Token      => tk.tk
+              case as: ByteVector => ":" + as.toBase64 + ":"
+              case b: Boolean     => if b then "?1" else "?0"
 
       //
       // complex types

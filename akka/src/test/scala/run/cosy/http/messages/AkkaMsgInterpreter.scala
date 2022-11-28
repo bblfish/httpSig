@@ -27,6 +27,8 @@ import run.cosy.http.Http.Request
 import run.cosy.http.messages.{MessageInterpreterError, Platform, HttpMessageDB as DB}
 
 import scala.language.implicitConversions
+import run.cosy.http.utils.StringUtils.rfc8792single
+
 object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, AkkaTp.HT]:
    val VerticalTAB: Char = "\u000B".head
 
@@ -90,6 +92,35 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
         case DB.`2.2.8_Query_Parameters` => HttpRequest(
             HttpMethods.GET,
             Uri("/path?param=value&foo=bar&baz=batman&qux=")
+          )
+        case DB.`2.5_Post_Ex` => HttpRequest(
+            HttpMethods.POST,
+            Uri("/foo?param=Value&Pet=dog"),
+            Seq(
+              Host("example.com"),
+              RawHeader("Date", "Tue, 20 Apr 2021 02:07:55 GMT"),
+              RawHeader(
+                "Content-Digest",
+                "sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T" +
+                  "aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:"
+              ),
+              RawHeader(
+                "Signature-Input",
+                """sig1=("@method" "@authority" "@path" \
+                   "content-digest" "content-length" "content-type")\
+                   ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
+              ),
+              RawHeader(
+                "Signature",
+                """sig1=:HIbjHC5rS0BYaa9v4QfD4193TORw7u9edguPh0AW3dMq9WImrl\
+                |FrCGUDih47vAxi4L2YRZ3XMJc1uOKk/J0ZmZ+wcta4nKIgBkKq0rM9hs3CQyxXGxH\
+                |LMCy8uqK488o+9jrptQ+xFPHK7a9sRL1IXNaagCNN3ZxJsYapFj+JXbmaI5rtAdSf\
+                |SvzPuBCh+ARHBmWuNo1UzVVdHXrl8ePL4cccqlazIJdC4QEjrF+Sn4IxBQzTZsL9y\
+                |9TP5FsZYzHvDqbInkTNigBcE9cKOYNFCn4D/WM7F6TNuZO9EgtzepLWcjTymlHzK7\
+                |aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:""".rfc8792single
+              )
+            ),
+            entity = HttpEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
           )
 
    override def asResponse(header: DB.ResponseStr): Http.Response[Id, AkkaTp.HT] =

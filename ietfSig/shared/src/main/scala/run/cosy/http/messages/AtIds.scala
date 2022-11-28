@@ -27,4 +27,8 @@ object AtIds:
    val `query`          = AtId("@query").get
    val `query-param`    = AtId("@query-param").get
    val `status`         = AtId("@status").get
+
+   val requestIds =
+     List(method, `request-target`, `target-uri`, authority, scheme, path, query, `query-param`)
+   val responseIds = List(status)
 end AtIds

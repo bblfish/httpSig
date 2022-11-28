@@ -33,6 +33,7 @@ import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.model.HttpHeader
+import akka.http.scaladsl.settings.ParserSettings.ConflictingContentTypeHeaderProcessingMode.NoContentType
 
 class SelectorFnsAkka(using sc: ServerContext)
     extends SelectorFns[Id, HT]:
@@ -127,6 +128,13 @@ object SelectorAkka:
       val N = name.specName
       msg.headers.collect { case HttpHeader(N, value) => value.trim.nn }.toList match
          case Nil =>
-           Failure(SelectorException(s"No headers named ${name.canon} selectable in request"))
+           name.specName match
+              case "content-length" => msg.entity.contentLengthOption
+                  .toRight(SelectorException("no content-length header set"))
+                  .toTry.map(l => NonEmptyList.one("" + l))
+              case "content-type" if msg.entity.contentType != NoContentType =>
+                Success(NonEmptyList.one(msg.entity.contentType.value))
+              case _ =>
+                Failure(SelectorException(s"No headers named ${name.canon} selectable in request"))
          case head :: tail => Success(NonEmptyList(head, tail))
 end SelectorAkka

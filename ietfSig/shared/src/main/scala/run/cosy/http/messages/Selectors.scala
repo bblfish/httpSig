@@ -30,6 +30,7 @@ import run.cosy.http.messages.{AtSelectorFns, Parameters}
 
 import scala.collection.immutable.{ArraySeq, HashMap, ListMap}
 import scala.util.{Failure, Success, Try}
+import scodec.bits.ByteVector
 
 class Selectors[F[_], H <: Http](using SelectorFns[F, H])
     extends AtSelectors[F, H] with HeaderSelectors[F, H]
@@ -153,9 +154,8 @@ object Selectors:
 
    def bin(headers: NonEmptyList[String]): Try[String] = Try {
      headers.map(h =>
-       ArraySeq.ofByte(h.trim.nn.getBytes(java.nio.charset.StandardCharsets.US_ASCII).nn).canon
-     )
-       .toList.mkString(", ")
+       ByteVector.view(h.trim.nn.getBytes(java.nio.charset.StandardCharsets.US_ASCII).nn).canon
+     ).toList.mkString(", ")
    }
 
    def sfParseList(

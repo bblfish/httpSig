@@ -20,6 +20,7 @@ import run.cosy.http.headers.Rfc8941.{Bytes, PItem, SfDict}
 
 import scala.None
 import scala.collection.immutable.{ArraySeq, ListMap}
+import scodec.bits.ByteVector
 
 /** A Signature is an SfDict, refined to contain only PItems of Arrays of Bytes. We want to keep
   * potential attributes as they could be useful.
@@ -41,7 +42,7 @@ object Signatures:
    // filter out any that are obviously wrong
    def filter(lm: SfDict): ListMap[Rfc8941.Token, PItem[Bytes]] =
      lm.collect {
-       case (sigName, pi @ PItem(bytes: ArraySeq[?], attr)) =>
+       case (sigName, pi @ PItem(bytes: ByteVector, attr)) =>
          // if it is an ArraySeq, it is a ByteArraySequence!
          (sigName, pi.asInstanceOf[PItem[Bytes]])
      }

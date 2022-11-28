@@ -18,14 +18,35 @@ object HttpMessageDB:
    	  |X-Empty-Header: \
    	  |
    	  |Cache-Control:    must-revalidate
-   	  |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)  \
+   	  |Example-Dict:  a=1,   b=2;x=1;y=2,   c=(a   b   c)  \
       |
       |Example-Header: value, with, lots
       |Example-Dict: d
       |Example-Header: of, commas
       |""".rfc8792single
    )
-   
+
+   val `§2.1_HeaderField_2` = RequestStr(
+     """GET /xyz HTTP/1.1
+        |Host: www.example.com
+        |Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)  \
+        |
+        |X-OWS-Header:   Leading and trailing whitespace.   \
+        |
+        |X-Obs-Fold-Header: Obsolete
+        |    line folding. \
+        |
+        |Date: Tue, 20 Apr 2021 02:07:56 GMT
+        |X-Empty-Header: \
+        |
+        |Cache-Control:    must-revalidate
+        |Cache-Control: max-age=60
+        |Example-Header: value, with, lots
+        |Example-Dict: d
+        |Example-Header: of, commas
+        |""".rfc8792single
+   )
+
    val `2.2.1_Method_POST` = RequestStr(
       """POST /path?param=value HTTP/1.1
         |Host: www.example.com""".rfc8792single)

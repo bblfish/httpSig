@@ -14,11 +14,12 @@ import scala.util.{Failure, Success, Try}
 open class RequestSigSuite[F[_], H <: Http](
     msgSig: MessageSignature[F, H],
     msgDB: HttpMsgInterpreter[F, H]
-)(using RequestSelectorDB[F, H]) extends CatsEffectSuite:
+)(using rdb: RequestSelectorDB[F, H]) extends CatsEffectSuite:
 
    import msgSig.{*, given}
+   val DB = HttpMessageDB
 
-   List(HttpMessageDB.`2.4_Req_Ex`, HttpMessageDB.`2.4_Req_v2`).zipWithIndex.foreach { (msg, i) =>
+   List(DB.`2.4_Req_Ex`, DB.`2.4_Req_v2`).zipWithIndex.foreach { (msg, i) =>
      test(s"Test SigInput §2.4 round $i") {
        val req: Http.Request[F, H] = msgDB.asRequest(msg)
        val sigInput25: Option[SigInput] = SigInput(
@@ -61,5 +62,62 @@ open class RequestSigSuite[F[_], H <: Http](
          sigData.map(_._2.canon),
          Some(signature.substring("sig1=".length).nn)
        )
+     }
+   }
+   {
+     given RequestSelectorDB[F, H] = rdb.addIds(
+       HeaderId("x-ows-header").get,
+       HeaderId("x-obs-fold-header").get,
+       HeaderId.dict("example-dict").get,
+       HeaderId("x-empty-header").get
+     )
+     case class TestSig(reqStr: DB.RequestStr, sigInputStr: String, baseResult: String)
+
+     List(
+       TestSig(
+         DB.`§2.1_HeaderField`,
+         """("host" "date" "x-obs-fold-header" "x-ows-header" "cache-control" "example-dict")""",
+         """"host": www.example.com
+           |"date": Sat, 07 Jun 2014 20:51:35 GMT
+           |"x-obs-fold-header": Obsolete line folding.
+           |"x-ows-header": Leading and trailing whitespace.
+           |"cache-control": max-age=60, must-revalidate
+           |"example-dict": a=1,   b=2;x=1;y=2,   c=(a   b   c), d""".rfc8792single
+       ),
+       TestSig(
+         DB.`§2.1_HeaderField_2`,
+         """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
+         """"host": www.example.com
+            |"date": Tue, 20 Apr 2021 02:07:56 GMT
+            |"x-ows-header": Leading and trailing whitespace.
+            |"x-obs-fold-header": Obsolete line folding.
+            |"cache-control": must-revalidate, max-age=60
+            |"example-dict": a=1,    b=2;x=1;y=2,   c=(a   b   c), d""".rfc8792single
+       ),
+       TestSig(
+         DB.`§2.1_HeaderField_2`,
+         """("host" "date"  "x-empty-header" "x-ows-header";bs "cache-control";key="max-age" "example-dict";sf)""",
+         """"host": www.example.com
+           |"date": Tue, 20 Apr 2021 02:07:56 GMT
+           |"x-empty-header": \
+           |
+           |"x-ows-header";bs: :TGVhZGluZyBhbmQgdHJhaWxpbmcgd2hpdGVzcGFjZS4=:
+           |"cache-control";key="max-age": 60
+           |"example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""".rfc8792single
+       )
+     ).zipWithIndex.foreach { (testSig, i) =>
+       test("Test §2.1 Header Fields - take " + i) {
+         val req                          = msgDB.asRequest(testSig.reqStr)
+         val sigInput21: Option[SigInput] = SigInput(testSig.sigInputStr)
+         val x: Try[SigningString]        = req.signingStr(sigInput21.get)
+         assertEquals(
+           x.flatMap(s => s.decodeAscii.toTry),
+           Success(
+             s"""${testSig.baseResult}
+                |"@signature-params": """.stripMargin + sigInput21.get.canon
+           ),
+           clue = testSig
+         )
+       }
      }
    }

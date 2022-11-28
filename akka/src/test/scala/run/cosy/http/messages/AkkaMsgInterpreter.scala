@@ -49,7 +49,7 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
               RawHeader("Cache-Control", "max-age=60"),
               RawHeader("X-Empty-Header", ""),
               RawHeader("Cache-Control", "    must-revalidate"),
-              RawHeader("Example-Dict", " a=1,     b=2;x=1;y=2,   c=(a   b   c)   "),
+              RawHeader("Example-Dict", " a=1,   b=2;x=1;y=2,   c=(a   b   c)   "),
               RawHeader("Example-Header", "value, with, lots"),
               RawHeader("Example-Dict", "d"),
               RawHeader("Example-Header", "of, commas")

@@ -20,9 +20,9 @@ import run.cosy.http.messages.Selectors.SelFormat as SF
 
 object HeaderIds:
    lazy val all =
-      import retrofit.*
       import Request.{`content-length` as _, `content-type` as _, *}
-      import Response.{`content-length` as _, `content-digest` as _, etag}
+      import Response.{etag, `content-digest` as _, `content-length` as _}
+      import retrofit.*
       Seq(
         `accept-encoding`,
         `accept-language`,
@@ -55,6 +55,7 @@ object HeaderIds:
         `content-length`,
         `content-type`,
         `cross-origin-resource-policy`,
+        date,
         `dnt`,
         `expect-ct`,
         `expect`,
@@ -155,6 +156,7 @@ object HeaderIds:
       lazy val authorization: HeaderId.OldId = HeaderId("authorization").get
       // todo: another way to model this would be HeaderId.Item("content-type")
       lazy val `content-type`: HeaderId = HeaderId.item("content-type").get
+      lazy val date: HeaderId.OldId     = HeaderId("date").get
 
       /** a list because sometimes multiple lengths are sent! */
       lazy val `content-length` = HeaderId.list("content-length").get

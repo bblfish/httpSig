@@ -44,6 +44,8 @@ class RequestSelectorDB[F[_], H <: Http](
    import Parameters.{bsTk, keyTk, nameTk, sfTk}
    import Rfc8941.SfString
 
+   def addIds(ids: HeaderId*) = RequestSelectorDB(atSel, knownIds ++ ids, selFns)
+
    lazy val atComponentMap: Map[AtId, RequestSelector[F, H]] =
       import atSel.*
       List(
@@ -108,7 +110,7 @@ class RequestSelectorDB[F[_], H <: Http](
          case (`sfTk`, true) => id match
               case sfId: SfHeaderId => Selectors.Strict
               case _ => throw AttributeException(
-                  "We don't know what the agreed type for parsing header >$id< as sf is."
+                  s"We don't know what the agreed type for parsing header >$id< as sf is."
                 )
          case (`sfTk`, x) =>
            throw AttributeException(s"value of attributed 'sf' can only be true. Received >$x<")

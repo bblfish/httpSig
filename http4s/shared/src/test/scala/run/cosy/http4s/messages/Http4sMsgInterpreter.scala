@@ -22,6 +22,8 @@ import run.cosy.http4s.Http4sTp.HT
 import cats.effect.IO
 import org.http4s.Header
 import org.typelevel.ci.CIString
+import run.cosy.http.messages.HttpMsgInterpreter
+import scodec.bits.ByteVector
 
 class Http4sMsgInterpreter[F[_]] extends run.cosy.http.messages.HttpMsgInterpreter[F, Http4sTp.HT]:
 
@@ -32,10 +34,10 @@ class Http4sMsgInterpreter[F[_]] extends run.cosy.http.messages.HttpMsgInterpret
         case head :: tail =>
           head.split("\\s+").nn.toList match
              case methd :: path :: httpVersion :: Nil =>
-               val Right(m) = org.http4s.Method.fromString(methd.nn): @unchecked
-               val Right(p) = org.http4s.Uri.fromString(path.nn): @unchecked
-               val Right(v) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
-               val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
+               val Right(m)     = org.http4s.Method.fromString(methd.nn): @unchecked
+               val Right(p)     = org.http4s.Uri.fromString(path.nn): @unchecked
+               val Right(v)     = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
+               val (rawH, body) = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
                // we can ignore the body here, since that is actually not relevant to signing
                org.http4s.Request[F](m, p, v, org.http4s.Headers(rawH))
@@ -51,25 +53,19 @@ class Http4sMsgInterpreter[F[_]] extends run.cosy.http.messages.HttpMsgInterpret
                val Right(status) =
                  org.http4s.Status.fromInt(Integer.parseInt(statusCode.nn)): @unchecked
                val Right(version) = org.http4s.HttpVersion.fromString(httpVersion.nn): @unchecked
-               val rawH: scala.List[org.http4s.Header.Raw] = parseHeaders(tail)
+               val (rawH, body)   = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
-               org.http4s.Response[F](status, version, org.http4s.Headers(rawH))
+               val e = body match
+                  case "" => org.http4s.Entity.Empty
+                  case _  => org.http4s.Entity.Strict(ByteVector.encodeAscii(body).toOption.get)
+               org.http4s.Response[F](status, version, org.http4s.Headers(rawH), e)
                  .asInstanceOf[Http.Response[F, HT]] // <- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
-   private def parseHeaders(nonMethodLines: List[String]): List[Header.Raw] =
-      val (headers, body) = // we loose the body for the moment
-         val i = nonMethodLines.indexOf("")
-         if i < 0 then (nonMethodLines, List())
-         else nonMethodLines.splitAt(i)
-      val foldedHeaders = headers.foldLeft(List[String]()) { (ll, str) =>
-        if str.contains(':') then str :: ll
-        else (ll.head.nn.trim.nn + " " + str.trim.nn) :: ll.tail
-      }
-      val rawH: List[Header.Raw] = foldedHeaders.map(line => line.splitAt(line.indexOf(':'))).map {
-        case (h, v) => Header.Raw(CIString(h.trim.nn), v.tail.trim.nn)
-      }
-      rawH.reverse
+   private def parseHeaders(nonMethodLines: List[String]): (List[Header.Raw], String) =
+      val (headers, body) = HttpMsgInterpreter.headersAndBody(nonMethodLines)
+      val hds             = headers.map { case (h, v) => Header.Raw(CIString(h), v) }
+      (hds, body)
 
 end Http4sMsgInterpreter

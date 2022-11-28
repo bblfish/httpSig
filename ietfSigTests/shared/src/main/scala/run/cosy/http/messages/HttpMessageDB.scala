@@ -75,7 +75,7 @@ object HttpMessageDB:
         |Date: Fri, 26 Mar 2010 00:05:00 GMT"""
    )
    
-   val `2.5_Post_Ex` = RequestStr(
+   val `2.4_Req_Ex` = RequestStr(
      """POST /foo?param=Value&Pet=dog HTTP/1.1
        |Host: example.com
        |Date: Tue, 20 Apr 2021 02:07:55 GMT
@@ -94,6 +94,42 @@ object HttpMessageDB:
        |  aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:
        |
        |{"hello": "world"}""".rfc8792single
+   )
+   
+   /** Semantically the same as the previous one, to test akka parsing  */
+   val `2.4_Req_v2` = RequestStr(
+     """POST /foo?param=Value&Pet=dog HTTP/1.1
+        |Host: example.com
+        |Date: Tue, 20 Apr 2021 02:07:55 GMT
+        |Content-Type: application/json
+        |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+        |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+        |Signature-Input: sig1=("@method" "@authority" "@path" \
+        |     "content-digest" "content-length" "content-type")\
+        |     ;created=1618884473;keyid="test-key-rsa-pss"
+        |Content-Length: 18
+        |Signature: sig1=:HIbjHC5rS0BYaa9v4QfD4193TORw7u9edguPh0AW3dMq9WImrl\
+        |  FrCGUDih47vAxi4L2YRZ3XMJc1uOKk/J0ZmZ+wcta4nKIgBkKq0rM9hs3CQyxXGxH\
+        |  LMCy8uqK488o+9jrptQ+xFPHK7a9sRL1IXNaagCNN3ZxJsYapFj+JXbmaI5rtAdSf\
+        |  SvzPuBCh+ARHBmWuNo1UzVVdHXrl8ePL4cccqlazIJdC4QEjrF+Sn4IxBQzTZsL9y\
+        |  9TP5FsZYzHvDqbInkTNigBcE9cKOYNFCn4D/WM7F6TNuZO9EgtzepLWcjTymlHzK7\
+        |  aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:
+        |
+        |{"hello": "world"}""".rfc8792single
+   )
+   
+   val `2.4_Response` = ResponseStr(
+     """HTTP/1.1 503 Service Unavailable
+       |Date: Tue, 20 Apr 2021 02:07:56 GMT
+       |Content-Type: application/json
+       |Content-Length: 62
+       |Signature-Input: reqres=("@status" "content-length" "content-type" \
+       | "signature";req;key="sig1" "@authority";req "@method";req)\
+       |  ;created=1618884479;keyid="test-key-ecc-p256"
+       |Signature: reqres=:mh17P4TbYYBmBwsXPT4nsyVzW4Rp9Fb8WcvnfqKCQLoMvzOB\
+       |  LD/n32tL/GPW6XE5GAS5bdsg1khK6lBzV1Cx/Q==:
+       |
+       |{"busy": true, "message": "Your call is very important to us"}""".stripMargin
    )
 
 

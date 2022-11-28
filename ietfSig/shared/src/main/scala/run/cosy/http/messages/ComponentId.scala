@@ -37,8 +37,9 @@ sealed trait HeaderId extends ComponentId:
    /* The lower case name of the header */
    def lcname: Rfc8941.Token
 
-   def canon: String    = s""""${lcname.tk}""""
-   def specName: String = lcname.tk
+   def canon: String             = s""""${lcname.tk}""""
+   def specName: String          = lcname.tk
+   override def toString: String = specName
 end HeaderId
 
 sealed trait AtId extends ComponentId:

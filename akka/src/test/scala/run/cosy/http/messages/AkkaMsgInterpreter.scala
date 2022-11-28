@@ -19,15 +19,16 @@ package run.cosy.http.messages
 import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.HttpMethods.*
 import akka.http.scaladsl.model.headers.*
+import akka.parboiled2.ParserInput
 import cats.Id
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.Http
 import run.cosy.http.Http.Request
 import run.cosy.http.messages.{MessageInterpreterError, Platform, HttpMessageDB as DB}
+import run.cosy.http.utils.StringUtils.rfc8792single
 
 import scala.language.implicitConversions
-import run.cosy.http.utils.StringUtils.rfc8792single
 
 object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, AkkaTp.HT]:
    val VerticalTAB: Char = "\u000B".head
@@ -93,7 +94,7 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
             HttpMethods.GET,
             Uri("/path?param=value&foo=bar&baz=batman&qux=")
           )
-        case DB.`2.5_Post_Ex` => HttpRequest(
+        case DB.`2.4_Req_Ex` => HttpRequest(
             HttpMethods.POST,
             Uri("/foo?param=Value&Pet=dog"),
             Seq(
@@ -122,6 +123,35 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
             ),
             entity = HttpEntity(ContentTypes.`application/json`, """{"hello": "world"}""")
           )
+        case other => other.str.split(Array('\n', '\r')).nn.toList match
+             case head :: tail =>
+               head.split("\\s+").nn.toList match
+                  case methd :: path :: httpVersion :: Nil =>
+                    val m = HttpMethods.getForKey(methd.nn).nn.get
+                    val uri = Uri.parseHttpRequestTarget(
+                      new ParserInput.StringBasedParserInput(path.nn)
+                    )
+                    val httpVrsn = HttpProtocols.`HTTP/1.1` // todo, don't hardcode it
+                    val (h, b)   = parseRest(tail)
+                    val ct = h.collect {
+                      case h if h.lowercaseName == "content-type" =>
+                        ContentType.parse(h.value).toOption.toList
+                    }.flatten
+                    val cl = h.collect {
+                      case h if h.lowercaseName == "content-length" => h.value
+                    }
+                    val e = ct.headOption match
+                       case Some(ct) =>
+                         HttpEntity(ct, b.getBytes(java.nio.charset.StandardCharsets.US_ASCII).nn)
+                       case None => HttpEntity(b)
+                    val hdrsTrans = h.filterNot(h =>
+                      h.lowercaseName == "content-type" || h.lowercaseName == "content-length"
+                    )
+                      .map(h => if h.lowercaseName == "host" then Host(h.value) else h)
+                    HttpRequest(m, uri, headers = hdrsTrans, entity = e, httpVrsn)
+                  case other =>
+                    throw new Exception("Malformed first line of request. received >" + head + "<")
+             case other => throw new Exception("Badly formed HTTP request")
 
    override def asResponse(header: DB.ResponseStr): Http.Response[Id, AkkaTp.HT] =
      header match
@@ -130,4 +160,7 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
             Seq(RawHeader("Date", "Fri, 26 Mar 2010 00:05:00 GMT"))
           )
 
-end AkkaMsgInterpreter
+   private def parseRest(nonMethodLines: List[String]): (List[RawHeader], String) =
+      val (headers, body) = HttpMsgInterpreter.headersAndBody(nonMethodLines)
+      val hds             = headers.map { case (h, v) => RawHeader(h, v) }
+      (hds, body)

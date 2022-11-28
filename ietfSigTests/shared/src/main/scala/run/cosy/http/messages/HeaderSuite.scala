@@ -101,7 +101,7 @@ open class HeaderSuite[F[_], H <: Http](
    /** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html
      */
    // the example in the spec does not have the `GET`. Added here for coherence
-   val `§2.1_HF`: Request[F, H] = interp.asRequest(DB.`§2.1_HeaderField`)
+   lazy val `§2.1_HF`: Request[F, H] = interp.asRequest(DB.`§2.1_HeaderField`)
 
    //  val `§2.1_HeadersWihoutObsLF`: HttpHeaders = `§2.1_HeaderField`.map { (k, v) =>
    //    (k, v.split(VerticalTAB).map(_.trim).mkString(" "))

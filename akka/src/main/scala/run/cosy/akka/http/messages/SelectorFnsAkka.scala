@@ -44,7 +44,7 @@ class SelectorFnsAkka(using sc: ServerContext)
    override val authority: RequestFn =
      RequestAkka { req =>
        Try(
-         req.effectiveUri(true, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
+         req.effectiveUri(sc.secure, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
            .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
        )
      }

@@ -18,14 +18,14 @@ package run.cosy.http.auth
 
 import _root_.run.cosy.http.Http.*
 import _root_.run.cosy.http.auth.Agent
-import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.headers.*
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.messages.{RequestSelector, RequestSelectorDB, `@signature-params`}
 import _root_.run.cosy.http.{Http, HttpOps}
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.kernel.{Clock, MonadCancel}
 import cats.syntax.all.*
-import _root_.run.cosy.http.messages.{RequestSelectorDB, `@signature-params`}
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
@@ -121,18 +121,32 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
         *   to be added to the Request. In the latter case use the withSigInput method. todo: it may
         *   be more correct if the result is a byte array, rather than a Unicode String.
         */
-      def signingStr(sigInput: SigInput): Try[SigningString] =
-         val xl: Either[Throwable, List[String]] = sigInput.headerItems.reverse
-           .foldM(List(`@signature-params`.signingStr(sigInput))) { (lst, pih) =>
-             (for
-                selector <- selectorDB.get(pih.item.asciiStr, pih.params)
-                str      <- selector.signingStr(req)
-             yield str :: lst).toEither
+      def signatureBase(sigInput: SigInput): Either[ParsingExc, SigningString] =
+         val xl: Either[ParsingExc, List[RequestSelector[F, H]]] = sigInput.headerItems
+           .foldLeftM(List[RequestSelector[F, H]]()) { (lst, pih) =>
+             selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
            }
-         xl.flatMap(list =>
-           ByteVector.encodeAscii(list.mkString("\n"))
-         ).toTry
-      end signingStr
+         for
+            list     <- xl
+            baseList <- sigBase(list, true)
+            bytes <- ByteVector.encodeAscii(
+              baseList.mkString("\n") + `@signature-params`.paramStr(sigInput)
+            ).leftMap(ce => CharacterCodingExc(ce.getMessage.nn))
+         yield bytes
+      end signatureBase
+
+      /** return the sigbase but without the attributes, which can be appended later */
+      def sigBase(
+          selectors: List[RequestSelector[F, H]],
+          reversed: Boolean = false
+      ): Either[ParsingExc, List[String]] =
+         val s  = if reversed then selectors else selectors.reverse
+         val sp = if reversed then selectors.reverse else s
+         val sigParams =
+           s""""@signature-params": (${sp.map(s => s.identifier).mkString(" ")})"""
+         s.foldM(List(sigParams)) { (lst, selector) =>
+           selector.signingStr(req).map(_ :: lst)
+         }
 
    extension (req: Http.Request[F, H])
      /** get the signature data for a given signature name eg `sig1` from the headers.

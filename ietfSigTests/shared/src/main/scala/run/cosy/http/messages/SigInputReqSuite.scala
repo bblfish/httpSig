@@ -3,7 +3,7 @@ package run.cosy.http.messages
 import bobcats.Verifier.SigningString
 import munit.CatsEffectSuite
 import run.cosy.http.Http.Request
-import run.cosy.http.auth.MessageSignature
+import run.cosy.http.auth.{MessageSignature, ParsingExc}
 import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.{Rfc8941, SigInput}
 import run.cosy.http.utils.StringUtils.*
@@ -11,7 +11,7 @@ import run.cosy.http.{Http, HttpOps}
 
 import scala.util.{Failure, Success, Try}
 
-open class RequestSigSuite[F[_], H <: Http](
+open class SigInputReqSuite[F[_], H <: Http](
  msgSig: MessageSignature[F, H],
  rdb: RequestSelectorDB[F, H],
  msgDB: TestHttpMsgInterpreter[F, H]
@@ -38,10 +38,10 @@ open class RequestSigSuite[F[_], H <: Http](
                |;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
          )
          
-         val x: Try[SigningString] = req.signingStr(sigInput25.get)
+         val x: Either[ParsingExc, SigningString] = req.signatureBase(sigInput25.get)
          assertEquals(
-            x.flatMap(s => s.decodeAscii.toTry),
-            Success(
+            x.flatMap(s => s.decodeAscii),
+            Right(
                """"@method": POST
                   |"@authority": example.com
                   |"@path": /foo
@@ -144,10 +144,10 @@ open class RequestSigSuite[F[_], H <: Http](
       test(s"test req.signingStr $i: ${testSig.doc}") {
          val req = msgDB.asRequest(testSig.reqStr)
          val sigIn: Option[SigInput] = SigInput(testSig.sigInputStr)
-         val x: Try[SigningString] = req.signingStr(sigIn.get)
+         val x: Either[ParsingExc, SigningString] = req.signatureBase(sigIn.get)
          assertEquals(
-            x.flatMap(s => s.decodeAscii.toTry),
-            Success(
+            x.flatMap(s => s.decodeAscii),
+            Right(
                ((if testSig.baseResult == "" then List() else List(testSig.baseResult)) ::: List(
                   """"@signature-params": """ + sigIn.get.canon
                )).mkString("\n")
@@ -158,6 +158,7 @@ open class RequestSigSuite[F[_], H <: Http](
    }
    
    test("static SigInput") {
-//      val at: rdb.
+      val `@` = rdb.atSel
+      val x = rdb.selFns
       
    }

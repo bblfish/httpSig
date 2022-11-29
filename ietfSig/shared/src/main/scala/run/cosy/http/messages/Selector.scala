@@ -23,7 +23,12 @@ import scala.util.Try
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.util.{Failure, Success, Try}
 import run.cosy.http.headers.Rfc8941.Serialise.given
-import run.cosy.http.auth.{AttributeException, HTTPHeaderParseException, SelectorException}
+import run.cosy.http.auth.{
+  AttributeException,
+  HTTPHeaderParseException,
+  ParsingExc,
+  SelectorException
+}
 import run.cosy.http.messages.Parameters.{bsTk, keyTk, nameTk, reqTk, sfTk}
 import run.cosy.http.headers.{ParsingException, Rfc8941}
 import run.cosy.http.headers.Rfc8941.SfDict
@@ -44,7 +49,7 @@ trait SelectorFn[Msg]:
     * of ways.
     * The result is a String for simple methods such as @query
     * */
-   val signingValues: Msg => Try[String | NonEmptyList[String]]
+   val signingValues: Msg => Either[ParsingExc, String | NonEmptyList[String]]
 end SelectorFn
 
 /** Selector for components starting with @ take whole messages as parameters In the spec they are
@@ -80,14 +85,15 @@ trait Selector:
    val selectorFn: SelectorFn[Msg]
 
    /** this is the implementation for @query-param, only. Override on headers. */
-   def renderNel(nel: NonEmptyList[String]): Try[String]
+   def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String]
 
-   def signingStr(msg: Msg): Try[String] =
+   def signingStr(msg: Msg): Either[ParsingExc, String] =
      selectorFn.signingValues(msg).flatMap {
        case nel: NonEmptyList[String] => renderNel(nel)
-       case str                       => Success(identifier + str)
+       case str                       => Right(header + str)
      }
 
+   def header: String = identifier + ": "
    def identifier: String =
       val attrs =
         if params.isEmpty then ""
@@ -96,7 +102,7 @@ trait Selector:
              if value.isInstanceOf[Boolean] then key.canon
              else key.canon + "=" + value.canon
            ).mkString(";", ";", "")
-      s"""${name.canon}$attrs: """
+      s"""${name.canon}$attrs"""
    end identifier
 
 end Selector

@@ -10,7 +10,7 @@ import scala.util.Try
 import cats.data.NonEmptyList
 
 import scala.util.{Failure, Success}
-import run.cosy.http.auth.SelectorException
+import run.cosy.http.auth.{ParsingExc, SelectorException}
 import _root_.org.typelevel.ci.CIString
 
 object DummyHttp extends Http:
@@ -63,22 +63,22 @@ object DummyHeaderSelectorFns extends messages.HeaderSelectorFns[Id,DHT]:
 
   override def requestHeaders(name: HeaderId): RequestFn =
     new messages.SelectorFn[Http.Request[Id,DHT]]:
-      override val signingValues: Request[Id, DHT] => Try[String|NonEmptyList[String]] =
+      override val signingValues: Request[Id, DHT] => Either[ParsingExc, String|NonEmptyList[String]] =
         req => msgSel(name, req.asInstanceOf[Seq[(String,String)]])
         
   end requestHeaders 
 
-  def msgSel(name: HeaderId, msg: Seq[(String, String)]): Try[String|NonEmptyList[String]] =
+  def msgSel(name: HeaderId, msg: Seq[(String, String)]): Either[ParsingExc,String|NonEmptyList[String]] =
      msg.groupBy(_._1).get(CIString(name.specName)) match
-            case None => Failure(SelectorException("no header named: "+name))
+            case None => Left(SelectorException("no header named: "+name))
             case Some(pairs) => 
               val v: Seq[String] =  pairs.map(_._2)
-              Success(NonEmptyList(v.head,v.tail.toList))
+              Right(NonEmptyList(v.head,v.tail.toList))
   end msgSel
 
   override def responseHeaders(name: HeaderId): ResponseFn =
     new messages.SelectorFn[Http.Response[Id,DHT]]:
-      override val signingValues: Response[Id, DHT] => Try[String | NonEmptyList[String]] = 
+      override val signingValues: Response[Id, DHT] => Either[ParsingExc, String | NonEmptyList[String]] =
         res => msgSel(name, res.asInstanceOf[Seq[(String,String)]])
 
 end DummyHeaderSelectorFns

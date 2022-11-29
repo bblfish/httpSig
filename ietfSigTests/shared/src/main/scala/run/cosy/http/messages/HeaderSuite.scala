@@ -22,11 +22,12 @@ import _root_.run.cosy.http.Http
 import _root_.run.cosy.http.Http.Request
 import _root_.run.cosy.http.headers.Rfc8941
 import _root_.run.cosy.http.headers.Rfc8941.Token
-import _root_.run.cosy.http.messages.{HeaderSelectors, TestHttpMsgInterpreter, RequestSelector, HttpMessageDB as DB, Selectors}
+import _root_.run.cosy.http.messages.{HeaderSelectors, RequestSelector, Selectors, TestHttpMsgInterpreter, HttpMessageDB as DB}
 import _root_.run.cosy.platform
 import cats.data.NonEmptyList
 import cats.effect.Async
 import munit.CatsEffectSuite
+import run.cosy.http.auth.ParsingExc
 import scodec.bits.ByteVector
 
 import java.util.Locale
@@ -64,15 +65,15 @@ open class HeaderSuite[F[_], H <: Http](
    import HeaderId.{OldId,DictId,ListId,ItemId}
    
    // special headers used in the spec that we won't find elsewhere
-   val `x-example` = selectr.requestHeader(exHd.`x-example`)
-   val `x-empty-header` = selectr.requestHeader(exHd.`x-empty-header`)
-   val `x-ows-header` = selectr.requestHeader(exHd.`x-ows-header`)
-   val `x-obs-fold-header` = selectr.requestHeader(exHd.`x-obs-fold-header`)
-   val `example-dict` = selectr.requestHeader(exHd.`example-dict`)
-   val `example-header` = selectr.requestHeader(exHd.`example-header`)
-   val `cache-control` = selectr.requestHeader(hds.retrofit.`cache-control`)
-   val date =  selectr.requestHeader(hds.Response.`date`)
-   val host = selectr.requestHeader(hds.retrofit.`host`)
+   val `x-example` = selectr.onRequest(exHd.`x-example`)
+   val `x-empty-header` = selectr.onRequest(exHd.`x-empty-header`)
+   val `x-ows-header` = selectr.onRequest(exHd.`x-ows-header`)
+   val `x-obs-fold-header` = selectr.onRequest(exHd.`x-obs-fold-header`)
+   val `example-dict` = selectr.onRequest(exHd.`example-dict`)
+   val `example-header` = selectr.onRequest(exHd.`example-header`)
+   val `cache-control` = selectr.onRequest(hds.retrofit.`cache-control`)
+   val date =  selectr.onRequest(hds.Response.`date`)
+   val host = selectr.onRequest(hds.retrofit.`host`)
    import exHd.VerticalTAB
    
    val sfTk   = Rfc8941.Token("sf")
@@ -81,18 +82,15 @@ open class HeaderSuite[F[_], H <: Http](
    val keyTk  = Rfc8941.Token("key")
    val bsTk   = Rfc8941.Token("bs")
 
-//   given ec: ExecutionContext = scala.concurrent.ExecutionContext.global
-//   given clock: Clock =
-//     Clock.fixed(java.time.Instant.ofEpochSecond(16188845000L), java.time.ZoneOffset.UTC).nn
 
    def expectedParamHeader(name: String, params: String, value: String) =
-     Success(s""""$name"$params: $value""")
+     Right(s""""$name"$params: $value""")
 
-   def expectedNameHeader(name: String, nameVal: String, value: String): Success[String] =
-     Success("\"" + name + "\";name=\"" + nameVal + "\": " + value)
+   def expectedNameHeader(name: String, nameVal: String, value: String): Right[ParsingExc, String] =
+     Right("\"" + name + "\";name=\"" + nameVal + "\": " + value)
 
    def expectedHeader(name: String, value: String) =
-     Success(s""""$name": $value""")
+     Right(s""""$name": $value""")
 
    // helper method
    extension (bytes: Try[ByteVector])
@@ -161,7 +159,7 @@ open class HeaderSuite[F[_], H <: Http](
    test("§2.1.1 Strict Serialization of Dictionary Structured Header Request") {
      assertEquals(
        `example-dict`(Selectors.Strict).signingStr(`§2.1_HF`),
-       Success(""""example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""")
+       Right(""""example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""")
      )
    }
 
@@ -194,13 +192,13 @@ open class HeaderSuite[F[_], H <: Http](
        `example-dict`(Selectors.DictSel(sf"q")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(HeaderId("dodo").get)(Selectors.Raw).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId("dodo").get)(Selectors.Raw).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.requestHeader(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"domino")).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"domino")).signingStr(`§2.1_HF`)
      )
    }
 
@@ -219,7 +217,7 @@ open class HeaderSuite[F[_], H <: Http](
      )
    }
 
-   def failureTest[X](shouldFail: Try[X]): Unit =
-     assert(shouldFail.isFailure, shouldFail)
+   def failureTest[X](shouldFail: Either[ParsingExc, X]): Unit =
+     assert(shouldFail.isLeft, shouldFail)
 
 end HeaderSuite

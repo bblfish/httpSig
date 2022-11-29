@@ -101,7 +101,7 @@ final case class SigInput private (val il: IList):
 
 object SigInput:
    /** registered metadata parameters for Signature specifications as per
-     * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-initial-contents-2 §6.2.2 of 07 spec]].
+     * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-15.html#name-initial-contents-2 §6.3.2 of 15 spec]].
      */
    val algTk     = Token("alg")
    val createdTk = Token("created")

@@ -16,7 +16,7 @@
 
 package run.cosy.http.messages
 
-import run.cosy.http.auth.SelectorException
+import run.cosy.http.auth.{ParsingExc, SelectorException}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.SfString
 import run.cosy.http.messages.Selectors.{CollationTp, SelFormat}
@@ -57,16 +57,20 @@ object AtId:
      * something like https://softwaremill.com/fancy-strings-in-scala-3/ (otherwise: that is what
      * unit tests are for)
      */
-   def apply(name: String): Try[AtId] = Try {
-     if name.length == 0 then throw SelectorException("Message Component must start with @ char ")
-     else if name.head != '@' then
-        throw SelectorException("Message Component must start with @ char ")
-     else
-        ComponentId.parse(name.tail) match
-           case err: String => throw SelectorException(err)
-           case tk: Rfc8941.Token => new AtId:
-                override val lcname: Rfc8941.Token = tk
-   }
+   def apply(name: String): Either[SelectorException, AtId] =
+     try
+        if name.length == 0 then
+           throw SelectorException("Message Component must start with @ char ")
+        else if name.head != '@' then
+           throw SelectorException("Message Component must start with @ char ")
+        else
+           ComponentId.parse(name.tail) match
+              case err: String => throw SelectorException(err)
+              case tk: Rfc8941.Token => Right(
+                  new AtId:
+                     override val lcname: Rfc8941.Token = tk
+                )
+     catch case e: SelectorException => Left(e)
 
 end AtId
 

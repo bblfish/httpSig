@@ -17,6 +17,7 @@
 package run.cosy.http.messages
 
 import run.cosy.http.headers.Rfc8941
+import run.cosy.http.headers.Rfc8941.Serialise.given
 import run.cosy.http.headers.SigInput
 import scala.util.{Try, Success, Failure}
 import cats.data.NonEmptyList
@@ -28,3 +29,4 @@ object `@signature-params`:
    val lowercaseName                          = "@signature-params"
    val pitem                                  = Rfc8941.PItem(Rfc8941.SfString(lowercaseName))
    def signingStr(sigInput: SigInput): String = s""""@signature-params": ${sigInput.canon}"""
+   def paramStr(sigInput: SigInput): String   = sigInput.il.params.canon

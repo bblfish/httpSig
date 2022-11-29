@@ -27,6 +27,7 @@ import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
 import run.cosy.http.headers.NumberOutOfBoundsException
 import scodec.bits.ByteVector
+import cats.syntax.all.*
 
 /** Structured Field Values for HTTP [[https://www.rfc-editor.org/rfc/rfc8941.html RFC8941]]
   */
@@ -42,7 +43,8 @@ object Rfc8941:
    type Params = ListMap[Token, Item]
    type SfList = List[Parameterized]
    type SfDict = ListMap[Token, Parameterized]
-   def Param(tk: String, i: Item): Param = (Token(tk), i)
+   // warning this is public and there is an unsafeParse
+   def Param(tk: String, i: Item): Param = (Token.unsafeParsed(tk), i)
    def Params(ps: Param*): Params        = ListMap(ps*)
    def SfDict(entries: (Token, Parameterized)*): ListMap[Token, Parameterized] =
      ListMap(entries*)
@@ -240,7 +242,7 @@ object Rfc8941:
       val lcalpha: P[Char] = P.charIn(0x61.toChar to 0x7a.toChar) | P.charIn('a' to 'z')
       val key: P[Token] =
         ((lcalpha | `*`) ~ (lcalpha | R5234.digit | P.charIn('_', '-', '.', '*')).rep0)
-          .map((c, lc) => Token((c :: lc).mkString))
+          .map((c, lc) => Token.unsafeParsed((c :: lc).mkString))
       val parameter: P[Param] =
         (key ~ (P.char('=') *> bareItem).orElse(P.pure(true)))
       // note: parameters always returns an answer (the empty list) as everything can have parameters

@@ -16,14 +16,21 @@
 
 package run.cosy.akka.http.messages
 
-import akka.http.scaladsl.model.{HttpMessage, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.headers.Host
+import akka.http.scaladsl.settings.ParserSettings.ConflictingContentTypeHeaderProcessingMode.NoContentType
 import cats.Id
 import cats.data.NonEmptyList
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.Http
 import run.cosy.http.Http.{Request, Response}
-import run.cosy.http.auth.{AttributeException, HTTPHeaderParseException, SelectorException}
+import run.cosy.http.auth.{
+  AttributeException,
+  HTTPHeaderParseException,
+  ParsingExc,
+  SelectorException
+}
 import run.cosy.http.headers.Rfc8941.{Param, Params}
 import run.cosy.http.headers.{ParsingException, Rfc8941}
 import run.cosy.http.messages.*
@@ -31,28 +38,32 @@ import run.cosy.http.messages.*
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
-import akka.http.scaladsl.model.headers.Host
-import akka.http.scaladsl.model.HttpHeader
-import akka.http.scaladsl.settings.ParserSettings.ConflictingContentTypeHeaderProcessingMode.NoContentType
 
 class SelectorFnsAkka(using sc: ServerContext)
     extends SelectorFns[Id, HT]:
 
    override val method: RequestFn =
-     RequestAkka { req => Success(req.method.value) }
+     RequestAkka { req => Right(req.method.value) }
 
    override val authority: RequestFn =
      RequestAkka { req =>
-       Try(
-         req.effectiveUri(sc.secure, sc.defaultHost.map(Host(_)).getOrElse(Host.empty))
-           .authority.toString().toLowerCase(java.util.Locale.ROOT).nn
-       )
+       try
+          Right(req.effectiveUri(
+            sc.secure,
+            sc.defaultHost.map(Host(_))
+              .getOrElse(Host.empty)
+          ).authority.toString().toLowerCase(java.util.Locale.ROOT).nn)
+       catch
+          case urlEx: IllegalUriException =>
+            Left(
+              SelectorException("cannot calculate effectuve url for request. " + urlEx.getMessage)
+            )
      }
 
    /** best not used if not HTTP1.1 according to spec. Does not even work with Akka (see test suite)
      */
    override val requestTarget: RequestFn =
-     RequestAkka { req => Success(req.uri.toString()) }
+     RequestAkka { req => Right(req.uri.toString()) }
 
    // raw headers, no interpretation
    override def requestHeaders(headerName: HeaderId): RequestFn =
@@ -68,12 +79,12 @@ class SelectorFnsAkka(using sc: ServerContext)
 
    override val path: RequestFn =
      RequestAkka { req =>
-       Success(req.uri.path.toString())
+       Right(req.uri.path.toString())
      }
 
    override val query: RequestFn =
      RequestAkka { req =>
-       Try(
+       Right(
          req.uri.queryString(StandardCharsets.US_ASCII.nn)
            .map("?" + _).getOrElse("?")
        )
@@ -82,41 +93,43 @@ class SelectorFnsAkka(using sc: ServerContext)
    override def queryParam(name: Rfc8941.SfString): RequestFn =
      RequestAkka { req =>
        req.uri.query().getAll(name.asciiStr).reverse match
-          case Nil => Failure(SelectorException(
+          case Nil => Left(SelectorException(
               s"No query parameter with key ${name} found. Suspicious."
             ))
-          case head :: tail => Success(NonEmptyList(head, tail))
+          case head :: tail => Right(NonEmptyList(head, tail))
      }
 
    override val scheme: RequestFn =
      RequestAkka { req =>
-       Try(req.effectiveUri(
+       Right(req.effectiveUri(
          securedConnection = sc.secure,
          defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
        ).scheme)
      }
 
    override val targetUri: RequestFn = RequestAkka { req =>
-     Success(req.effectiveUri(
+     Right(req.effectiveUri(
        securedConnection = sc.secure,
        defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
      ).toString())
    }
 
    override val status: ResponseFn = ResponseAkka { resp =>
-     Success("" + resp.status.intValue)
+     Right("" + resp.status.intValue)
    }
 
    case class RequestAkka(
-       val sigValues: HttpRequest => Try[String | NonEmptyList[String]]
+       val sigValues: HttpRequest => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Request[Id, HT]]:
-      override val signingValues: Request[Id, HT] => Try[String | NonEmptyList[String]] =
+      override val signingValues
+          : Request[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpRequest])
 
    case class ResponseAkka(
-       val sigValues: HttpResponse => Try[String | NonEmptyList[String]]
+       val sigValues: HttpResponse => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Response[Id, HT]]:
-      override val signingValues: Response[Id, HT] => Try[String | NonEmptyList[String]] =
+      override val signingValues
+          : Response[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpResponse])
 
 end SelectorFnsAkka
@@ -124,17 +137,17 @@ end SelectorFnsAkka
 object SelectorAkka:
    import run.cosy.http.headers.Rfc8941.Serialise.given
 
-   def getHeaders(name: HeaderId)(msg: HttpMessage): Try[NonEmptyList[String]] =
+   def getHeaders(name: HeaderId)(msg: HttpMessage): Either[ParsingExc, NonEmptyList[String]] =
       val N = name.specName
       msg.headers.collect { case HttpHeader(N, value) => value.trim.nn }.toList match
          case Nil =>
            name.specName match
               case "content-length" => msg.entity.contentLengthOption
                   .toRight(SelectorException("no content-length header set"))
-                  .toTry.map(l => NonEmptyList.one("" + l))
+                  .map(l => NonEmptyList.one("" + l))
               case "content-type" if msg.entity.contentType != NoContentType =>
-                Success(NonEmptyList.one(msg.entity.contentType.value))
+                Right(NonEmptyList.one(msg.entity.contentType.value))
               case _ =>
-                Failure(SelectorException(s"No headers named ${name.canon} selectable in request"))
-         case head :: tail => Success(NonEmptyList(head, tail))
+                Left(SelectorException(s"No headers named ${name.canon} selectable in request"))
+         case head :: tail => Right(NonEmptyList(head, tail))
 end SelectorAkka

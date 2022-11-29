@@ -18,15 +18,15 @@ package run.cosy.http.messages
 import run.cosy.http.messages.AtId.*
 
 object AtIds:
-   val `method`         = AtId("@method").get
-   val `request-target` = AtId("@request-target").get
-   val `target-uri`     = AtId("@target-uri").get
-   val `authority`      = AtId("@authority").get
-   val `scheme`         = AtId("@scheme").get
-   val `path`           = AtId("@path").get
-   val `query`          = AtId("@query").get
-   val `query-param`    = AtId("@query-param").get
-   val `status`         = AtId("@status").get
+   val `method`         = AtId("@method").toTry.get
+   val `request-target` = AtId("@request-target").toTry.get
+   val `target-uri`     = AtId("@target-uri").toTry.get
+   val `authority`      = AtId("@authority").toTry.get
+   val `scheme`         = AtId("@scheme").toTry.get
+   val `path`           = AtId("@path").toTry.get
+   val `query`          = AtId("@query").toTry.get
+   val `query-param`    = AtId("@query-param").toTry.get
+   val `status`         = AtId("@status").toTry.get
 
    val requestIds =
      List(method, `request-target`, `target-uri`, authority, scheme, path, query, `query-param`)

@@ -18,7 +18,7 @@ package run.cosy.http.messages
 
 import cats.data.NonEmptyList
 import run.cosy.http.Http
-import run.cosy.http.auth.{AttributeException, SelectorException}
+import run.cosy.http.auth.{AttributeException, ParsingExc, SelectorException}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.messages.HeaderId.SfHeaderId
@@ -36,7 +36,7 @@ import scala.util.{Failure, Success, Try}
   * @param headerTypeDB
   *   Database mapping header ids to the recognised way of encoding that header
   */
-class RequestSelectorDB[F[_], H <: Http](
+case class RequestSelectorDB[F[_], H <: Http](
     atSel: AtSelectors[F, H],
     knownIds: Seq[HeaderId],
     selFns: HeaderSelectorFns[F, H]
@@ -63,19 +63,19 @@ class RequestSelectorDB[F[_], H <: Http](
      (AtIds.requestIds.toSeq ++ knownIds).map(id => id.specName -> id).toMap
 
    // we get this info from the Signing-String header
-   def get(id: String, params: Rfc8941.Params): Try[RequestSelector[F, H]] =
+   def get(id: String, params: Rfc8941.Params): Either[ParsingExc, RequestSelector[F, H]] =
      componentIds.get(id) match
         case Some(at: AtId) => atComponentMap.get(at) match
-             case Some(sel) => Success(sel)
+             case Some(sel) => Right(sel)
              case None =>
                if at == AtIds.`query-param` then
                   params.get(nameTk).collect {
                     case p: SfString => atSel.`@query-param`(p)
                   }.toRight(SelectorException(
                     s"Wrong parameter for @query-param. Received: >$params<"
-                  )).toTry
+                  ))
                else
-                  Failure(
+                  Left(
                     SelectorException(
                       s"component >$id< is not valid msg component name for requests"
                     )
@@ -90,54 +90,58 @@ class RequestSelectorDB[F[_], H <: Http](
               selFns.requestHeaders(hdrId),
               params // we pass the params as received since they have been filtered for sanity
             )
-        case None => Failure(SelectorException(s"we don't recognised component >$id<"))
+        case None => Left(SelectorException(s"we don't recognised component >$id<"))
 
    /** return the collation type for the this header selector id as requested by the given
      * parameters. Check with headerTypeDB if the requests are valid for intepreted types this
      * ignores parameters it does not understand. May not be the right behavior. todo: check
      */
-   def interpretParams(id: HeaderId, params: Rfc8941.Params): Try[id.AllowedCollation] =
-     Try {
-       // 1. we translate all the parameters to well typed CollationTps and forget anything else
-       val tps: Seq[CollationTp] = params.collect {
-         case (`keyTk`, str: Rfc8941.SfString) => id match
-              case sfId: SfHeaderId if sfId.format == SelFormat.Dictionary => Selectors.DictSel(str)
-              case _ => throw AttributeException(
-                  s"we don't know that header >$id< can be interpreted as a dictionary"
+   def interpretParams(
+       id: HeaderId,
+       params: Rfc8941.Params
+   ): Either[AttributeException, id.AllowedCollation] =
+     try
+        // 1. we translate all the parameters to well typed CollationTps and forget anything else
+        val tps: Seq[CollationTp] = params.collect {
+          case (`keyTk`, str: Rfc8941.SfString) => id match
+               case sfId: SfHeaderId if sfId.format == SelFormat.Dictionary =>
+                 Selectors.DictSel(str)
+               case _ => throw AttributeException(
+                   s"we don't know that header >$id< can be interpreted as a dictionary"
+                 )
+          case (`keyTk`, x) =>
+            throw AttributeException(s"key value can only be of type SfString. Received >$x< ")
+          case (`sfTk`, true) => id match
+               case sfId: SfHeaderId => Selectors.Strict
+               case _ => throw AttributeException(
+                   s"We don't know what the agreed type for parsing header >$id< as sf is."
+                 )
+          case (`sfTk`, x) =>
+            throw AttributeException(s"value of attributed 'sf' can only be true. Received >$x<")
+          case (`bsTk`, true) => Selectors.Bin
+          case (`bsTk`, x) =>
+            throw AttributeException(s"value of attributed 'bs' can only be true. Received >$x<")
+        }.toSeq
+        // 2. now we have to detect inconsistencies and reduce
+        val ct =
+          if tps.contains(Selectors.Bin)
+          then // a. is it binary? then check if it is inconsistent, or return
+             if tps.exists(ct =>
+                  ct.isInstanceOf[Selectors.DictSel] || ct == Selectors.Strict
                 )
-         case (`keyTk`, x) =>
-           throw AttributeException(s"key value can only be of type SfString. Received >$x< ")
-         case (`sfTk`, true) => id match
-              case sfId: SfHeaderId => Selectors.Strict
-              case _ => throw AttributeException(
-                  s"We don't know what the agreed type for parsing header >$id< as sf is."
+             then
+                throw AttributeException(
+                  "We cannot have attributes 'sf' or 'key' together with 'sb' on a header component"
                 )
-         case (`sfTk`, x) =>
-           throw AttributeException(s"value of attributed 'sf' can only be true. Received >$x<")
-         case (`bsTk`, true) => Selectors.Bin
-         case (`bsTk`, x) =>
-           throw AttributeException(s"value of attributed 'bs' can only be true. Received >$x<")
-       }.toSeq
-       // 2. now we have to detect inconsistencies and reduce
-       val ct =
-         if tps.contains(Selectors.Bin)
-         then // a. is it binary? then check if it is inconsistent, or return
-            if tps.exists(ct =>
-                 ct.isInstanceOf[Selectors.DictSel] || ct == Selectors.Strict
-               )
-            then
-               throw AttributeException(
-                 "We cannot have attributes 'sf' or 'key' together with 'sb' on a header component"
-               )
-            else Selectors.Bin
-         else // b. if not binary, then
-            tps.find(_.isInstanceOf[Selectors.DictSel]) orElse {
-              tps.find(_ == Selectors.Strict)
-            } getOrElse {
-              Selectors.Raw
-            }
-       // todo: find a way of not using xx_instnaceOf methods
-       ct.asInstanceOf[id.AllowedCollation]
-     }
+             else Selectors.Bin
+          else // b. if not binary, then
+             tps.find(_.isInstanceOf[Selectors.DictSel]) orElse {
+               tps.find(_ == Selectors.Strict)
+             } getOrElse {
+               Selectors.Raw
+             }
+        // todo: find a way of not using xx_instnaceOf methods
+        Right(ct.asInstanceOf[id.AllowedCollation])
+     catch case e: AttributeException => Left(e)
 
 end RequestSelectorDB

@@ -21,6 +21,7 @@ import run.cosy.http.headers.Rfc8941
 import cats.data.NonEmptyList
 import scala.util.{Try, Success, Failure}
 import scala.collection.immutable.ListMap
+import run.cosy.http.auth.ParsingExc
 
 class RequestHeaderSel[F[_], H <: Http](
     override val name: HeaderId,
@@ -28,8 +29,8 @@ class RequestHeaderSel[F[_], H <: Http](
     override val selectorFn: SelectorFn[Http.Request[F, H]],
     override val params: Rfc8941.Params = ListMap()
 ) extends RequestSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Try[String] =
-     Selectors.render(name, collTp)(nel).map(identifier + _)
+   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
+     Selectors.render(name, collTp)(nel).map(header + _)
 
 class ResponseHeaderSel[F[_], H <: Http](
     override val name: HeaderId,
@@ -37,8 +38,8 @@ class ResponseHeaderSel[F[_], H <: Http](
     override val selectorFn: SelectorFn[Http.Response[F, H]],
     override val params: Rfc8941.Params = ListMap()
 ) extends ResponseSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Try[String] =
-     Selectors.render(name, collTp)(nel).map(identifier + _)
+   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
+     Selectors.render(name, collTp)(nel).map(header + _)
 
 trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
    import Selectors.CollationTp
@@ -47,7 +48,7 @@ trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
      * @collTp
      *   the way to interpret the headers values returned
      */
-   def requestHeader(name: HeaderId)(
+   def onRequest(name: HeaderId)(
        collTp: name.AllowedCollation
    ): RequestSelector[F, H] =
      new RequestHeaderSel[F, H](
@@ -57,7 +58,7 @@ trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
        collTp.toParam
      )
 
-   def responseHeader(name: HeaderId)(
+   def onResponse(name: HeaderId)(
        collTp: name.AllowedCollation
    ): ResponseSelector[F, H] =
      new ResponseHeaderSel[F, H](
@@ -78,52 +79,52 @@ trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
       import Selectors.{SelFormat, CollationTp as Ct}
       import run.cosy.http.messages.HeaderIds.Request as req
 
-      lazy val accept = requestHeader(retro.accept)
+      lazy val accept = onRequest(retro.accept)
       /* could not find authorization in retrofit. Could one send more than one? Yet, I think. */
-      lazy val authorization   = requestHeader(req.authorization)
-      lazy val `cache-control` = requestHeader(retro.`cache-control`)
-      lazy val `content-type`  = requestHeader(retro.`content-type`)
+      lazy val authorization   = onRequest(req.authorization)
+      lazy val `cache-control` = onRequest(retro.`cache-control`)
+      lazy val `content-type`  = onRequest(retro.`content-type`)
 
       /** a list because sometimes multiple lengths are sent! */
-      lazy val `content-length` = requestHeader(retro.`content-length`)
-      lazy val signature_sf     = requestHeader(req.signature)
+      lazy val `content-length` = onRequest(retro.`content-length`)
+      lazy val signature_sf     = onRequest(req.signature)
       // todo: it feels like dict objs should allow the user to select the type cloer to the point
       // of creating the signature.
-      lazy val signature_dict   = requestHeader(req.signature)
-      lazy val `content-digest` = requestHeader(req.`content-digest`)
+      lazy val signature_dict   = onRequest(req.signature)
+      lazy val `content-digest` = onRequest(req.`content-digest`)
 
       /** Defined in:
         * [[https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-client-cert-field-03#section-2 httpbis-client-cert]]
         */
-      lazy val `client-cert`       = requestHeader(req.`client-cert`)
-      lazy val `client-cert-chain` = requestHeader(req.`client-cert-chain`)
-      lazy val forwarded           = requestHeader(req.forwarded)
+      lazy val `client-cert`       = onRequest(req.`client-cert`)
+      lazy val `client-cert-chain` = onRequest(req.`client-cert-chain`)
+      lazy val forwarded           = onRequest(req.forwarded)
    end RequestHd
 
    object ResponseHd:
       import Selectors.{SelFormat, CollationTp as Ct}
       import run.cosy.http.messages.HeaderIds.Response as res
 
-      lazy val `accept-post`   = responseHeader(retro.`accept-post`)
-      lazy val `cache-control` = responseHeader(res.`cache-control`)
+      lazy val `accept-post`   = onResponse(retro.`accept-post`)
+      lazy val `cache-control` = onResponse(res.`cache-control`)
 
       /** Clients cannot send date headers via JS. Also not really useful as the time is available
         * in the Signature-Input in unix time. see
         * [[https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6 rfc9110]] for handling
         * requirements (from httpbis-retrofit)
         */
-      lazy val date             = responseHeader(res.date)
-      lazy val `content-type`   = responseHeader(res.`content-type`)
-      lazy val `content-length` = responseHeader(res.`content-length`)
+      lazy val date             = onResponse(res.date)
+      lazy val `content-type`   = onResponse(res.`content-type`)
+      lazy val `content-length` = onResponse(res.`content-length`)
 
       /** One could create a new parameter to convert to SF-ETAG specified by httpbis-retrofit */
-      lazy val etag      = responseHeader(res.etag)
-      lazy val signature = responseHeader(res.signature)
+      lazy val etag      = onResponse(res.etag)
+      lazy val signature = onResponse(res.signature)
 
       /** [[https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-digest-headers-10#section-2
         * digest-headers draft rfc]
         */
       lazy val `content-digest` =
-        responseHeader(res.`content-digest`)
+        onResponse(res.`content-digest`)
    end ResponseHd
 end HeaderSelectors

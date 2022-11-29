@@ -20,6 +20,7 @@ import run.cosy.http.Http
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.{Params, SfString}
 import cats.data.NonEmptyList
+import run.cosy.http.auth.ParsingExc
 
 import scala.collection.immutable.ListMap
 import scala.util.{Success, Try}
@@ -30,16 +31,16 @@ open class AtRequestSel[F[_], H <: Http](
     val selectorFn: SelectorFn[Http.Request[F, H]],
     override val params: Rfc8941.Params = ListMap()
 ) extends RequestSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Try[String] =
-     Success(nel.map(identifier + _).toList.mkString("\n"))
+   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
+     Right(nel.map(header + _).toList.mkString("\n"))
 
 open class AtResponseSel[F[_], H <: Http](
     val name: AtId,
     val selectorFn: SelectorFn[Http.Response[F, H]],
     override val params: Rfc8941.Params = ListMap()
 ) extends ResponseSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Try[String] =
-     Success(nel.map(identifier + _).toList.mkString("\n"))
+   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
+     Right(nel.map(header + _).toList.mkString("\n"))
 
 trait AtSelectors[F[_], H <: Http](using sf: AtSelectorFns[F, H]):
 

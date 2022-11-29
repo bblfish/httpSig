@@ -2,6 +2,7 @@ package run.cosy.http.messages
 
 import munit.CatsEffectSuite
 import run.cosy.http.Http.{Request, Response}
+import run.cosy.http.auth.ParsingExc
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.messages.{AtSelectors, ServerContext}
 import run.cosy.http.{Http, auth}
@@ -17,14 +18,14 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      val sc: ServerContext       = ServerContext("www.example.com", true)
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.1_Method_POST`)
      val sigStr                  = sel(sc).`@method`.signingStr(req)
-     assertEquals(sigStr, Success(""""@method": POST"""))
+     assertEquals(sigStr, Right(""""@method": POST"""))
    }
 
    def reqFail(selector: RequestSelector[F, H], req: Request[F, H]): Unit =
-      val result: Try[String] = selector.signingStr(req)
+      val result: Try[String] = selector.signingStr(req).toTry
       assert(result.isFailure, result)
 
-   def resS(meth: String, res: String, attrs: (String, String)*): Try[String] = Try {
+   def resS(meth: String, res: String, attrs: (String, String)*): Either[ParsingExc,String] = Right {
      val ats     = for (k, v) <- attrs.toSeq yield s"""$k="$v""""
      val optAtts = if ats.isEmpty then "" else ats.mkString(";", ";", "")
      s""""$meth"$optAtts: $res"""
@@ -95,7 +96,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      assertEquals(`@query`.signingStr(req), resS("@query", "?param=value&param=another"))
      assertEquals(
        `@query-param`(sf"param").signingStr(req),
-       Success(""""@query-param";name="param": value
+       Right(""""@query-param";name="param": value
                  |"@query-param";name="param": another""".stripMargin)
      )
 
@@ -204,7 +205,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      assertEquals(`@query`.signingStr(req), resS("@query", "?queryString"))
      assertEquals(
        `@query-param`(sf"queryString").signingStr(req),
-       Success(""""@query-param";name="queryString": """)
+       Right(""""@query-param";name="queryString": """)
      )
      reqFail(`@query-param`(sf"q"), req)
      // we use the server context
@@ -235,7 +236,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      assertEquals(`@query`.signingStr(req), resS("@query", "?param=value&foo=bar&baz=batman&qux="))
      assertEquals(
        `@query-param`(sf"param").signingStr(req),
-       Success(""""@query-param";name="param": value""")
+       Right(""""@query-param";name="param": value""")
      )
      // we use the server context
      assertEquals(`@authority`.signingStr(req), resS("@authority", "bblfish.net"))
@@ -256,7 +257,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
 
      // because of typesafety we can only make one test here
      assertEquals(`@status`.signingStr(res), resS("@status", "200"))
-     assertEquals(`@status`.signingStr(res), Success(""""@status": 200"""))
+     assertEquals(`@status`.signingStr(res), Right(""""@status": 200"""))
    }
 
 end AtSelectorSuite

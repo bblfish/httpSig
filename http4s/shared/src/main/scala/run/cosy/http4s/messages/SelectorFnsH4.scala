@@ -25,7 +25,7 @@ import run.cosy.http.messages.Parameters.nameTk
 import run.cosy.http4s.Http4sTp.HT as H4
 import run.cosy.platform
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.auth.{AttributeException, SelectorException}
+import run.cosy.http.auth.{AttributeException, ParsingExc, SelectorException}
 import run.cosy.http4s.messages.SelectorFnsH4.getHeaders
 
 import scala.util.Try
@@ -33,26 +33,25 @@ import scala.util.{Failure, Success}
 import org.typelevel.ci.CIString
 
 class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
-   import SelectorFnsH4 as SF
+   val SF = SelectorFnsH4
 
    override def method: RequestFn =
-     RequestSelH4(req => Success(req.method.name))
+     RequestSelH4(req => Right(req.method.name))
 
    override def authority: RequestFn = RequestSelH4(req =>
      for
         auth <- SF.authorityFor(req)
           .toRight(SelectorException("could not construct authority for request"))
-          .toTry
      yield platform.StringUtil.toLowerCaseInsensitive(auth.renderString)
    )
 
    /** best not used if not HTTP1.1 */
-   override def requestTarget: RequestFn = RequestSelH4(req => Success(req.uri.renderString))
+   override def requestTarget: RequestFn = RequestSelH4(req => Right(req.uri.renderString))
 
-   override def path: RequestFn = RequestSelH4(req => Success(req.uri.path.toString()))
+   override def path: RequestFn = RequestSelH4(req => Right(req.uri.path.toString()))
 
    override def query: RequestFn = RequestSelH4(req =>
-     Success {
+     Right {
        val q: Query = req.uri.query
        if q == Query.empty then "?"
        else if q == Query.blank then "?"
@@ -63,14 +62,12 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
    )
 
    override def queryParam(name: Rfc8941.SfString): RequestFn = RequestSelH4(req =>
-     Try {
-       req.uri.query.multiParams.get(name.asciiStr) match
-          case None => throw SelectorException(
-              s"No query parameter with key ${name.asciiStr} found. Suspicious."
-            )
-          case Some(Nil)          => ""
-          case Some(head :: tail) => NonEmptyList(head, tail)
-     }
+     req.uri.query.multiParams.get(name.asciiStr) match
+        case None => Left(SelectorException(
+            s"No query parameter with key ${name.asciiStr} found. Suspicious."
+          ))
+        case Some(Nil)          => Right("")
+        case Some(head :: tail) => Right(NonEmptyList(head, tail))
    )
 
    override def scheme: RequestFn = RequestSelH4(req =>
@@ -85,7 +82,7 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
      )
    )
 
-   override def status: ResponseFn = ResponseSelH4(req => Success("" + req.status.code))
+   override def status: ResponseFn = ResponseSelH4(req => Right("" + req.status.code))
 
    override def requestHeaders(name: HeaderId): RequestFn = RequestSelH4(req =>
      SF.getHeaders(req, name)
@@ -96,15 +93,17 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
    )
 
    case class RequestSelH4(
-       val sigValues: H4Request[F] => Try[String | NonEmptyList[String]]
+       val sigValues: H4Request[F] => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Request[F, H4]]:
-      override val signingValues: Http.Request[F, H4] => Try[String | NonEmptyList[String]] =
+      override val signingValues
+          : Http.Request[F, H4] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[H4Request[F]])
 
    case class ResponseSelH4(
-       sigValues: H4Response[F] => Try[String | NonEmptyList[String]]
+       sigValues: H4Response[F] => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Response[F, H4]]:
-      override val signingValues: Http.Response[F, H4] => Try[String | NonEmptyList[String]] =
+      override val signingValues
+          : Http.Response[F, H4] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[H4Response[F]])
 
 end SelectorFnsH4
@@ -113,8 +112,8 @@ object SelectorFnsH4:
 
    def getHeaders[F[_]](msg: H4Message[F], name: HeaderId) =
      msg.headers.get(CIString(name.specName)).map(_.map(_.value)) match
-        case None      => Failure(SelectorException(s"no header in request named $name"))
-        case Some(nel) => Success(nel)
+        case None      => Left(SelectorException(s"no header in request named $name"))
+        case Some(nel) => Right(nel)
 
    def defaultAuthorityOpt(scheme: Option[Uri.Scheme])(
        using sc: ServerContext
@@ -149,16 +148,18 @@ object SelectorFnsH4:
    def defaultScheme(using sc: ServerContext): Uri.Scheme =
      if sc.secure then Uri.Scheme.https else Uri.Scheme.http
 
-   def effectiveUriFor[F[_]](req: H4Request[F])(using sc: ServerContext): Try[Uri] =
+   def effectiveUriFor[F[_]](req: H4Request[F])(using
+       sc: ServerContext
+   ): Either[SelectorException, Uri] =
       val uri = req.uri
       if uri.scheme.isDefined && uri.authority.isDefined
-      then Success(uri)
+      then Right(uri)
       else
          val newUri = uri.copy(
            scheme = uri.scheme.orElse(Some(defaultScheme)),
            authority = authorityFor(req)
          )
          if newUri.authority.isDefined
-         then Success(newUri)
-         else Failure(SelectorException(s"cannot create effective Uri for req. Got: <$newUri>"))
+         then Right(newUri)
+         else Left(SelectorException(s"cannot create effective Uri for req. Got: <$newUri>"))
    end effectiveUriFor

@@ -10,7 +10,7 @@ import scala.util.{Success, Try}
 
 trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    def sel(sc: ServerContext): AtSelectors[F, H]
-   def interp: HttpMsgInterpreter[F, H]
+   def interp: TestHttpMsgInterpreter[F, H]
    def platform: Platform
 
    test("@method") {

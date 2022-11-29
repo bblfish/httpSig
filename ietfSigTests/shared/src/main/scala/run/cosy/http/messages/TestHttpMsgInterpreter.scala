@@ -11,7 +11,7 @@ enum Platform:
 
 case class MessageInterpreterError(platform: Platform, message: String) extends Exception
 
-trait HttpMsgInterpreter[F[_], H <: Http]:
+trait TestHttpMsgInterpreter[F[_], H <: Http]:
 
    import run.cosy.http.messages.HttpMessageDB.{RequestStr,ResponseStr}
 
@@ -20,7 +20,7 @@ trait HttpMsgInterpreter[F[_], H <: Http]:
    def asResponse(header: ResponseStr): Http.Response[F,H]
    
    
-object HttpMsgInterpreter:
+object TestHttpMsgInterpreter:
   val AttVals: Regex = "^([^:]+):(.*)$".r
   val VerticalTAB: Char = "\u000B".head
   

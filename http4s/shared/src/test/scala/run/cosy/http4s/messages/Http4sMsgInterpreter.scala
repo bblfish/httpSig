@@ -22,10 +22,11 @@ import run.cosy.http4s.Http4sTp.HT
 import cats.effect.IO
 import org.http4s.Header
 import org.typelevel.ci.CIString
-import run.cosy.http.messages.HttpMsgInterpreter
+import run.cosy.http.messages.TestHttpMsgInterpreter
 import scodec.bits.ByteVector
 
-class Http4sMsgInterpreter[F[_]] extends run.cosy.http.messages.HttpMsgInterpreter[F, Http4sTp.HT]:
+class Http4sMsgInterpreter[F[_]]
+    extends run.cosy.http.messages.TestHttpMsgInterpreter[F, Http4sTp.HT]:
 
    import run.cosy.http.messages.HttpMessageDB.{RequestStr, ResponseStr}
 
@@ -64,7 +65,7 @@ class Http4sMsgInterpreter[F[_]] extends run.cosy.http.messages.HttpMsgInterpret
         case _ => throw new Exception("Badly formed HTTP request")
 
    private def parseHeaders(nonMethodLines: List[String]): (List[Header.Raw], String) =
-      val (headers, body) = HttpMsgInterpreter.headersAndBody(nonMethodLines)
+      val (headers, body) = TestHttpMsgInterpreter.headersAndBody(nonMethodLines)
       val hds             = headers.map { case (h, v) => Header.Raw(CIString(h), v) }
       (hds, body)
 

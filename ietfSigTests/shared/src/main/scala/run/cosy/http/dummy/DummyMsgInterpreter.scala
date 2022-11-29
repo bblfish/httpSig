@@ -1,6 +1,6 @@
 package run.cosy.http.dummy
 
-import run.cosy.http.messages.HttpMsgInterpreter
+import run.cosy.http.messages.TestHttpMsgInterpreter
 import run.cosy.http.Http.Request
 import run.cosy.http.messages.HttpMessageDB.RequestStr
 import run.cosy.http.messages.HttpMessageDB
@@ -8,7 +8,7 @@ import run.cosy.http.Http.Response
 import run.cosy.http.messages.HttpMessageDB.ResponseStr
 import org.typelevel.ci.*
 
-class DummyMsgInterpreter extends HttpMsgInterpreter[cats.Id, DummyHttp.HT]:
+class DummyMsgInterpreter extends TestHttpMsgInterpreter[cats.Id, DummyHttp.HT]:
    val VerticalTAB: Char           = "\u000B".head
 
    def asRequest(header: RequestStr): Request[cats.Id, DummyHttp.HT] =

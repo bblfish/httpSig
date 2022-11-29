@@ -22,7 +22,7 @@ import _root_.run.cosy.http.Http
 import _root_.run.cosy.http.Http.Request
 import _root_.run.cosy.http.headers.Rfc8941
 import _root_.run.cosy.http.headers.Rfc8941.Token
-import _root_.run.cosy.http.messages.{HeaderSelectors, HttpMsgInterpreter, RequestSelector, HttpMessageDB as DB, Selectors}
+import _root_.run.cosy.http.messages.{HeaderSelectors, TestHttpMsgInterpreter, RequestSelector, HttpMessageDB as DB, Selectors}
 import _root_.run.cosy.platform
 import cats.data.NonEmptyList
 import cats.effect.Async
@@ -52,7 +52,7 @@ object HeaderSuite:
   */
 open class HeaderSuite[F[_], H <: Http](
     selectr: HeaderSelectors[F, H],
-    interp: HttpMsgInterpreter[F, H]
+    interp: TestHttpMsgInterpreter[F, H]
 ) extends CatsEffectSuite:
 
    import _root_.run.cosy.http.headers.Rfc8941

@@ -20,7 +20,7 @@ import run.cosy.http.Http
 import run.cosy.http.messages.{
   AtSelectorSuite,
   AtSelectors,
-  HttpMsgInterpreter,
+  TestHttpMsgInterpreter,
   Platform,
   ServerContext
 }
@@ -32,5 +32,5 @@ class Http4sAtSelectorSuite[F[_]] extends AtSelectorSuite[F, H4]:
    def sel(using ServerContext): AtSelectors[F, H4] =
      new AtSelectors[F, H4](using new SelectorFnsH4[F]) {}
 
-   def interp: HttpMsgInterpreter[F, H4] = new Http4sMsgInterpreter[F]
-   def platform: Platform                = Platform.Http4s
+   def interp: TestHttpMsgInterpreter[F, H4] = new Http4sMsgInterpreter[F]
+   def platform: Platform                    = Platform.Http4s

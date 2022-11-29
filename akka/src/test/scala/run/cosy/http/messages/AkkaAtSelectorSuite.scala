@@ -21,7 +21,7 @@ import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.akka.http.AkkaTp
 import cats.Id
 import run.cosy.akka.http.messages.SelectorFnsAkka
-import run.cosy.http.messages.{AtSelectorSuite, HttpMsgInterpreter}
+import run.cosy.http.messages.{AtSelectorSuite, TestHttpMsgInterpreter}
 import run.cosy.http.messages.{AtSelectors, ServerContext}
 
 class AkkaAtSelectorSuite extends AtSelectorSuite[Id, AkkaTp.HT]:
@@ -29,5 +29,5 @@ class AkkaAtSelectorSuite extends AtSelectorSuite[Id, AkkaTp.HT]:
    def sel(using ServerContext): AtSelectors[Id, HT] =
      new AtSelectors[cats.Id, HT](using new SelectorFnsAkka()) {}
 
-   def interp: HttpMsgInterpreter[cats.Id, HT] = AkkaMsgInterpreter
-   def platform: Platform                      = Platform.Akka
+   def interp: TestHttpMsgInterpreter[cats.Id, HT] = AkkaMsgInterpreter
+   def platform: Platform                          = Platform.Akka

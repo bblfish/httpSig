@@ -26,10 +26,10 @@ val xxxx = new run.cosy.akka.http.messages.SelectorFnsAkka(using ServerContext("
 
 class AkkaReqSigSuite extends RequestSigSuite[cats.Id, HT](
       run.cosy.http.auth.AkkaHttpMessageSignature,
-      run.cosy.http.messages.AkkaMsgInterpreter,
       new run.cosy.http.messages.RequestSelectorDB(
         new AtSelectors[cats.Id, HT](using xxxx) {},
         HeaderIds.all,
         xxxx
-      )
+      ),
+      run.cosy.http.messages.AkkaMsgInterpreter
     )

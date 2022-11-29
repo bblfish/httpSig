@@ -30,7 +30,7 @@ import run.cosy.http.utils.StringUtils.rfc8792single
 
 import scala.language.implicitConversions
 
-object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, AkkaTp.HT]:
+object AkkaMsgInterpreter extends run.cosy.http.messages.TestHttpMsgInterpreter[Id, AkkaTp.HT]:
    val VerticalTAB: Char = "\u000B".head
 
    override def asRequest(header: DB.RequestStr): Http.Request[Id, AkkaTp.HT] =
@@ -161,6 +161,6 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.HttpMsgInterpreter[Id, 
           )
 
    private def parseRest(nonMethodLines: List[String]): (List[RawHeader], String) =
-      val (headers, body) = HttpMsgInterpreter.headersAndBody(nonMethodLines)
+      val (headers, body) = TestHttpMsgInterpreter.headersAndBody(nonMethodLines)
       val hds             = headers.map { case (h, v) => RawHeader(h, v) }
       (hds, body)

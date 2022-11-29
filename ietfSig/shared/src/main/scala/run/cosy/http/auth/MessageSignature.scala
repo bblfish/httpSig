@@ -36,6 +36,7 @@ import java.util.Locale
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
+import cats.data.NonEmptyList
 
 trait SignatureInputMatcher[H <: Http]:
    type SI <: Header[H]
@@ -118,27 +119,18 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
         */
       def signingStr(sigInput: SigInput): Try[SigningString] =
          import Rfc8941.Serialise.{*, given}
-
-         @tailrec
-         def buildSigString(todo: Seq[Rfc8941.PItem[SfString]], onto: String): Try[String] =
-           todo match
-              case Seq() => Success(onto)
-              case pih :: tail =>
-                if (pih == `@signature-params`.pitem) then
-                   val sigp = `@signature-params`.signingStr(sigInput)
-                   Success(if onto == "" then sigp else onto + "\n" + sigp)
-                else
-                   selectorDB.get(pih.item.asciiStr, pih.params).flatMap(selector =>
-                     selector.signingStr(req)
-                   ) match
-                      case Success(hdr) =>
-                        buildSigString(todo.tail, if onto == "" then hdr else onto + "\n" + hdr)
-                      case f => f
-         end buildSigString
-
-         buildSigString(sigInput.headerItems.appended(`@signature-params`.pitem), "")
-           .flatMap(string => ByteVector.encodeAscii(string).toTry)
-
+         val xl: Either[Throwable, List[String]] = sigInput.headerItems.reverse
+           .foldM(List(`@signature-params`.signingStr(sigInput))) { (lst, pih) =>
+              val x =
+                for
+                   selector <- selectorDB.get(pih.item.asciiStr, pih.params)
+                   str      <- selector.signingStr(req)
+                yield str :: lst
+              x.toEither
+           }
+         xl.flatMap(list =>
+           ByteVector.encodeAscii(list.mkString("\n"))
+         ).toTry
       end signingStr
 
       /** get the signature data for a given signature name eg `sig1` from the headers.

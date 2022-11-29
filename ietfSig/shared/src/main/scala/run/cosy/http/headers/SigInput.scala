@@ -81,8 +81,8 @@ final case class SigInput private (val il: IList):
    import SigInput.*
 
    // todo: verify that collecting only SfStrings is ok
-   def headers: Seq[String]              = il.items.collect { case PItem(SfString(str), _) => str }
-   def headerItems: Seq[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])
+   def headers: List[String]              = il.items.collect { case PItem(SfString(str), _) => str }
+   def headerItems: List[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])
 
    def keyid: Option[Rfc8941.SfString] =
      il.params.get(keyidTk) match

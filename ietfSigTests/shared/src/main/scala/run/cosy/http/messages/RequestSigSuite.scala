@@ -13,9 +13,17 @@ import scala.util.{Failure, Success, Try}
 
 open class RequestSigSuite[F[_], H <: Http](
     msgSig: MessageSignature[F, H],
-    msgDB: HttpMsgInterpreter[F, H]
-)(using rdb: RequestSelectorDB[F, H]) extends CatsEffectSuite:
+    msgDB: HttpMsgInterpreter[F, H],
+    rdb: RequestSelectorDB[F, H]
+) extends CatsEffectSuite:
 
+   given RequestSelectorDB[F, H] = rdb.addIds(
+     HeaderId("x-ows-header").get,
+     HeaderId("x-obs-fold-header").get,
+     HeaderId.dict("example-dict").get,
+     HeaderId("example-header").get,
+     HeaderId("x-empty-header").get
+   )
    import msgSig.{*, given}
    val DB = HttpMessageDB
 
@@ -64,60 +72,85 @@ open class RequestSigSuite[F[_], H <: Http](
        )
      }
    }
-   {
-     given RequestSelectorDB[F, H] = rdb.addIds(
-       HeaderId("x-ows-header").get,
-       HeaderId("x-obs-fold-header").get,
-       HeaderId.dict("example-dict").get,
-       HeaderId("x-empty-header").get
-     )
-     case class TestSig(reqStr: DB.RequestStr, sigInputStr: String, baseResult: String)
 
-     List(
-       TestSig(
-         DB.`§2.1_HeaderField`,
-         """("host" "date" "x-obs-fold-header" "x-ows-header" "cache-control" "example-dict")""",
-         """"host": www.example.com
+   case class TestSig(doc: String, reqStr: DB.RequestStr, sigInputStr: String, baseResult: String)
+
+   List(
+     TestSig("empty SigInput", DB.`§2.1_HeaderField`, "()", """"""),
+     TestSig(
+       "SigInput from in §2.1 with old request",
+       DB.`§2.1_HeaderField`,
+       """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
+       """"host": www.example.com
            |"date": Sat, 07 Jun 2014 20:51:35 GMT
-           |"x-obs-fold-header": Obsolete line folding.
            |"x-ows-header": Leading and trailing whitespace.
+           |"x-obs-fold-header": Obsolete line folding.
            |"cache-control": max-age=60, must-revalidate
            |"example-dict": a=1,   b=2;x=1;y=2,   c=(a   b   c), d""".rfc8792single
-       ),
-       TestSig(
-         DB.`§2.1_HeaderField_2`,
-         """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
-         """"host": www.example.com
+     ),
+     TestSig(
+       "SigInput from §2.1 with new request",
+       DB.`§2.1_HeaderField_2`,
+       """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
+       """"host": www.example.com
             |"date": Tue, 20 Apr 2021 02:07:56 GMT
             |"x-ows-header": Leading and trailing whitespace.
             |"x-obs-fold-header": Obsolete line folding.
             |"cache-control": must-revalidate, max-age=60
             |"example-dict": a=1,    b=2;x=1;y=2,   c=(a   b   c), d""".rfc8792single
-       ),
-       TestSig(
-         DB.`§2.1_HeaderField_2`,
-         """("host" "date"  "x-empty-header" "x-ows-header";bs "cache-control";key="max-age" "example-dict";sf)""",
-         """"host": www.example.com
+     ),
+     TestSig(
+       "SigInput with ;key and ;sf and ;bs selectors",
+       DB.`§2.1_HeaderField_2`,
+       """("host" "date"  "x-empty-header" "x-ows-header";bs "cache-control";key="max-age" "example-dict";sf)""",
+       """"host": www.example.com
            |"date": Tue, 20 Apr 2021 02:07:56 GMT
            |"x-empty-header": \
            |
            |"x-ows-header";bs: :TGVhZGluZyBhbmQgdHJhaWxpbmcgd2hpdGVzcGFjZS4=:
            |"cache-control";key="max-age": 60
            |"example-dict";sf: a=1, b=2;x=1;y=2, c=(a b c), d""".rfc8792single
+     ),
+     TestSig(
+       "SigInput with example-dict selectors",
+       DB.`§2.1_HeaderField_2`,
+       """("example-dict";key="a" "example-dict";key="d" "example-dict";key="b" "example-dict";key="c")""",
+       """"example-dict";key="a": 1
+           |"example-dict";key="d": ?1
+           |"example-dict";key="b": 2;x=1;y=2
+           |"example-dict";key="c": (a b c)""".rfc8792single
+     ),
+     TestSig(
+       "SigInput from §2.1.3, lots of commas",
+       DB.`§2.1_HeaderField_2`,
+       """( "example-header" "example-header";bs   )""",
+       """"example-header": value, with, lots, of, commas
+            |"example-header";bs: :dmFsdWUsIHdpdGgsIGxvdHM=:, :b2YsIGNvbW1hcw==:""".rfc8792single
+     ),
+     TestSig(
+       "SigInput from §2.3, covering @ and header selectors",
+       DB.`§2.1_HeaderField_2`,
+       """("@target-uri" "@authority" "date" "cache-control")\
+              ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512";\
+              created=1618884475;expires=1618884775""".rfc8792single,
+       """"@target-uri": https://www.example.com/xyz
+           |"@authority": www.example.com
+           |"date": Tue, 20 Apr 2021 02:07:56 GMT
+           |"cache-control": must-revalidate, max-age=60""".rfc8792single
+     )
+   ).zipWithIndex.foreach { (testSig, i) =>
+     test(s"test req.signingStr $i: ${testSig.doc}") {
+       val req                     = msgDB.asRequest(testSig.reqStr)
+       val sigIn: Option[SigInput] = SigInput(testSig.sigInputStr)
+       val x: Try[SigningString]   = req.signingStr(sigIn.get)
+       assertEquals(
+         x.flatMap(s => s.decodeAscii.toTry),
+         Success(
+           ((if testSig.baseResult == "" then List() else List(testSig.baseResult)) ::: List(
+             """"@signature-params": """ + sigIn.get.canon
+           )).mkString("\n")
+         ),
+         clue = testSig
        )
-     ).zipWithIndex.foreach { (testSig, i) =>
-       test("Test §2.1 Header Fields - take " + i) {
-         val req                          = msgDB.asRequest(testSig.reqStr)
-         val sigInput21: Option[SigInput] = SigInput(testSig.sigInputStr)
-         val x: Try[SigningString]        = req.signingStr(sigInput21.get)
-         assertEquals(
-           x.flatMap(s => s.decodeAscii.toTry),
-           Success(
-             s"""${testSig.baseResult}
-                |"@signature-params": """.stripMargin + sigInput21.get.canon
-           ),
-           clue = testSig
-         )
-       }
      }
    }

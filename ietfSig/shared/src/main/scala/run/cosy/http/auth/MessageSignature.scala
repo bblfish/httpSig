@@ -60,6 +60,16 @@ object MessageSignature:
   */
 trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
 
+   /** return the sigbase but without the attributes, which can be appended later */
+   protected def sigBaseFn(
+       req: Http.Request[F, H],
+       selectors: List[RequestSelector[F, H]],
+       sigParamStr: String
+   ): Either[ParsingExc, List[String]] =
+     selectors.foldM(List(sigParamStr)) { (lst, selector) =>
+       selector.signingStr(req).map(_ :: lst)
+     }
+
    import Http.*
    import MessageSignature.*
    import bobcats.Verifier.{Signature, SigningString}
@@ -126,50 +136,52 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
            .foldLeftM(List[RequestSelector[F, H]]()) { (lst, pih) =>
              selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
            }
+
          for
-            list     <- xl
-            baseList <- sigBase(list, true)
+            list <- xl
+            sigParamStr =
+              s""""@signature-params": (${list.reverse.map(s => s.identifier).mkString(" ")})"""
+            baseList <- sigBaseFn(req, list, sigParamStr)
             bytes <- ByteVector.encodeAscii(
               baseList.mkString("\n") + `@signature-params`.paramStr(sigInput)
             ).leftMap(ce => CharacterCodingExc(ce.getMessage.nn))
          yield bytes
       end signatureBase
 
-      /** return the sigbase but without the attributes, which can be appended later */
-      def sigBase(
-          selectors: List[RequestSelector[F, H]],
-          reversed: Boolean = false
-      ): Either[ParsingExc, List[String]] =
-         val s  = if reversed then selectors else selectors.reverse
-         val sp = if reversed then selectors.reverse else s
-         val sigParams =
-           s""""@signature-params": (${sp.map(s => s.identifier).mkString(" ")})"""
-         s.foldM(List(sigParams)) { (lst, selector) =>
-           selector.signingStr(req).map(_ :: lst)
-         }
-
    extension (req: Http.Request[F, H])
-     /** get the signature data for a given signature name eg `sig1` from the headers.
-       *
-       * <pre> Signature-Input: sig1=("@authority" "content-type")\
-       * ;created=1618884475;keyid="test-key-rsa-pss" Signature:
-       * sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvu...: </pre>
-       *
-       * @return
-       *   a pair of SigInput Data, and the signature bytes The SigInput Data tells us what the
-       *   signature bytes are a signature of and how to interpret them, i.e. what the headers are
-       *   that were signed, where the key is and what the signing algorithm used was
-       */
-     def getSignature(name: Rfc8941.Token): Option[(SigInput, ByteVector)] =
-       req.headers.collectFirst {
-         case `Signature-Input`(inputs) if inputs.si.contains(name) =>
-           inputs.si(name)
-       }.flatMap { siginput =>
-         req.headers.collectFirst {
-           case Signature(sigs) if sigs.sigmap.contains(name) =>
-             (siginput, sigs.sigmap(name).item)
-         }
-       }
+
+      def sigBase(sigIn: ReqSigInput[F, H]): Either[ParsingExc, SigningString] =
+        for
+           lines <- sigBaseFn(req, sigIn.selectors.reverse, sigIn.toString)
+           bytes <- ByteVector.encodeAscii(lines.mkString("\n"))
+             .leftMap(ce =>
+               CharacterCodingExc(
+                 "should never happen when called using ReqSigInput" + ce.getMessage.nn
+               )
+             )
+        yield bytes
+
+      /** get the signature data for a given signature name eg `sig1` from the headers.
+        *
+        * <pre> Signature-Input: sig1=("@authority" "content-type")\
+        * ;created=1618884475;keyid="test-key-rsa-pss" Signature:
+        * sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvu...: </pre>
+        *
+        * @return
+        *   a pair of SigInput Data, and the signature bytes The SigInput Data tells us what the
+        *   signature bytes are a signature of and how to interpret them, i.e. what the headers are
+        *   that were signed, where the key is and what the signing algorithm used was
+        */
+      def getSignature(name: Rfc8941.Token): Option[(SigInput, ByteVector)] =
+        req.headers.collectFirst {
+          case `Signature-Input`(inputs) if inputs.si.contains(name) =>
+            inputs.si(name)
+        }.flatMap { siginput =>
+          req.headers.collectFirst {
+            case Signature(sigs) if sigs.sigmap.contains(name) =>
+              (siginput, sigs.sigmap(name).item)
+          }
+        }
 
    /** take a function `fetchKeyId` which takes a keyId argument and fetches in context F that key's
      * data (public key, etc) allowing it to construct a signature verifier that can return an Agent

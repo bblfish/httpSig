@@ -18,11 +18,11 @@ open class SigInputReqSuite[F[_], H <: Http](
 ) extends CatsEffectSuite:
    
    given RequestSelectorDB[F, H] = rdb.addIds(
-      HeaderId("x-ows-header").get,
-      HeaderId("x-obs-fold-header").get,
-      HeaderId.dict("example-dict").get,
-      HeaderId("example-header").get,
-      HeaderId("x-empty-header").get
+      HeaderId("x-ows-header").toTry.get,
+      HeaderId("x-obs-fold-header").toTry.get,
+      HeaderId.dict("example-dict").toTry.get,
+      HeaderId("example-header").toTry.get,
+      HeaderId("x-empty-header").toTry.get
    )
    
    import msgSig.{*, given}

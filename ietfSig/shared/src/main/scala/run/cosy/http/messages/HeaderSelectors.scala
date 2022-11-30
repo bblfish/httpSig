@@ -19,9 +19,11 @@ package run.cosy.http.messages
 import run.cosy.http.Http
 import run.cosy.http.headers.Rfc8941
 import cats.data.NonEmptyList
-import scala.util.{Try, Success, Failure}
+
+import scala.util.{Failure, Success, Try}
 import scala.collection.immutable.ListMap
 import run.cosy.http.auth.ParsingExc
+import run.cosy.http.messages.Selectors.Raw
 
 class RequestHeaderSel[F[_], H <: Http](
     override val name: HeaderId,

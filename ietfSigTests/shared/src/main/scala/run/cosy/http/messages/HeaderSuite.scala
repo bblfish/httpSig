@@ -37,12 +37,12 @@ import scala.util.{Failure, Success, Try}
 object HeaderSuite:
   import HeaderId.*
     // special headers used in the spec that we won't find elsewhere
-   val `x-example`: OldId = HeaderId("x-example").get
-   val `x-empty-header`: OldId = HeaderId("x-empty-header").get
-   val `x-ows-header`: OldId = HeaderId("x-ows-header").get
-   val `x-obs-fold-header`: OldId = HeaderId("x-obs-fold-header").get
-   val `example-dict`: DictId = HeaderId.dict("example-dict").get
-   val `example-header`: OldId = HeaderId("example-header").get
+   val `x-example`: OldId = HeaderId("x-example").toTry.get
+   val `x-empty-header`: OldId = HeaderId("x-empty-header").toTry.get
+   val `x-ows-header`: OldId = HeaderId("x-ows-header").toTry.get
+   val `x-obs-fold-header`: OldId = HeaderId("x-obs-fold-header").toTry.get
+   val `example-dict`: DictId = HeaderId.dict("example-dict").toTry.get
+   val `example-header`: OldId = HeaderId("example-header").toTry.get
    val VerticalTAB: Char           = "\u000B".head
 
 
@@ -192,13 +192,13 @@ open class HeaderSuite[F[_], H <: Http](
        `example-dict`(Selectors.DictSel(sf"q")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.onRequest(HeaderId("dodo").get)(Selectors.Raw).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId("dodo").toTry.get)(Selectors.Raw).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.onRequest(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId.dict("dodo").toTry.get)(Selectors.DictSel(sf"a")).signingStr(`§2.1_HF`)
      )
      failureTest(
-       selectr.onRequest(HeaderId.dict("dodo").get)(Selectors.DictSel(sf"domino")).signingStr(`§2.1_HF`)
+       selectr.onRequest(HeaderId.dict("dodo").toTry.get)(Selectors.DictSel(sf"domino")).signingStr(`§2.1_HF`)
      )
    }
 

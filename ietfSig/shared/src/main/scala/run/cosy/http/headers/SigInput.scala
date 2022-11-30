@@ -142,3 +142,4 @@ object SigInput:
       }
       headersOk && paramsOk
    end valid
+end SigInput

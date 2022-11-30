@@ -16,9 +16,9 @@
 
 package run.cosy.http.messages
 
-import run.cosy.http.auth.{ParsingExc, SelectorException}
+import run.cosy.http.auth.{HttpSigParsingExc, ParsingExc, SelectorException}
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.SfString
+import run.cosy.http.headers.Rfc8941.{Parser, SfString}
 import run.cosy.http.messages.Selectors.{CollationTp, SelFormat}
 
 import scala.util.{Failure, Success, Try}
@@ -47,62 +47,59 @@ sealed trait AtId extends ComponentId:
    def specName: String = "@" + lcname.tk
 
 object ComponentId:
-   def parse(name: String): Rfc8941.Token | String =
-      val id = Rfc8941.Token(name)
-      if id.tk.forall(c => (!Character.isAlphabetic(c)) || Character.isLowerCase(c)) then id
-      else s"header selector must be lower case token. received >$name<"
+   def parse(name: String): Either[HttpSigParsingExc, Rfc8941.Token] =
+     Rfc8941.Parser.sfToken.parseAll(name) match
+        case Right(token)
+            if token.tk.forall(c => (!Character.isAlphabetic(c)) || Character.isLowerCase(c)) =>
+          Right(token)
+        case other =>
+          Left(HttpSigParsingExc(s"header selector must be lower case token. received >$name<"))
 
 object AtId:
    /** Because there are a limited set of these, they should be tested at compile time using
      * something like https://softwaremill.com/fancy-strings-in-scala-3/ (otherwise: that is what
      * unit tests are for)
      */
-   def apply(name: String): Either[SelectorException, AtId] =
-     try
-        if name.length == 0 then
-           throw SelectorException("Message Component must start with @ char ")
-        else if name.head != '@' then
-           throw SelectorException("Message Component must start with @ char ")
-        else
-           ComponentId.parse(name.tail) match
-              case err: String => throw SelectorException(err)
-              case tk: Rfc8941.Token => Right(
-                  new AtId:
-                     override val lcname: Rfc8941.Token = tk
-                )
-     catch case e: SelectorException => Left(e)
-
+   def apply(name: String): Either[ParsingExc, AtId] =
+     if name.length == 0 then
+        Left(SelectorException("Message Component must start with @ char "))
+     else if name.head != '@' then
+        Left(SelectorException("Message Component must start with @ char "))
+     else
+        ComponentId.parse(name.tail).map(tk =>
+          new AtId:
+             override val lcname: Rfc8941.Token = tk
+        )
 end AtId
 
 object HeaderId:
    def apply(name: Rfc8941.Token) = ???
 
-   def apply(name: String, format: SelFormat): Try[HeaderId] = Try {
-     ComponentId.parse(name) match
-        case str: String => throw new SelectorException(str)
-        case id: Rfc8941.Token =>
-          format match
-             case SelFormat.Item       => new ItemId(id)
-             case SelFormat.List       => new ListId(id)
-             case SelFormat.Dictionary => new DictId(id)
-   }
+   def apply(name: String, format: SelFormat): Either[ParsingExc, HeaderId] =
+     ComponentId.parse(name).map { id =>
+       format match
+          case SelFormat.Item       => new ItemId(id)
+          case SelFormat.List       => new ListId(id)
+          case SelFormat.Dictionary => new DictId(id)
+     }
 
-   private def parseAndWrap[X <: HeaderId](name: String, wrap: Rfc8941.Token => X): Try[X] =
-     ComponentId.parse(name) match
-        case tk: Rfc8941.Token => Success(wrap(tk))
-        case str: String       => Failure(SelectorException(str))
+   private def parseAndWrap[X <: HeaderId](
+       name: String,
+       wrap: Rfc8941.Token => X
+   ): Either[HttpSigParsingExc, X] =
+     ComponentId.parse(name).map(tk => wrap(tk))
 
-   def item(name: String): Try[ItemId] = parseAndWrap(name, x => new ItemId(x))
+   def item(name: String): Either[HttpSigParsingExc, ItemId] =
+     parseAndWrap(name, x => new ItemId(x))
 
-   def dict(name: String): Try[DictId] = parseAndWrap(name, x => new DictId(x))
+   def dict(name: String): Either[HttpSigParsingExc, DictId] =
+     parseAndWrap(name, x => new DictId(x))
 
-   def list(name: String): Try[ListId] = parseAndWrap(name, x => new ListId(x))
+   def list(name: String): Either[HttpSigParsingExc, ListId] =
+     parseAndWrap(name, x => new ListId(x))
 
-   def apply(name: String) = Try {
-     ComponentId.parse(name) match
-        case str: String       => throw new SelectorException(str)
-        case id: Rfc8941.Token => new OldId(id)
-   }
+   def apply(name: String): Either[HttpSigParsingExc, OldId] =
+     ComponentId.parse(name).map(id => new OldId(id))
 
    sealed trait SfHeaderId extends HeaderId:
       def format: SelFormat

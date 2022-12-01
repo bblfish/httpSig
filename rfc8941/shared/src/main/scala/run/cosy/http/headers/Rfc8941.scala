@@ -25,13 +25,16 @@ import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
-import run.cosy.http.headers.NumberOutOfBoundsException
 import scodec.bits.ByteVector
 import cats.syntax.all.*
+
+//https://dotty.epfl.ch/docs/reference/experimental/canthrow.html
+// import language.experimental.saferExceptions
 
 /** Structured Field Values for HTTP [[https://www.rfc-editor.org/rfc/rfc8941.html RFC8941]]
   */
 object Rfc8941:
+
    //
    // types used by RFC8941
    //
@@ -43,12 +46,17 @@ object Rfc8941:
    type Params = ListMap[Token, Item]
    type SfList = List[Parameterized]
    type SfDict = ListMap[Token, Parameterized]
+
    // warning this is public and there is an unsafeParse
    def Param(tk: String, i: Item): Param = (Token.unsafeParsed(tk), i)
-   def Params(ps: Param*): Params        = ListMap(ps*)
+
+   def Params(ps: Param*): Params = ListMap(ps*)
+
    def SfDict(entries: (Token, Parameterized)*): ListMap[Token, Parameterized] =
      ListMap(entries*)
+
    private def paramConversion(paras: Param*): Params = ListMap(paras*)
+
    sealed trait Parameterized:
       def params: Params
 
@@ -56,6 +64,7 @@ object Rfc8941:
      * pattern matched. Only the object constructor can build these
      */
    final case class SfInt private (val long: Long)
+
    /* https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal */
    final case class SfDec private (val double: Double)
 
@@ -76,6 +85,7 @@ object Rfc8941:
             else sb.append(c)
          sb.append('"')
          sb.toString()
+
    // class is abstract to remove copy operation
    final case class Token private (val tk: String)
 
@@ -153,7 +163,7 @@ object Rfc8941:
    end SfString
 
    object Token:
-      @throws[ParsingException]
+      //      @throws[ParsingException]
       def apply(t: String): Token =
         Parser.sfToken.parseAll(t) match
            case Right(value) => value
@@ -161,7 +171,9 @@ object Rfc8941:
                s"error parsing token $t",
                s"failed at offset ${err.failedAtOffset}"
              )
+
       private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
+
    end Token
 
    object PItem:
@@ -323,7 +335,8 @@ object Rfc8941:
          extension (o: Params)
            def canon: String = o.map(_.canon).mkString
 
-      given sfParamterizedSer[T <: Item](using
+      given sfParamterizedSer[T <: Item](
+          using
           Serialise[Item],
           Serialise[Params]
       ): Serialise[Parameterized] with
@@ -332,14 +345,15 @@ object Rfc8941:
               case l: IList => l.items.map(i => i.canon).mkString("(", " ", ")") + l.params.canon
               case pi: PItem[?] => pi.item.canon + pi.params.canon
 
-      given sfListSer(using
-          Serialise[Params]
+      given sfListSer(
+          using Serialise[Params]
       ): Serialise[SfList] with
          extension (o: SfList)
            def canon: String =
              o.map(p => p.canon).mkString(", ")
 
-      given sfDictSer(using
+      given sfDictSer(
+          using
           Serialise[Item],
           Serialise[Param],
           Serialise[Params],

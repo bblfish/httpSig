@@ -45,7 +45,7 @@ class ReqSigInput[F[_], H <: Http](
            case Expires(v) => "expires=" + v.canon
            case Nonce(v)   => "nonce=" + v.canon
            case Tag(v)     => "tag=" + v.canon
-           case Alg(v)     => s"""tag="$v""""
+           case Alg(v)     => s"""alg="$v""""
          }.mkString(";", ";", "")
    override def toString() = """"@signature-params": """ + siginputStr + paramStr
 

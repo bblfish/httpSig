@@ -1,10 +1,7 @@
-import org.openqa.selenium.WebDriver
-import org.openqa.selenium.chrome.{ChromeDriver, ChromeOptions}
-import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
-import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
+import org.openqa.selenium.chrome.ChromeOptions
+import org.openqa.selenium.firefox.FirefoxOptions
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
-import JSEnv.*
 
 name := "httpSig"
 
@@ -27,6 +24,8 @@ ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
 ThisBuild / crossScalaVersions := Seq("3.2.1")
+// check https://dotty.epfl.ch/docs/reference/experimental/canthrow.html
+//ThisBuild / scalaVersion := "3.3.0-RC1-bin-20221130-72c4ffd-NIGHTLY"
 
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(
@@ -193,6 +192,7 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
   .dependsOn(ietfSigHttp, ietfSigHttpTests % Test, testUtils % Test)
 
 lazy val scala3Options = Seq(
+//    "-language:experimental.saferExceptions",
   // "-classpath", "foo:bar:...",         // Add to the classpath.
   // "-encoding", "utf-8",                // Specify character encoding used by source files.
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
@@ -215,6 +215,8 @@ lazy val scala3Options = Seq(
   "-Yexplicit-nulls" // For explicit nulls behavior.
 )
 lazy val scala3jsOptions = Seq(
+  //  "-language:experimental.saferExceptions",
+  // "-classpath", "foo:bar:...",         // Add to the classpath.
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   "-new-syntax", // Require `then` and `do` in control expressions.
   "-source:future", // Choices: future and future-migration. I use this to force future deprecation warnings, etc.

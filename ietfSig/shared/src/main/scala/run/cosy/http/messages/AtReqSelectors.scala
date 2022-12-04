@@ -42,9 +42,9 @@ open class AtResponseSel[F[_], H <: Http](
    override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
      Right(nel.map(header + _).toList.mkString("\n"))
 
-trait AtSelectors[F[_], H <: Http](using sf: AtSelectorFns[F, H]):
+trait AtReqSelectors[F[_], H <: Http](using sf: AtReqSelectorFns[F, H]):
 
-   import AtIds.*
+   import AtIds.Request.*
    import Rfc8941.Syntax.*
    lazy val `@method`: AtRequestSel[F, H] =
      AtRequestSel[F, H](method, sf.method)
@@ -67,9 +67,6 @@ trait AtSelectors[F[_], H <: Http](using sf: AtSelectorFns[F, H]):
    lazy val `@query`: AtRequestSel[F, H] =
      AtRequestSel[F, H](`query`, sf.query)
 
-   lazy val `@status`: AtResponseSel[F, H] =
-     AtResponseSel[F, H](`status`, sf.status)
-
    /** todo: arguably the paramName should be an Rfc8941.Token, because it will be used as the key
      * in a dict, and that is a token. But then one has to be careful to render that token as a
      * string in the `"@query-param";key="q":` header
@@ -81,4 +78,9 @@ trait AtSelectors[F[_], H <: Http](using sf: AtSelectorFns[F, H]):
        Params(Parameters.nameTk -> paramName)
      )
 
-end AtSelectors
+end AtReqSelectors
+
+trait AtResSelectors[F[_], H <: Http](using sf: AtResSelectorFns[F, H]):
+
+   lazy val `@status`: AtResponseSel[F, H] =
+     AtResponseSel[F, H](AtIds.Response.`status`, sf.status)

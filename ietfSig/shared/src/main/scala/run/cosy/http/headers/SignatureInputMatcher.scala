@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package run.cosy.http.messages
-import run.cosy.akka.http.messages.SelectorFnsAkka
-import run.cosy.http.messages.{HeaderSuite, ServerContext}
+package run.cosy.http.headers
 
-class AkkaHeaderSelectorSuite extends HeaderSuite(
-      // todo: no need for server context here in a header suite. use HeaderSelectorFns instead...
-      new run.cosy.http.messages.Selectors(
-        using new SelectorFnsAkka(using ServerContext("bblfish.net", true))
-      ),
-      AkkaMsgInterpreter
-    )
+import run.cosy.http.Http
+import run.cosy.http.Http.Header
+
+trait SignatureInputMatcher[H <: Http]:
+   type SI <: Header[H]
+
+   def unapply(h: Header[H]): Option[SigInputs]
+
+   def apply(name: Rfc8941.Token, sigInput: SigInput): SI

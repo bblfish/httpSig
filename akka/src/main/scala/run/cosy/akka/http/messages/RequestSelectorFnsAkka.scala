@@ -39,8 +39,8 @@ import java.nio.charset.StandardCharsets
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-class SelectorFnsAkka(using sc: ServerContext)
-    extends SelectorFns[Id, HT]:
+class RequestSelectorFnsAkka(using sc: ServerContext)
+    extends ReqFns[Id, HT]:
 
    override val method: RequestFn =
      RequestAkka { req => Right(req.method.value) }
@@ -69,12 +69,6 @@ class SelectorFnsAkka(using sc: ServerContext)
    override def requestHeaders(headerName: HeaderId): RequestFn =
      RequestAkka { (req: HttpRequest) =>
        SelectorAkka.getHeaders(headerName)(req)
-     }
-
-   // raw headers, no interpretation
-   override def responseHeaders(headerName: HeaderId): ResponseFn =
-     ResponseAkka {
-       SelectorAkka.getHeaders(headerName)
      }
 
    override val path: RequestFn =
@@ -114,16 +108,21 @@ class SelectorFnsAkka(using sc: ServerContext)
      ).toString())
    }
 
-   override val status: ResponseFn = ResponseAkka { resp =>
-     Right("" + resp.status.intValue)
-   }
-
    case class RequestAkka(
        val sigValues: HttpRequest => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Request[Id, HT]]:
       override val signingValues
           : Request[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpRequest])
+
+end RequestSelectorFnsAkka
+
+class ResponseSelectorFnsAkka(using sc: ServerContext)
+    extends ResFns[Id, HT]:
+
+   override val status: ResponseFn = ResponseAkka { resp =>
+     Right("" + resp.status.intValue)
+   }
 
    case class ResponseAkka(
        val sigValues: HttpResponse => Either[ParsingExc, String | NonEmptyList[String]]
@@ -132,7 +131,11 @@ class SelectorFnsAkka(using sc: ServerContext)
           : Response[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpResponse])
 
-end SelectorFnsAkka
+   // raw headers, no interpretation
+   override def responseHeaders(headerName: HeaderId): ResponseFn =
+     ResponseAkka {
+       SelectorAkka.getHeaders(headerName)
+     }
 
 object SelectorAkka:
    import run.cosy.http.headers.Rfc8941.Serialise.given

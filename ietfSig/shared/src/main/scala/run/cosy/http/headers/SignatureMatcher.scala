@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package run.cosy.http4s.auth
+package run.cosy.http.headers
 
-import run.cosy.http.auth.{SignatureInputMatcher, SignatureMatcher}
-import run.cosy.http4s.Http4sTp.HT as AH
+import run.cosy.http.Http
+import run.cosy.http.Http.Header
 
-class Http4sMessageSignature[F[_]] extends run.cosy.http.auth.MessageSignature[F, AH]:
-   override protected val Signature: SignatureMatcher[AH] = run.cosy.http4s.headers.Signature
-   override protected val `Signature-Input`: SignatureInputMatcher[AH] =
-     run.cosy.http4s.headers.`Signature-Input`
+trait SignatureMatcher[H <: Http]:
+   type SM <: Header[H]
+
+   def apply(sig: Signatures): SM
+
+   def unapply(h: Header[H]): Option[Signatures]

@@ -18,17 +18,19 @@ package run.cosy.http.messages
 import run.cosy.http.messages.AtId.*
 
 object AtIds:
-   val `method`         = AtId("@method").toTry.get
-   val `request-target` = AtId("@request-target").toTry.get
-   val `target-uri`     = AtId("@target-uri").toTry.get
-   val `authority`      = AtId("@authority").toTry.get
-   val `scheme`         = AtId("@scheme").toTry.get
-   val `path`           = AtId("@path").toTry.get
-   val `query`          = AtId("@query").toTry.get
-   val `query-param`    = AtId("@query-param").toTry.get
-   val `status`         = AtId("@status").toTry.get
+   object Request:
+      val `method`         = AtId("@method").toTry.get
+      val `request-target` = AtId("@request-target").toTry.get
+      val `target-uri`     = AtId("@target-uri").toTry.get
+      val `authority`      = AtId("@authority").toTry.get
+      val `scheme`         = AtId("@scheme").toTry.get
+      val `path`           = AtId("@path").toTry.get
+      val `query`          = AtId("@query").toTry.get
+      val `query-param`    = AtId("@query-param").toTry.get
+      val all =
+        List(method, `request-target`, `target-uri`, authority, scheme, path, query, `query-param`)
 
-   val requestIds =
-     List(method, `request-target`, `target-uri`, authority, scheme, path, query, `query-param`)
-   val responseIds = List(status)
+   object Response:
+      val `status` = AtId("@status").toTry.get
+
 end AtIds

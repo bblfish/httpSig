@@ -19,8 +19,7 @@ package run.cosy.http4s.headers
 import cats.parse.Parser0
 import org.http4s.{Header, ParseFailure, ParseResult}
 import org.http4s.headers.{`Accept-Language`, `Cache-Control`}
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.{Rfc8941, SigInput, SigInputs}
+import run.cosy.http.headers.{Rfc8941, SigInput, SigInputs, SignatureInputMatcher}
 import org.typelevel.ci.*
 import cats.syntax.all.*
 import org.http4s.util.{Renderer, Writer}
@@ -33,7 +32,7 @@ import scala.collection.immutable.ListMap
   */
 case class `Signature-Input`(values: SigInputs)
 
-object `Signature-Input` extends run.cosy.http.auth.SignatureInputMatcher[Http4sTp.type]:
+object `Signature-Input` extends SignatureInputMatcher[Http4sTp.type]:
 
    override type SI = Header.Raw
    override def apply(name: Rfc8941.Token, sigInput: SigInput): SI =

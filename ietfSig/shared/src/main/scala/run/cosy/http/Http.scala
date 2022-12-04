@@ -17,6 +17,7 @@
 package run.cosy.http
 
 import run.cosy.http.Http.Header
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
 
 trait Http:
    http =>
@@ -31,6 +32,9 @@ end Http
 
 trait HttpOps[H <: Http]:
    import Http.*
+
+   val Signature: SignatureMatcher[H]
+   val `Signature-Input`: SignatureInputMatcher[H]
 
    /** extensions needed to abstract across HTTP implementations for our purposes */
    extension [F[_]](msg: Http.Message[F, H])

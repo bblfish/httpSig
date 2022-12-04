@@ -16,8 +16,6 @@
 
 package run.cosy.http.messages
 
-import run.cosy.http.messages.Selectors.SelFormat as SF
-
 object HeaderIds:
    lazy val all =
       import Request.{`content-length` as _, `content-type` as _, *}

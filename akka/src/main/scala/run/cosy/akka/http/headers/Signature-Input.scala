@@ -38,12 +38,7 @@ import cats.parse.Parser
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.{
-  HTTPHeaderParseException,
-  InvalidSigException,
-  ParsingExc,
-  SignatureInputMatcher
-}
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, ParsingExc}
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.{
   IList,

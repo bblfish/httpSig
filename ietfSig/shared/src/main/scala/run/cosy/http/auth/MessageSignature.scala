@@ -20,7 +20,7 @@ import _root_.run.cosy.http.Http.*
 import _root_.run.cosy.http.auth.Agent
 import _root_.run.cosy.http.headers.*
 import _root_.run.cosy.http.headers.Rfc8941.*
-import _root_.run.cosy.http.messages.{RequestSelector, RequestSelectorDB, `@signature-params`}
+import _root_.run.cosy.http.messages.{RequestSelector, ReqComponentDB, `@signature-params`}
 import _root_.run.cosy.http.{Http, HttpOps}
 import cats.MonadError
 import cats.data.NonEmptyList
@@ -35,20 +35,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
 
-trait SignatureInputMatcher[H <: Http]:
-   type SI <: Header[H]
-
-   def unapply(h: Header[H]): Option[SigInputs]
-
-   def apply(name: Rfc8941.Token, sigInput: SigInput): SI
-
-trait SignatureMatcher[H <: Http]:
-   type SM <: Header[H]
-
-   def apply(sig: Signatures): SM
-
-   def unapply(h: Header[H]): Option[Signatures]
-
 object MessageSignature:
 
    import bobcats.Verifier.{Signature, SigningString}
@@ -58,7 +44,7 @@ object MessageSignature:
 
 /** Adds extensions methods to sign HttpMessage-s - be they requests or responses.
   */
-trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
+class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
 
    /** return the sigbase but without the attributes, which can be appended later */
    protected def sigBaseFn(
@@ -78,8 +64,6 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
    val urlStrRegex = "<(.*)>".r
 
    // todo: is this the right place
-   protected val Signature: SignatureMatcher[H]
-   protected val `Signature-Input`: SignatureInputMatcher[H]
 
    /** [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
      * Note: the F[_] here is playing too many roles. In http4s it is the type of the content
@@ -88,7 +72,7 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
      * messages, only at the headers. (but for http4s we do need to know the type of the content or
      * else we cannot correctly type the result of adding headers to a Message)
      */
-   extension (req: Http.Request[F, H])(using selectorDB: RequestSelectorDB[F, H])
+   extension (req: Http.Request[F, H])(using selectorDB: ReqComponentDB[F, H])
 
       /** Generate a function to create a new HttpRequest with the given Signature-Input header.
         * Called by the client that is building the message.
@@ -136,7 +120,6 @@ trait MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
            .foldLeftM(List[RequestSelector[F, H]]()) { (lst, pih) =>
              selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
            }
-
          for
             list <- xl
             sigParamStr =

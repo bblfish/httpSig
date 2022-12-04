@@ -19,7 +19,7 @@ package run.cosy.http.messages
 import run.cosy.http.auth.{HttpSigParsingExc, ParsingExc, SelectorException}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.{Parser, SfString}
-import run.cosy.http.messages.Selectors.{CollationTp, SelFormat}
+import run.cosy.http.messages.HeaderSelectors.{CollationTp, SelFormat}
 
 import scala.util.{Failure, Success, Try}
 
@@ -73,6 +73,8 @@ object AtId:
 end AtId
 
 object HeaderId:
+   import HeaderSelectors.*
+
    def apply(name: Rfc8941.Token) = ???
 
    def apply(name: String, format: SelFormat): Either[ParsingExc, HeaderId] =
@@ -105,16 +107,16 @@ object HeaderId:
       def format: SelFormat
 
    final class OldId private[HeaderId] (val lcname: Rfc8941.Token) extends HeaderId:
-      override type AllowedCollation = Selectors.Bin.type | Selectors.Raw.type
+      override type AllowedCollation = BS.type | LS.type
 
    final class DictId private[HeaderId] (val lcname: Rfc8941.Token) extends SfHeaderId:
       override type AllowedCollation = CollationTp
       def format: SelFormat = SelFormat.Dictionary
    final class ItemId private[HeaderId] (val lcname: Rfc8941.Token) extends SfHeaderId:
       override type AllowedCollation =
-        Selectors.Bin.type | Selectors.Raw.type | Selectors.Strict.type
+        BS.type | LS.type | SF.type
       def format: SelFormat = SelFormat.Item
    final class ListId private[HeaderId] (val lcname: Rfc8941.Token) extends SfHeaderId:
       override type AllowedCollation =
-        Selectors.Bin.type | Selectors.Raw.type | Selectors.Strict.type
+        BS.type | LS.type | SF.type
       def format: SelFormat = SelFormat.List

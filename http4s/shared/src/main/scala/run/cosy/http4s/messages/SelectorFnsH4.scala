@@ -17,7 +17,14 @@
 package run.cosy.http4s.messages
 
 import cats.data.NonEmptyList
-import run.cosy.http.messages.{AtSelectorFns, HeaderId, SelectorFn, SelectorFns, ServerContext}
+import run.cosy.http.messages.{
+  AtReqSelectorFns,
+  HeaderId,
+  ReqFns,
+  ResFns,
+  SelectorFn,
+  ServerContext
+}
 import org.http4s.headers.Host
 import org.http4s.{Query, Uri, Message as H4Message, Request as H4Request, Response as H4Response}
 import run.cosy.http.Http
@@ -32,7 +39,7 @@ import scala.util.Try
 import scala.util.{Failure, Success}
 import org.typelevel.ci.CIString
 
-class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
+class SelectorFnsH4[F[_]](using sc: ServerContext) extends ReqFns[F, H4]:
    val SF = SelectorFnsH4
 
    override def method: RequestFn =
@@ -82,14 +89,8 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
      )
    )
 
-   override def status: ResponseFn = ResponseSelH4(req => Right("" + req.status.code))
-
    override def requestHeaders(name: HeaderId): RequestFn = RequestSelH4(req =>
      SF.getHeaders(req, name)
-   )
-
-   override def responseHeaders(name: HeaderId): ResponseFn = ResponseSelH4(res =>
-     SF.getHeaders(res, name)
    )
 
    case class RequestSelH4(
@@ -99,14 +100,22 @@ class SelectorFnsH4[F[_]](using sc: ServerContext) extends SelectorFns[F, H4]:
           : Http.Request[F, H4] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[H4Request[F]])
 
+end SelectorFnsH4
+
+class ResponseSelectorFnsH4[F[_]](using sc: ServerContext) extends ResFns[F, H4]:
+   val SF = SelectorFnsH4
+
+   override def responseHeaders(name: HeaderId): ResponseFn = ResponseSelH4(res =>
+     SF.getHeaders(res, name)
+   )
+   override def status: ResponseFn = ResponseSelH4(req => Right("" + req.status.code))
+
    case class ResponseSelH4(
        sigValues: H4Response[F] => Either[ParsingExc, String | NonEmptyList[String]]
    ) extends SelectorFn[Http.Response[F, H4]]:
       override val signingValues
           : Http.Response[F, H4] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[H4Response[F]])
-
-end SelectorFnsH4
 
 object SelectorFnsH4:
 

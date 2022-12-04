@@ -26,14 +26,12 @@ import run.cosy.http.messages.SelectorFn
 
 import scala.util.{Failure, Success, Try}
 
-trait SelectorFnTyps[F[_], H <: Http]:
-   type RequestFn  = SelectorFn[Http.Request[F, H]]
-   type ResponseFn = SelectorFn[Http.Response[F, H]]
-
-trait SelectorFns[F[_], H <: Http] extends AtSelectorFns[F, H] with HeaderSelectorFns[F, H]
+trait ReqFns[F[_], H <: Http] extends AtReqSelectorFns[F, H] with RequestHeaderSelectorFns[F, H]
+trait ResFns[F[_], H <: Http] extends AtResSelectorFns[F, H] with ResponseHeaderSelectorFns[F, H]
 
 /** The functions that need to look at the whole HTTP Message */
-trait AtSelectorFns[F[_], H <: Http] extends SelectorFnTyps[F, H]:
+trait AtReqSelectorFns[F[_], H <: Http]:
+   type RequestFn = SelectorFn[Http.Request[F, H]]
 
    def method: RequestFn
 
@@ -52,14 +50,19 @@ trait AtSelectorFns[F[_], H <: Http] extends SelectorFnTyps[F, H]:
    def scheme: RequestFn
 
    def targetUri: RequestFn
+end AtReqSelectorFns
+
+trait AtResSelectorFns[F[_], H <: Http]:
+   type ResponseFn = SelectorFn[Http.Response[F, H]]
 
    // on responses
    def status: ResponseFn
-end AtSelectorFns
 
 /** The functions that only need to look at the HTTP headers */
-trait HeaderSelectorFns[F[_], H <: Http] extends SelectorFnTyps[F, H]:
+trait RequestHeaderSelectorFns[F[_], H <: Http]:
+   type RequestFn = SelectorFn[Http.Request[F, H]]
    def requestHeaders(name: HeaderId): RequestFn
 
+trait ResponseHeaderSelectorFns[F[_], H <: Http]:
+   type ResponseFn = SelectorFn[Http.Response[F, H]]
    def responseHeaders(name: HeaderId): ResponseFn
-end HeaderSelectorFns

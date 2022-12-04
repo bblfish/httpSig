@@ -12,6 +12,7 @@ import cats.data.NonEmptyList
 import scala.util.{Failure, Success}
 import run.cosy.http.auth.{ParsingExc, SelectorException}
 import _root_.org.typelevel.ci.CIString
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
 
 object DummyHttp extends Http:
   http =>
@@ -23,6 +24,9 @@ object DummyHttp extends Http:
   override type Header = (CIString, String)
   
   given hOps: HttpOps[HT] with
+  
+    val Signature: SignatureMatcher[run.cosy.http.dummy.DummyHttp.HT] = ???
+    val `Signature-Input`: SignatureInputMatcher[run.cosy.http.dummy.DummyHttp.HT] = ???
     /** extensions needed to abstract across HTTP implementations for our purposes */
     extension[F[_]] (msg: Http.Message[F, HT])
       def headers: Seq[Http.Header[HT]] =
@@ -57,7 +61,8 @@ import run.cosy.http.Http
 import run.cosy.http.Http.*
 
   
-object DummyHeaderSelectorFns extends messages.HeaderSelectorFns[Id,DHT]:
+object DummyHeaderSelectorFns extends messages.RequestHeaderSelectorFns[Id,DHT]
+    with messages.ResponseHeaderSelectorFns[Id, DHT]:
 
   import DummyHttp.given
 

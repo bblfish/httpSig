@@ -2,13 +2,12 @@ package run.cosy.http.messages
 
 import bobcats.Verifier.SigningString
 import munit.CatsEffectSuite
-import run.cosy.http.Http
+import run.cosy.http.{Http, HttpOps}
 import run.cosy.http.auth.{MessageSignature, ParsingExc}
 import run.cosy.http.headers.ReqSigInput
 import run.cosy.http.headers.Rfc8941.SfInt
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.SigIn.*
-import run.cosy.http.messages.Selectors.*
 import run.cosy.http.messages.TestHttpMsgInterpreter
 
 import scala.collection.immutable.ListSet
@@ -17,16 +16,20 @@ import scala.collection.immutable.ListSet
   * clients writing signatures.
   */
 open class StaticSigInputReqSuite[F[_], H <: Http](
- msgSig: MessageSignature[F, H], // needed for methods on req
- hsel: Selectors[F, H], // todo: pass only request selectors
- interpret: TestHttpMsgInterpreter[F, H] // to abstract from http implementation
+ hsel: ReqSelectors[F, H], // we don't pass it implicitly, because we need to add some headers.
+)(using
+  hops: HttpOps[H],
+  interpret: TestHttpMsgInterpreter[F, H]
 ) extends CatsEffectSuite:
    val hds = HeaderIds
    
    import hsel.*
    import hsel.RequestHd.*
-   import msgSig.*
    import run.cosy.http.utils.StringUtils.*
+   import HeaderSelectors.*
+
+   val msgSigfns: MessageSignature[F, H] = new MessageSignature[F, H]
+   import msgSigfns.*
    
    val DB = HttpMessageDB
    
@@ -47,9 +50,9 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
                `@method`,
                `@authority`,
                `@path`,
-               `content-digest`(Raw),
-               `content-length`(Raw),
-               `content-type`(Raw)
+               `content-digest`(LS),
+               `content-length`(LS),
+               `content-type`(LS)
             )
          val rsi = new ReqSigInput(
             rsel,
@@ -89,12 +92,12 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          "SigInput from in §2.1 with old request",
          DB.`§2.1_HeaderField`,
          new ReqSigInput(List(
-            host(Raw),
-            date(Raw),
-            `x-ows-header`(Raw),
-            `x-obs-fold-header`(Raw),
-            `cache-control`(Raw),
-            `example-dict`(Raw)
+            host(LS),
+            date(LS),
+            `x-ows-header`(LS),
+            `x-obs-fold-header`(LS),
+            `cache-control`(LS),
+            `example-dict`(LS)
          )),
          """"host": www.example.com
             |"date": Sat, 07 Jun 2014 20:51:35 GMT
@@ -111,12 +114,12 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          DB.`§2.1_HeaderField_2`,
          //       """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
          ReqSigInput(
-            host(Raw),
-            date(Raw),
-            `x-ows-header`(Raw),
-            `x-obs-fold-header`(Raw),
-            `cache-control`(Raw),
-            `example-dict`(Raw)
+            host(LS),
+            date(LS),
+            `x-ows-header`(LS),
+            `x-obs-fold-header`(LS),
+            `cache-control`(LS),
+            `example-dict`(LS)
          )(),
          """"host": www.example.com
             |"date": Tue, 20 Apr 2021 02:07:56 GMT
@@ -132,12 +135,12 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          "SigInput with ;key and ;sf and ;bs selectors",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
-            host(Raw),
-            date(Raw),
-            `x-empty-header`(Raw),
-            `x-ows-header`(Bin),
-            `cache-control`(DictSel(sf"max-age")),
-            `example-dict`(Strict)
+            host(LS),
+            date(LS),
+            `x-empty-header`(LS),
+            `x-ows-header`(BS),
+            `cache-control`(Dict(sf"max-age")),
+            `example-dict`(SF)
          )(),
          """"host": www.example.com
             |"date": Tue, 20 Apr 2021 02:07:56 GMT
@@ -154,10 +157,10 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          "SigInput with example-dict selectors",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
-            `example-dict`(DictSel(sf"a")),
-            `example-dict`(DictSel(sf"d")),
-            `example-dict`(DictSel(sf"b")),
-            `example-dict`(DictSel(sf"c"))
+            `example-dict`(Dict(sf"a")),
+            `example-dict`(Dict(sf"d")),
+            `example-dict`(Dict(sf"b")),
+            `example-dict`(Dict(sf"c"))
          )(),
          """"example-dict";key="a": 1
             |"example-dict";key="d": ?1
@@ -171,7 +174,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          "SigInput from §2.1.3, lots of commas",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
-            `example-header`(Raw), `example-header`(Bin)
+            `example-header`(LS), `example-header`(BS)
          )(),
          """"example-header": value, with, lots, of, commas
             |"example-header";bs: :dmFsdWUsIHdpdGgsIGxvdHM=:, :b2YsIGNvbW1hcw==:
@@ -180,7 +183,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
       TestSig(
          "SigInput from §2.3, covering @ and header selectors",
          DB.`§2.1_HeaderField_2`,
-         ReqSigInput(`@target-uri`, `@authority`, `date`(Raw), `cache-control`(Raw))(KeyId(sf"test-key-rsa-pss"), Alg(SigAlg.`rsa-pss-sha512`),
+         ReqSigInput(`@target-uri`, `@authority`, `date`(LS), `cache-control`(LS))(KeyId(sf"test-key-rsa-pss"), Alg(SigAlg.`rsa-pss-sha512`),
             Created(SfInt(1618884475)),Expires(SfInt(1618884775L))
          ),
          """"@target-uri": https://www.example.com/xyz

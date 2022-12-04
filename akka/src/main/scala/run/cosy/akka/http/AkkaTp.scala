@@ -16,12 +16,12 @@
 
 package run.cosy.akka.http
 
-import akka.http.scaladsl.model
-import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
+import akka.http.scaladsl.{model}
 import akka.http.scaladsl.model.headers.RawHeader
-import run.cosy.http.{Http, HttpOps}
-import akka.http.scaladsl.model as ak
+import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
 import cats.effect.IO
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
+import run.cosy.http.{Http, HttpOps}
 
 object AkkaTp extends Http:
    override type Message[F[_]]  = model.HttpMessage
@@ -38,8 +38,12 @@ object AkkaTp extends Http:
 
       extension [F[_]](msg: Http.Message[F, HT])
         def headers: Seq[Http.Header[HT]] =
-           val m = msg.asInstanceOf[ak.HttpMessage]
+           val m = msg.asInstanceOf[model.HttpMessage]
            m.headers
+
+      override val Signature: SignatureMatcher[HT] = run.cosy.akka.http.headers.Signature
+      override val `Signature-Input`: SignatureInputMatcher[HT] =
+        run.cosy.akka.http.headers.`Signature-Input`
 
       extension [F[_], R <: Http.Message[F, HT]](msg: R)
          def addHeaders(headers: Seq[Http.Header[HT]]): R =
@@ -53,7 +57,7 @@ object AkkaTp extends Http:
             m.withHeaders(m.headers.prepended(RawHeader(name, value))).asInstanceOf[R]
 
          def removeHeader(name: String): R =
-            val m = msg.asInstanceOf[ak.HttpMessage]
+            val m = msg.asInstanceOf[model.HttpMessage]
             m.removeHeader(name).asInstanceOf[R]
 
          def headerValue(name: String): Option[String] =

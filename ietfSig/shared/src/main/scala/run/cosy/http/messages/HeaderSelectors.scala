@@ -22,111 +22,110 @@ import cats.data.NonEmptyList
 
 import scala.util.{Failure, Success, Try}
 import scala.collection.immutable.ListMap
-import run.cosy.http.auth.ParsingExc
-import run.cosy.http.messages.Selectors.Raw
+import run.cosy.http.auth.{HTTPHeaderParseException, ParsingExc, SelectorException}
+import run.cosy.http.headers.Rfc8941.Params
+import run.cosy.http.messages.HeaderId.SfHeaderId
+import scodec.bits.ByteVector
+import run.cosy.http.headers.Rfc8941.Serialise.given
+import cats.syntax.all.*
 
-class RequestHeaderSel[F[_], H <: Http](
-    override val name: HeaderId,
-    collTp: name.AllowedCollation,
-    override val selectorFn: SelectorFn[Http.Request[F, H]],
-    override val params: Rfc8941.Params = ListMap()
-) extends RequestSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
-     Selectors.render(name, collTp)(nel).map(header + _)
+object HeaderSelectors:
+   import Parameters.*
 
-class ResponseHeaderSel[F[_], H <: Http](
-    override val name: HeaderId,
-    collTp: name.AllowedCollation,
-    override val selectorFn: SelectorFn[Http.Response[F, H]],
-    override val params: Rfc8941.Params = ListMap()
-) extends ResponseSelector[F, H]:
-   override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
-     Selectors.render(name, collTp)(nel).map(header + _)
+   def render(
+       id: HeaderId,
+       tp: id.AllowedCollation
+   )(headerValues: NonEmptyList[String]): Either[ParsingExc, String] =
+     tp match
+        case LS        => raw(headerValues)
+        case SF        => sfValue(headerValues, id.asInstanceOf[SfHeaderId].format)
+        case BS        => bin(headerValues)
+        case Dict(key) => sfDictNameSelector(key, headerValues)
+   end render
 
-trait HeaderSelectors[F[_], H <: Http](using sf: HeaderSelectorFns[F, H]):
-   import Selectors.CollationTp
+   def sfValue(headers: NonEmptyList[String], interp: SelFormat): Either[ParsingExc, String] =
+      val combinedHeaders = headers.toList.mkString(", ")
+      // sfParse(combinedHeaders).map{
+      interp match
+         case SelFormat.Item       => sfParseItem(combinedHeaders).map(_.canon)
+         case SelFormat.Dictionary => sfParseDict(combinedHeaders).map(_.canon)
+         case SelFormat.List       => sfParseItem(combinedHeaders).map(_.canon)
 
-   /** build a request Header selector for the given header id.
-     * @collTp
-     *   the way to interpret the headers values returned
-     */
-   def onRequest(name: HeaderId)(
-       collTp: name.AllowedCollation
-   ): RequestSelector[F, H] =
-     new RequestHeaderSel[F, H](
-       name,
-       collTp,
-       sf.requestHeaders(name),
-       collTp.toParam
+   def sfParseItem(
+       headerValue: String
+   ): Either[HTTPHeaderParseException, Rfc8941.PItem[?]] =
+     Rfc8941.Parser.sfItem.parseAll(headerValue).leftMap(err =>
+       HTTPHeaderParseException(err, headerValue)
      )
 
-   def onResponse(name: HeaderId)(
-       collTp: name.AllowedCollation
-   ): ResponseSelector[F, H] =
-     new ResponseHeaderSel[F, H](
-       name,
-       collTp,
-       sf.responseHeaders(name),
-       collTp.toParam
+   def sfParseDict(
+       headerValue: String
+   ): Either[HTTPHeaderParseException, Rfc8941.SfDict] =
+     Rfc8941.Parser.sfDictionary.parseAll(headerValue).leftMap(err =>
+       HTTPHeaderParseException(err, headerValue)
      )
 
-   import run.cosy.http.messages.HeaderIds.retrofit as retro
+   /** Dict selector with name param */
+   def sfDictNameSelector(
+       nameSelector: Rfc8941.SfString,
+       headers: NonEmptyList[String]
+   ): Either[ParsingExc, String] =
+      val combinedHeaders = headers.toList.mkString(", ")
+      for
+         dict <- sfParseDict(combinedHeaders)
+         name <- Rfc8941.Parser.sfToken.parseAll(nameSelector.asciiStr).leftMap(p =>
+           HTTPHeaderParseException(p, s"could not convert >$nameSelector< to token")
+         )
+         value <- dict.get(name)
+           .toRight(SelectorException(
+             s"No dictionary element >$nameSelector< in with value >$combinedHeaders"
+           ))
+      yield value.canon
 
-   /** for information on how existing headers can be understood as working with rfc8941 see
-     * [[https://greenbytes.de/tech/webdav/draft-ietf-httpbis-retrofit-latest.html Retrofit Structured Fields for HTTP]]
-     * oslo some good overview documentation on
-     * [[https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers HTTP Headers]]
+   def raw(headers: NonEmptyList[String]): Either[ParsingExc, String] =
+     Right(headers.map(_.trim).toList.mkString(", "))
+
+   def bin(headers: NonEmptyList[String]): Either[ParsingExc, String] = Right {
+     headers.map(h =>
+       ByteVector.view(h.trim.nn.getBytes(java.nio.charset.StandardCharsets.US_ASCII).nn).canon
+     ).toList.mkString(", ")
+   }
+
+   def sfParseList(
+       headerValue: String
+   ): Either[HTTPHeaderParseException, Rfc8941.SfList] =
+     Rfc8941.Parser.sfList.parseAll(headerValue).leftMap(err =>
+       HTTPHeaderParseException(err, headerValue)
+     )
+
+   sealed trait CollationTp:
+      def toParam: Params = this match
+         case LS        => Params()
+         case SF        => Params(sfTk -> true)
+         case BS        => Params(bsTk -> true)
+         case Dict(key) => Params(keyTk -> key)
+
+   /** interpret the field as a dict, and select an element of it */
+   case class Dict(key: Rfc8941.SfString) extends CollationTp
+
+   /** Byte Sequence or ;bs in the spec */
+   object BS extends CollationTp
+
+   /** This is the default. It takes list of headers, trims them then combines them by separating
+     * them with `, `. Since intermediaries can collate the headers with various number of spaces
+     * between them, it is recommended that a) if multiple headers are used they be comgined on the
+     * sending side, or b) that these multiple values be parsed out and recombined... (That means
+     * that there is knowledge required for which headers this can work with.
      */
-   object RequestHd:
-      import Selectors.{SelFormat, CollationTp as Ct}
-      import run.cosy.http.messages.HeaderIds.Request as req
+   object LS extends CollationTp
 
-      lazy val accept = onRequest(retro.accept)
-      /* could not find authorization in retrofit. Could one send more than one? Yet, I think. */
-      lazy val authorization   = onRequest(req.authorization)
-      lazy val `cache-control` = onRequest(retro.`cache-control`)
-      lazy val `content-type`  = onRequest(retro.`content-type`)
+   /** Structured Fields or ;sf in the spec: interpret the headers as RFC8941 constructs. Which ones
+     * must be agreed upon individually for each header.
+     */
+   object SF extends CollationTp
 
-      /** a list because sometimes multiple lengths are sent! */
-      lazy val `content-length` = onRequest(retro.`content-length`)
-      lazy val signature_sf     = onRequest(req.signature)
-      // todo: it feels like dict objs should allow the user to select the type cloer to the point
-      // of creating the signature.
-      lazy val signature_dict   = onRequest(req.signature)
-      lazy val `content-digest` = onRequest(req.`content-digest`)
-
-      /** Defined in:
-        * [[https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-client-cert-field-03#section-2 httpbis-client-cert]]
-        */
-      lazy val `client-cert`       = onRequest(req.`client-cert`)
-      lazy val `client-cert-chain` = onRequest(req.`client-cert-chain`)
-      lazy val forwarded           = onRequest(req.forwarded)
-   end RequestHd
-
-   object ResponseHd:
-      import Selectors.{SelFormat, CollationTp as Ct}
-      import run.cosy.http.messages.HeaderIds.Response as res
-
-      lazy val `accept-post`   = onResponse(retro.`accept-post`)
-      lazy val `cache-control` = onResponse(res.`cache-control`)
-
-      /** Clients cannot send date headers via JS. Also not really useful as the time is available
-        * in the Signature-Input in unix time. see
-        * [[https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6 rfc9110]] for handling
-        * requirements (from httpbis-retrofit)
-        */
-      lazy val date             = onResponse(res.date)
-      lazy val `content-type`   = onResponse(res.`content-type`)
-      lazy val `content-length` = onResponse(res.`content-length`)
-
-      /** One could create a new parameter to convert to SF-ETAG specified by httpbis-retrofit */
-      lazy val etag      = onResponse(res.etag)
-      lazy val signature = onResponse(res.signature)
-
-      /** [[https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-digest-headers-10#section-2
-        * digest-headers draft rfc]
-        */
-      lazy val `content-digest` =
-        onResponse(res.`content-digest`)
-   end ResponseHd
-end HeaderSelectors
+   /** Strict Format types, can be one of three */
+   enum SelFormat:
+      case List
+      case Item // a parameterized item
+      case Dictionary

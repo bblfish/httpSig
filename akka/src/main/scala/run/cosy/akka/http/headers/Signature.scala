@@ -21,15 +21,10 @@ import akka.http.scaladsl.model.{HttpHeader, ParsingException}
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion, Signature}
 import run.cosy.http.Http.Header
-import run.cosy.http.auth.{
-  HTTPHeaderParseException,
-  InvalidSigException,
-  ParsingExc,
-  SignatureMatcher
-}
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, ParsingExc}
 import run.cosy.http.headers
 import run.cosy.http.headers.Rfc8941.{Bytes, IList, PItem, SfDict}
-import run.cosy.http.headers.{Rfc8941, Signatures}
+import run.cosy.http.headers.{Rfc8941, SignatureMatcher, Signatures}
 
 import scala.collection.immutable
 import scala.collection.immutable.{ArraySeq, ListMap}

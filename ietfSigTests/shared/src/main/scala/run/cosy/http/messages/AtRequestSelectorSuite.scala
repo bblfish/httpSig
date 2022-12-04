@@ -4,13 +4,13 @@ import munit.CatsEffectSuite
 import run.cosy.http.Http.{Request, Response}
 import run.cosy.http.auth.ParsingExc
 import run.cosy.http.headers.Rfc8941.Syntax.sf
-import run.cosy.http.messages.{AtSelectors, ServerContext}
+import run.cosy.http.messages.{AtReqSelectors, ServerContext}
 import run.cosy.http.{Http, auth}
 
 import scala.util.{Success, Try}
 
-trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
-   def sel(sc: ServerContext): AtSelectors[F, H]
+trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
+   def sel(sc: ServerContext): AtReqSelectors[F, H]
    def interp: TestHttpMsgInterpreter[F, H]
    def platform: Platform
 
@@ -34,7 +34,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.1_POST with all @xxx") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.1_Method_POST`)
      val sc: ServerContext       = ServerContext("www.example.com", true)
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
 
      assertEquals(selF.`@method`.signingStr(req), resS("@method", "POST"))
      assertEquals(selF.`@method`.signingStr(req), resS("@method", "POST"))
@@ -60,7 +60,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.1_GET with all @xxx") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.1_Method_GET`)
      val sc: ServerContext       = ServerContext("bblfish.net", false)
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "GET"))
@@ -84,7 +84,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.5_GET with long URL - with 2 query params - testing all @xxx") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_GET_with_LongURL`)
      val sc: ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "GET"))
@@ -114,7 +114,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.5_Options (for akka) testing all @xxx") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_OPTIONS_4akka`)
      val sc = ServerContext("bblfish.net", false) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "OPTIONS"))
@@ -152,7 +152,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
         val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_CONNECT`)
         val sc: ServerContext =
           ServerContext("bblfish.net", false) // this should have no effect here
-        val selF: AtSelectors[F, H] = sel(sc)
+        val selF: AtReqSelectors[F, H] = sel(sc)
         import selF.*
         assertEquals(`@method`.signingStr(req), resS("@method", "CONNECT"))
         assertEquals(
@@ -168,7 +168,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
         val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.5_OPTIONS`)
         val sc: ServerContext =
           ServerContext("bblfish.net", false) // this should have no effect here
-        val selF: AtSelectors[F, H] = sel(sc)
+        val selF: AtReqSelectors[F, H] = sel(sc)
         import selF.*
 
         assertEquals(`@method`.signingStr(req), resS("@method", "OPTIONS"))
@@ -180,7 +180,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.7_Query") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.7_Query`)
      val sc: ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
      if platform != Platform.Akka then
         assertEquals(`@query`.signingStr(req), resS("@query", "?param=value&foo=bar&baz=bat%2Dman"))
@@ -195,7 +195,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.8_Query_String") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.7_Query_String`)
      val sc: ServerContext = ServerContext("cosy.run", true) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "HEAD"))
@@ -221,7 +221,7 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    test("2.2.8_Query_Parameters") {
      val req: Http.Request[F, H] = interp.asRequest(HttpMessageDB.`2.2.8_Query_Parameters`)
      val sc: ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
+     val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "GET"))
@@ -248,16 +248,4 @@ trait AtSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
 
    }
 
-   test("2.2.9 Status Code") {
-     // we still need these
-     val res: Http.Response[F, H] = interp.asResponse(HttpMessageDB.`2.2.9_Status_Code`)
-     val sc: ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
-     val selF: AtSelectors[F, H] = sel(sc)
-     import selF.*
-
-     // because of typesafety we can only make one test here
-     assertEquals(`@status`.signingStr(res), resS("@status", "200"))
-     assertEquals(`@status`.signingStr(res), Right(""""@status": 200"""))
-   }
-
-end AtSelectorSuite
+end AtRequestSelectorSuite

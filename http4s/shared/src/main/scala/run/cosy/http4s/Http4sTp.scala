@@ -19,6 +19,7 @@ package run.cosy.http4s
 import org.http4s.Headers
 import org.typelevel.ci.CIString
 import run.cosy.http.Http.{Header, Message}
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
 import run.cosy.http.{Http, HttpOps}
 
 object Http4sTp extends Http:
@@ -29,6 +30,10 @@ object Http4sTp extends Http:
    override type Header = org.http4s.Header.Raw
 
    given hOps: HttpOps[HT] with
+
+      override val Signature: SignatureMatcher[HT] = run.cosy.http4s.headers.Signature
+      override val `Signature-Input`: SignatureInputMatcher[HT] =
+        run.cosy.http4s.headers.`Signature-Input`
 
       extension [F[_]](msg: Http.Message[F, HT])
         def headers: Seq[Http.Header[HT]] =

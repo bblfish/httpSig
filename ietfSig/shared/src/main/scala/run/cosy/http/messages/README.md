@@ -238,7 +238,7 @@ should be read as
 ```scala
 type Component(@path): Params => Try[AsSelector[Request]]
 ```
-We remove the first `Try` monad layer in the [AtSelectors.scala](AtSelectors.scala)
+We remove the first `Try` monad layer in the [AtSelectors.scala](AtReqSelectors.scala)
 where we define the same method by narrowing down precisely the type
 of the argument
 ```scala
@@ -254,7 +254,7 @@ What we have is that
  2. the Params correspond to attribute values of the function, i.e. arguments, ie. the Domain!
  3. the value of applying the interpreted params to the function is a new function which takes a Request to a Try[String].
 
-When the a client wants to build an `Input-Signature` it should use the functions made available in [AtSelectors.scala](AtSelectors.scala), as those are type safe.
+When the a client wants to build an `Input-Signature` it should use the functions made available in [AtSelectors.scala](AtReqSelectors.scala), as those are type safe.
 When a server wants to verify a signature it must interpret each element: 
  1. first the function id
  2. *then* the attributes, which depend on the function
@@ -266,7 +266,7 @@ We have a try for the parameters because they may not be the parameters for that
 The function's domain specifies how to interpret the arguments. 
 Those arguments tune the resulting function between http messages and resulting strings. 
 
-And that is actually what we have. Well perhaps it topsy turvy. We have the interface [AtComponents](AtComponents.scala) that must be implemented by the frameworks, and which is used by [AtSelectors](AtSelectors.scala) which specifies the constructor functions. 
+And that is actually what we have. Well perhaps it topsy turvy. We have the interface [AtComponents](AtComponents.scala) that must be implemented by the frameworks, and which is used by [AtSelectors](AtReqSelectors.scala) which specifies the constructor functions. 
 
 
 

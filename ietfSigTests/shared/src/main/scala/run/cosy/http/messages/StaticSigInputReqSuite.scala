@@ -7,6 +7,7 @@ import run.cosy.http.headers.ReqSigInput
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{SfDict, SfInt, SfString}
 import run.cosy.http.headers.SigIn.*
+import run.cosy.http.messages.HttpMessageDB.RequestStr
 import run.cosy.http.messages.TestHttpMsgInterpreter
 import run.cosy.http.{Http, HttpOps}
 
@@ -77,7 +78,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
      }
    }
 
-   case class TestSig(
+   case class TestBase(
        doc: String,
        reqStr: DB.RequestStr,
        sigIn: ReqSigInput[F, H],
@@ -89,8 +90,8 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
 
    {
      List(
-       TestSig("empty SigInput", DB.`§2.1_HeaderField`, ReqSigInput()(), signatureParams("()")),
-       TestSig(
+       TestBase("empty SigInput", DB.`§2.1_HeaderField`, ReqSigInput()(), signatureParams("()")),
+       TestBase(
          "SigInput from in §2.1 with old request",
          DB.`§2.1_HeaderField`,
          new ReqSigInput(List(
@@ -111,7 +112,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")"""
          )
        ),
-       TestSig(
+       TestBase(
          "SigInput from §2.1 with new request",
          DB.`§2.1_HeaderField_2`,
          //       """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")""",
@@ -133,7 +134,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            """("host" "date" "x-ows-header" "x-obs-fold-header" "cache-control" "example-dict")"""
          )
        ),
-       TestSig(
+       TestBase(
          "SigInput with ;key and ;sf and ;bs selectors",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
@@ -155,7 +156,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            """("host" "date" "x-empty-header" "x-ows-header";bs "cache-control";key="max-age" "example-dict";sf)"""
          )
        ),
-       TestSig(
+       TestBase(
          "SigInput with example-dict selectors",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
@@ -172,7 +173,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            """("example-dict";key="a" "example-dict";key="d" "example-dict";key="b" "example-dict";key="c")"""
          )
        ),
-       TestSig(
+       TestBase(
          "SigInput from §2.1.3, lots of commas",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(
@@ -183,7 +184,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
             |"example-header";bs: :dmFsdWUsIHdpdGgsIGxvdHM=:, :b2YsIGNvbW1hcw==:
             |""".rfc8792single + signatureParams("""("example-header" "example-header";bs)""")
        ),
-       TestSig(
+       TestBase(
          "SigInput from §2.3, covering @ and header selectors",
          DB.`§2.1_HeaderField_2`,
          ReqSigInput(`@target-uri`, `@authority`, `date`(LS), `cache-control`(LS))(
@@ -202,7 +203,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
                 |   created=1618884475;expires=1618884775""".rfc8792single
          )
        ),
-       TestSig(
+       TestBase(
          "SigBase with attributes, example from §2.5",
          DB.`2.5_POST_req`,
          ReqSigInput(
@@ -227,7 +228,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          |  "content-digest" "content-length" "content-type")\
          |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
        ),
-       TestSig(
+       TestBase(
          "Selective covered components with tag",
          DB.`B.2_Request`,
          ReqSigInput(`@authority`, `content-digest`(LS), `@query-param`(SfString("Pet")))(
@@ -244,7 +245,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
         |  ;created=1618884473;keyid="test-key-rsa-pss"\
         |  ;tag="header-example"""".rfc8792single
        ),
-       TestSig(
+       TestBase(
          "B.2.3 full coverage",
          DB.`B.2_Request`,
          ReqSigInput(
@@ -273,7 +274,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          |  "@authority" "content-type" "content-digest" "content-length")\
          |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
        ),
-       TestSig(
+       TestBase(
          "B.2.5 test base",
          DB.`B.2_Request`,
          ReqSigInput(`date`(LS), `@authority`, `content-type`(LS))(
@@ -286,7 +287,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          |"@signature-params": ("date" "@authority" "content-type")\
          |  ;created=1618884473;keyid="test-shared-secret"""".rfc8792single
        ),
-       TestSig(
+       TestBase(
          "B.2.6 test base",
          DB.`B.2_Request`,
          ReqSigInput(
@@ -310,7 +311,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          |  "content-type" "content-length");created=1618884473\
          |  ;keyid="test-key-ed25519"""".rfc8792single
        ),
-       TestSig(
+       TestBase(
          "B.3 Proxy example",
          DB.`B.3.Proxy_enhanced`,
          ReqSigInput(`@path`, `@query`, `@method`, `@authority`, `client-cert`(LS))(
@@ -342,7 +343,7 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          DB.`B.4_Transform_4` -> false,
          DB.`B.4_Transform_5` -> false
        ).map(req =>
-         TestSig(
+         TestBase(
            "B.4 reordering",
            req._1,
            ReqSigInput(`@method`, `@path`, `@authority`, accept(LS))(
@@ -375,3 +376,10 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
        )
      }
    }
+   
+   
+   case class TestSig(
+     req: RequestStr,
+     signature: String,   
+   
+   )

@@ -18,19 +18,10 @@ package run.cosy.http.headers
 
 import run.cosy.http.auth.{AuthExc, InvalidSigException}
 import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.{
-  IList,
-  Item,
-  PItem,
-  Parameterized,
-  SfDict,
-  SfInt,
-  SfString,
-  Token
-}
+import run.cosy.http.headers.Rfc8941.{IList, Item, PItem, Parameterized, SfDict, SfInt, SfString, Token}
 
 import java.time.Instant
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListMap, ListSet}
 import scala.concurrent.duration.FiniteDuration
 
 /** SigInputs are Maps from Signature Names to SigInput entries that this server understands.
@@ -120,6 +111,20 @@ object SigInput:
 
    def apply(il: IList): Option[SigInput] =
      if valid(il) then Some(new SigInput(il)) else None
+     
+     
+   /* this will always succeed */
+   def apply(sigIn: ReqSigInput[?,?]): SigInput =
+     val pitems: List[PItem[SfString]] = sigIn.selectors.map { sel =>
+       new PItem(SfString(sel.name.lcname),sel.params)
+     }
+     val params: ListMap[Token, Item] =
+       val lmb = ListMap.newBuilder[Token, Item]
+       sigIn.params.foreach{ sg =>
+         lmb.addOne(sg.toRfcParam)
+       }
+       lmb.result()
+     new SigInput(new IList(pitems, params))
 
    // this is really functioning as a constructor in pattern matching contexts
    def unapply(pzd: Parameterized): Option[SigInput] =

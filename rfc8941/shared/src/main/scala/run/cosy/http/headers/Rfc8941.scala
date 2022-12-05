@@ -157,6 +157,9 @@ object Rfc8941:
         else throw new IllegalArgumentException(s"$str<<< contains non ascii chars ")
 
       def isAsciiChar(c: Int): Boolean = (c > 0x1f) && (c < 0x7f)
+      
+      /* No danger of throwing an exception here, as tokens are subsets of SfString */
+      def apply(token: Token): SfString = new SfString(token.tk)
 
       private[Rfc8941] def unsafeParsed(asciiStr: List[Char]): SfString =
         new SfString(asciiStr.mkString)

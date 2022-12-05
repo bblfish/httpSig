@@ -18,6 +18,7 @@ package run.cosy.http.headers
 
 import run.cosy.http.Http
 import run.cosy.http.headers.Rfc8941.{SfInt, SfString, Token}
+import run.cosy.http.headers.SigInput.{algTk, createdTk, expiresTk, keyidTk, nonceTk, tagTk}
 import run.cosy.http.messages.RequestSelector
 
 import java.time.Instant
@@ -39,29 +40,34 @@ class ReqSigInput[F[_], H <: Http](
       import Rfc8941.Serialise.*
       if params.size == 0 then ""
       else
-         params.map {
-           case KeyId(v)   => "keyid=" + v.canon
-           case Created(v) => "created=" + v.canon
-           case Expires(v) => "expires=" + v.canon
-           case Nonce(v)   => "nonce=" + v.canon
-           case Tag(v)     => "tag=" + v.canon
-           case Alg(v)     => s"""alg="$v""""
-         }.mkString(";", ";", "")
+         params.map(_.canon).mkString(";", ";", "")
+
    override def toString() = """"@signature-params": """ + siginputStr + paramStr
+
+end ReqSigInput
 
 object ReqSigInput:
    def apply[F[_], H <: Http](sels: RequestSelector[F, H]*)(params: SigIn.Param*) =
      new ReqSigInput[F, H](sels.toList, ListSet(params*))
 
 object SigIn:
-   sealed trait Param
+   import Rfc8941.Serialise.given
+   sealed trait Param:
+      def toRfcParam: Rfc8941.Param
+      def canon: String = toRfcParam.canon
 
-   case class KeyId(value: SfString) extends Param
-   case class Created(value: SfInt)  extends Param
-   case class Expires(value: SfInt)  extends Param
-   case class Nonce(value: SfString) extends Param
-   case class Tag(value: SfString)   extends Param
-   case class Alg(value: SigAlg)     extends Param
+   case class KeyId(value: SfString) extends Param:
+      override def toRfcParam: Rfc8941.Param = (keyidTk, value)
+   case class Created(value: SfInt) extends Param:
+      override def toRfcParam: Rfc8941.Param = (createdTk, value)
+   case class Expires(value: SfInt) extends Param:
+      override def toRfcParam: Rfc8941.Param = (expiresTk, value)
+   case class Nonce(value: SfString) extends Param:
+      override def toRfcParam: Rfc8941.Param = (nonceTk, value)
+   case class Tag(value: SfString) extends Param:
+      override def toRfcParam: Rfc8941.Param = (tagTk, value)
+   case class Alg(value: SigAlg) extends Param:
+      override def toRfcParam: Rfc8941.Param = (algTk, SfString(value.toString))
 
    object Created:
       @throws[NumberOutOfBoundsException]

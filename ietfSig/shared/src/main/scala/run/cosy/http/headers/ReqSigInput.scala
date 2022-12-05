@@ -64,20 +64,20 @@ object SigIn:
    case class Alg(value: SigAlg)     extends Param
 
    object Created:
-      def apply(time: Long): Either[NumberOutOfBoundsException, Created] =
-        try
-           Right(Created(SfInt(time)))
-        catch case e: NumberOutOfBoundsException => Left(e)
-      def apply(time: Instant): Either[NumberOutOfBoundsException, Created] =
+      @throws[NumberOutOfBoundsException]
+      def apply(time: Long): Created =
+        Created(SfInt(time))
+      @throws[NumberOutOfBoundsException]
+      def apply(time: Instant): Created =
         apply(time.getEpochSecond.nn)
 
    object Expires:
-      def apply(time: Long): Either[NumberOutOfBoundsException, Expires] =
-        try
-           Right(Expires(SfInt(time)))
-        catch case e: NumberOutOfBoundsException => Left(e)
+      @throws[NumberOutOfBoundsException]
+      def apply(time: Long): Expires =
+        Expires(SfInt(time))
 
-      def apply(time: Instant): Either[NumberOutOfBoundsException, Expires] =
+      @throws[NumberOutOfBoundsException]
+      def apply(time: Instant): Expires =
         apply(time.getEpochSecond.nn)
 
    enum SigAlg:

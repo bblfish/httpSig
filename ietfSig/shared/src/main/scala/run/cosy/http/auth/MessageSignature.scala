@@ -46,7 +46,9 @@ object MessageSignature:
   */
 class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
 
-   /** return the sigbase but without the attributes, which can be appended later */
+   /** return the sigbase given the request selectors and the corresponding @signature-params
+     * string.
+     */
    protected def sigBaseFn(
        req: Http.Request[F, H],
        selectors: List[RequestSelector[F, H]],

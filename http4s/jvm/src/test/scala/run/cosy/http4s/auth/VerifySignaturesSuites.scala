@@ -31,4 +31,4 @@ given synio: Sync[SyncIO]                   = SyncIO.syncForSyncIO
 
 class H4VerifySigTests extends VerifySignatureTests[IO, HT](
       new ReqSelectors[IO, HT]
-    )
+    ) {}

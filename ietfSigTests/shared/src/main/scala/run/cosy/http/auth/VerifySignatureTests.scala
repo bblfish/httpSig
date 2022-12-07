@@ -20,7 +20,7 @@ import scala.concurrent.duration.{FiniteDuration, TimeUnit}
 
 //todo: we assume IO to start.
 //  later look at how bobcats abstracts between AsyncIO needed for Java and IO for JS
-open class VerifySignatureTests[FH[_], H <: Http](
+trait VerifySignatureTests[FH[_], H <: Http](
     // we don't pass it implicitly, because we need to add some headers
     hsel: ReqSelectors[FH, H]
 )(using

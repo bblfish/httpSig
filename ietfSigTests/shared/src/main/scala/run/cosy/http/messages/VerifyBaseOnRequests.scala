@@ -1,12 +1,17 @@
 package run.cosy.http.messages
 
+import bobcats.Verifier
 import bobcats.Verifier.SigningString
+import cats.MonadError
+import cats.effect.IO
+import cats.effect.syntax.all.*
+import cats.effect.testkit.TestControl
 import munit.CatsEffectSuite
-import run.cosy.http.auth.{MessageSignature, ParsingExc}
-import run.cosy.http.headers.ReqSigInput
+import run.cosy.http.auth.*
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.Rfc8941.{SfDict, SfInt, SfString}
 import run.cosy.http.headers.SigIn.*
+import run.cosy.http.headers.{HttpSig, ReqSigInput, Rfc8941}
 import run.cosy.http.messages.HttpMessageDB.RequestStr
 import run.cosy.http.messages.TestHttpMsgInterpreter
 import run.cosy.http.{Http, HttpOps}
@@ -16,11 +21,14 @@ import scala.collection.immutable.ListSet
 /** This test suite looks at statically built SigInput requests using functions. This is useful for
   * clients writing signatures.
   */
-open class StaticSigInputReqSuite[F[_], H <: Http](
+open class VerifyBaseOnRequests[F[_], H <: Http](
     hsel: ReqSelectors[F, H] // we don't pass it implicitly, because we need to add some headers.
 )(using
     hops: HttpOps[H],
-    interpret: TestHttpMsgInterpreter[F, H]
+    interpret: TestHttpMsgInterpreter[F, H],
+    // needed for testing signatures
+//    ME: MonadError[F, Throwable],
+//    V: bobcats.Verifier[F],
 ) extends CatsEffectSuite:
    val hds = HeaderIds
 
@@ -33,19 +41,33 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
    import msgSigfns.*
 
    val DB = HttpMessageDB
-
-   val `x-ows-header`      = hsel.onRequest(HeaderId("x-ows-header").toTry.get)
-   val `x-obs-fold-header` = hsel.onRequest(HeaderId("x-obs-fold-header").toTry.get)
-   val `example-dict`      = hsel.onRequest(HeaderId.dict("example-dict").toTry.get)
-   val `example-header`    = hsel.onRequest(HeaderId("example-header").toTry.get)
-   val `x-empty-header`    = hsel.onRequest(HeaderId("x-empty-header").toTry.get)
+   
+   object testIds:
+      val `x-ows-header` = HeaderId("x-ows-header").toTry.get
+      val `x-obs-fold-header` = HeaderId("x-obs-fold-header").toTry.get
+      val `example-dict` = HeaderId.dict("example-dict").toTry.get
+      val `example-header` = HeaderId("example-header").toTry.get
+      val `x-empty-header` = HeaderId("x-empty-header").toTry.get
+      val all = Seq(`x-ows-header`, `x-obs-fold-header`, `example-dict`, `example-header`, `x-empty-header`)
+      
+   val `x-ows-header`      = hsel.onRequest(testIds.`x-ows-header`)
+   val `x-obs-fold-header` = hsel.onRequest(testIds.`x-obs-fold-header`)
+   val `example-dict`      = hsel.onRequest(testIds.`example-dict`)
+   val `example-header`    = hsel.onRequest(testIds.`example-header`)
+   val `x-empty-header`    = hsel.onRequest(testIds.`x-empty-header`)
    // one should prefer the `@...` versions over these two
    val date = hsel.onRequest(hds.Response.`date`)
    val host = hsel.onRequest(hds.retrofit.`host`)
-
+  
+   //todo: it may be useful if hsel had a list of all the headers it used
+   // so that there was not a danger of being out of sync with the verifier in ReqComponentDB...
+   // we did not duplicate the headerIds
+   //needed to verify signatures
+   given selectorDB: ReqComponentDB[F, H] = ReqComponentDB(hsel, HeaderIds.all ++ testIds.all)
+   
    List(DB.`2.4_Req_Ex`, DB.`2.4_Req_v2`).zipWithIndex.foreach { (msg, i) =>
+     val req = interpret.asRequest(msg)
      test("apply ReqSigInput selector on ex from 2.4 v." + i) {
-       val req = interpret.asRequest(msg)
        val rsel: List[RequestSelector[F, H]] =
          List(
            `@method`,
@@ -64,26 +86,26 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
          x.flatMap(s => s.decodeAscii),
          Right(
            """"@method": POST
-                  |"@authority": example.com
-                  |"@path": /foo
-                  |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
-                  |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
-                  |"content-length": 18
-                  |"content-type": application/json
-                  |"@signature-params": ("@method" "@authority" "@path" \
-                  |  "content-digest" "content-length" "content-type")\
-                  |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
+              |"@authority": example.com
+              |"@path": /foo
+              |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
+              |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+              |"content-length": 18
+              |"content-type": application/json
+              |"@signature-params": ("@method" "@authority" "@path" \
+              |  "content-digest" "content-length" "content-type")\
+              |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
          )
        )
      }
    }
 
    case class TestBase(
-       doc: String,
-       reqStr: DB.RequestStr,
-       sigIn: ReqSigInput[F, H],
-       baseResult: String,
-       success: Boolean = true
+     doc: String,
+     reqStr: DB.RequestStr,
+     sigIn: ReqSigInput[F, H],
+     baseResult: String,
+     success: Boolean = true
    )
 
    def signatureParams(str: String) = """"@signature-params": """ + str
@@ -199,8 +221,8 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
             |"cache-control": must-revalidate, max-age=60
             |""".rfc8792single + signatureParams(
            """("@target-uri" "@authority" "date" "cache-control")\
-                |   ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512";\
-                |   created=1618884475;expires=1618884775""".rfc8792single
+              |   ;keyid="test-key-rsa-pss";alg="rsa-pss-sha512";\
+              |   created=1618884475;expires=1618884775""".rfc8792single
          )
        ),
        TestBase(
@@ -218,15 +240,15 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            KeyId(sf"test-key-rsa-pss")
          ),
          """"@method": POST
-         |"@authority": example.com
-         |"@path": /foo
-         |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
-         |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
-         |"content-length": 18
-         |"content-type": application/json
-         |"@signature-params": ("@method" "@authority" "@path" \
-         |  "content-digest" "content-length" "content-type")\
-         |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
+            |"@authority": example.com
+            |"@path": /foo
+            |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
+            |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+            |"content-length": 18
+            |"content-type": application/json
+            |"@signature-params": ("@method" "@authority" "@path" \
+            |  "content-digest" "content-length" "content-type")\
+            |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
        ),
        TestBase(
          "Selective covered components with tag",
@@ -237,13 +259,13 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            Tag(SfString("header-example"))
          ),
          """"@authority": example.com
-        |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
-        |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
-        |"@query-param";name="Pet": dog
-        |"@signature-params": ("@authority" "content-digest" \
-        |  "@query-param";name="Pet")\
-        |  ;created=1618884473;keyid="test-key-rsa-pss"\
-        |  ;tag="header-example"""".rfc8792single
+            |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
+            |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+            |"@query-param";name="Pet": dog
+            |"@signature-params": ("@authority" "content-digest" \
+            |  "@query-param";name="Pet")\
+            |  ;created=1618884473;keyid="test-key-rsa-pss"\
+            |  ;tag="header-example"""".rfc8792single
        ),
        TestBase(
          "B.2.3 full coverage",
@@ -262,17 +284,17 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            KeyId(sf"test-key-rsa-pss")
          ),
          """"date": Tue, 20 Apr 2021 02:07:55 GMT
-         |"@method": POST
-         |"@path": /foo
-         |"@query": ?param=Value&Pet=dog
-         |"@authority": example.com
-         |"content-type": application/json
-         |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
-         |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
-         |"content-length": 18
-         |"@signature-params": ("date" "@method" "@path" "@query" \
-         |  "@authority" "content-type" "content-digest" "content-length")\
-         |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
+            |"@method": POST
+            |"@path": /foo
+            |"@query": ?param=Value&Pet=dog
+            |"@authority": example.com
+            |"content-type": application/json
+            |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
+            |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+            |"content-length": 18
+            |"@signature-params": ("date" "@method" "@path" "@query" \
+            |  "@authority" "content-type" "content-digest" "content-length")\
+            |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
        ),
        TestBase(
          "B.2.5 test base",
@@ -282,10 +304,10 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            KeyId(sf"test-shared-secret")
          ),
          """"date": Tue, 20 Apr 2021 02:07:55 GMT
-         |"@authority": example.com
-         |"content-type": application/json
-         |"@signature-params": ("date" "@authority" "content-type")\
-         |  ;created=1618884473;keyid="test-shared-secret"""".rfc8792single
+            |"@authority": example.com
+            |"content-type": application/json
+            |"@signature-params": ("date" "@authority" "content-type")\
+            |  ;created=1618884473;keyid="test-shared-secret"""".rfc8792single
        ),
        TestBase(
          "B.2.6 test base",
@@ -302,14 +324,14 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            KeyId(sf"test-key-ed25519")
          ),
          """"date": Tue, 20 Apr 2021 02:07:55 GMT
-         |"@method": POST
-         |"@path": /foo
-         |"@authority": example.com
-         |"content-type": application/json
-         |"content-length": 18
-         |"@signature-params": ("date" "@method" "@path" "@authority" \
-         |  "content-type" "content-length");created=1618884473\
-         |  ;keyid="test-key-ed25519"""".rfc8792single
+            |"@method": POST
+            |"@path": /foo
+            |"@authority": example.com
+            |"content-type": application/json
+            |"content-length": 18
+            |"@signature-params": ("date" "@method" "@path" "@authority" \
+            |  "content-type" "content-length");created=1618884473\
+            |  ;keyid="test-key-ed25519"""".rfc8792single
        ),
        TestBase(
          "B.3 Proxy example",
@@ -319,20 +341,20 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
            KeyId(sf"test-key-ecc-p256")
          ),
          """"@path": /foo
-        |"@query": ?param=Value&Pet=dog
-        |"@method": POST
-        |"@authority": service.internal.example
-        |"client-cert": :MIIBqDCCAU6gAwIBAgIBBzAKBggqhkjOPQQDAjA6MRswGQYDVQQ\
-        |  KDBJMZXQncyBBdXRoZW50aWNhdGUxGzAZBgNVBAMMEkxBIEludGVybWVkaWF0ZSBD\
-        |  QTAeFw0yMDAxMTQyMjU1MzNaFw0yMTAxMjMyMjU1MzNaMA0xCzAJBgNVBAMMAkJDM\
-        |  FkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8YnXXfaUgmnMtOXU/IncWalRhebrXm\
-        |  ckC8vdgJ1p5Be5F/3YC8OthxM4+k1M6aEAEFcGzkJiNy6J84y7uzo9M6NyMHAwCQY\
-        |  DVR0TBAIwADAfBgNVHSMEGDAWgBRm3WjLa38lbEYCuiCPct0ZaSED2DAOBgNVHQ8B\
-        |  Af8EBAMCBsAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHQYDVR0RAQH/BBMwEYEPYmRjQ\
-        |  GV4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIBHda/r1vaL6G3VliL4/Di6YK0\
-        |  Q6bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:
-        |"@signature-params": ("@path" "@query" "@method" "@authority" \
-        |  "client-cert");created=1618884473;keyid="test-key-ecc-p256"""".rfc8792single
+            |"@query": ?param=Value&Pet=dog
+            |"@method": POST
+            |"@authority": service.internal.example
+            |"client-cert": :MIIBqDCCAU6gAwIBAgIBBzAKBggqhkjOPQQDAjA6MRswGQYDVQQ\
+            |  KDBJMZXQncyBBdXRoZW50aWNhdGUxGzAZBgNVBAMMEkxBIEludGVybWVkaWF0ZSBD\
+            |  QTAeFw0yMDAxMTQyMjU1MzNaFw0yMTAxMjMyMjU1MzNaMA0xCzAJBgNVBAMMAkJDM\
+            |  FkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8YnXXfaUgmnMtOXU/IncWalRhebrXm\
+            |  ckC8vdgJ1p5Be5F/3YC8OthxM4+k1M6aEAEFcGzkJiNy6J84y7uzo9M6NyMHAwCQY\
+            |  DVR0TBAIwADAfBgNVHSMEGDAWgBRm3WjLa38lbEYCuiCPct0ZaSED2DAOBgNVHQ8B\
+            |  Af8EBAMCBsAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHQYDVR0RAQH/BBMwEYEPYmRjQ\
+            |  GV4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIBHda/r1vaL6G3VliL4/Di6YK0\
+            |  Q6bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:
+            |"@signature-params": ("@path" "@query" "@method" "@authority" \
+            |  "client-cert");created=1618884473;keyid="test-key-ecc-p256"""".rfc8792single
        )
      ) ::: {
        List(
@@ -351,35 +373,35 @@ open class StaticSigInputReqSuite[F[_], H <: Http](
              KeyId(sf"test-key-ed25519")
            ),
            """"@method": GET
-             |"@path": /demo
-             |"@authority": example.org
-             |"accept": application/json, */*
-             |"@signature-params": ("@method" "@path" "@authority" "accept")\
-             |  ;created=1618884473;keyid="test-key-ed25519"""".rfc8792single,
+              |"@path": /demo
+              |"@authority": example.org
+              |"accept": application/json, */*
+              |"@signature-params": ("@method" "@path" "@authority" "accept")\
+              |  ;created=1618884473;keyid="test-key-ed25519"""".rfc8792single,
            req._2
          )
        )
      }
    }.zipWithIndex.foreach { (testSig, i) =>
      test(s"test ReqSigInput $i: ${testSig.doc}") {
-       val req                                  = interpret.asRequest(testSig.reqStr)
+       val req = interpret.asRequest(testSig.reqStr)
        val x: Either[ParsingExc, SigningString] = req.sigBase(testSig.sigIn)
-       if testSig.success then assertEquals(
-         x.flatMap(s => s.decodeAscii),
-         Right(testSig.baseResult),
-         clue = testSig
-       )
-       else assertNotEquals(
-         x.flatMap(s => s.decodeAscii),
-         Right[ParsingExc,String](testSig.baseResult).toTry.toEither,
-         clue = testSig
-       )
+       if testSig.success then
+         assertEquals(
+           x.flatMap(s => s.decodeAscii),
+           Right(testSig.baseResult),
+           clue = testSig
+         )
+       else
+         assertNotEquals(
+           x.flatMap(s => s.decodeAscii),
+           Right[ParsingExc, String](testSig.baseResult).toTry.toEither,
+           clue = testSig
+         )
      }
    }
-   
-   
-   case class TestSig(
-     req: RequestStr,
-     signature: String,   
-   
-   )
+
+//  case class TestSig(
+//       req: RequestStr,
+//       signature: String
+//  )

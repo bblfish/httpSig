@@ -16,6 +16,9 @@
 
 package run.cosy.http4s.messages
 
+import bobcats.Verifier
+import cats.effect.{MonadCancel, Sync, SyncIO}
+import run.cosy.http.auth.VerifySignatureTests
 import run.cosy.http.messages.*
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
@@ -44,6 +47,6 @@ class H4ReqSigSuite[F[_]] extends SigInputReqSuite[F, HT](
     )
 
 class H4StaticSigInputReqSuite[F[_]]
-    extends StaticSigInputReqSuite[F, HT](
+    extends VerifyBaseOnRequests[F, HT](
       new ReqSelectors[F, HT]
     )

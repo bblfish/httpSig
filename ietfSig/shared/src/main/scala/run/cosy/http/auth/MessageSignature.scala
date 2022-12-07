@@ -29,7 +29,7 @@ import cats.syntax.all.*
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
-import java.security.{PrivateKey, PublicKey}
+import java.security.{PrivateKey, PublicKey, SignatureException}
 import java.util.Locale
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -43,15 +43,31 @@ object MessageSignature:
    type SigningF[F[_]]             = SigningString => F[Signature]
 
 /** Adds extensions methods to sign HttpMessage-s - be they requests or responses.
+  *
+  * Note!! We have a number of closely related but independent functors. In order to help
+  * distinguish them I will use the following naming conventions:
+  *
+  *   - `FH[_]` tied to `Http`` type (this may be important for reading header trailers that appear
+  *     at the end of a header)
+  *     - Http4s requires `FH : Async`` ( I think)
+  *     - Akka the type is actually `akka.stream.scaladsl.Source`
+  *   - `F[_]` for fetching key data info (this really has to be Async)
+  *     - `IO`` for http4s
+  *     - `Future`` for Akka
+  *   - `FB[_]` for Bobcats crypto
+  *     - `AsyncIO`` for java (it's all done in a thread)
+  *     - `IO`` for JS
+  *
+  * I will use those names to distinguish the types of functors we are using.
   */
-class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
+class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
 
    /** return the sigbase given the request selectors and the corresponding @signature-params
      * string.
      */
    protected def sigBaseFn(
-       req: Http.Request[F, H],
-       selectors: List[RequestSelector[F, H]],
+       req: Http.Request[FH, H],
+       selectors: List[RequestSelector[FH, H]],
        sigParamStr: String
    ): Either[ParsingExc, List[String]] =
      selectors.foldM(List(sigParamStr)) { (lst, selector) =>
@@ -68,13 +84,8 @@ class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
    // todo: is this the right place
 
    /** [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
-     * Note: the F[_] here is playing too many roles. In http4s it is the type of the content
-     * itself, though in Akka that is ignored. The other role of F is as a type of wrapper to fetch
-     * remote objects. This is ok, as for our uses we don't ever look at the content of either
-     * messages, only at the headers. (but for http4s we do need to know the type of the content or
-     * else we cannot correctly type the result of adding headers to a Message)
      */
-   extension (req: Http.Request[F, H])(using selectorDB: ReqComponentDB[F, H])
+   extension (req: Http.Request[FH, H])(using selectorDB: ReqComponentDB[FH, H])
 
       /** Generate the signature string, given the `signature-input` header. Note, that the headers
         * to be signed, always contains the `signature-input` header itself.
@@ -88,8 +99,8 @@ class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
         *   be more correct if the result is a byte array, rather than a Unicode String.
         */
       def signatureBase(sigInput: SigInput): Either[ParsingExc, SigningString] =
-         val xl: Either[ParsingExc, List[RequestSelector[F, H]]] = sigInput.headerItems
-           .foldLeftM(List[RequestSelector[F, H]]()) { (lst, pih) =>
+         val xl: Either[ParsingExc, List[RequestSelector[FH, H]]] = sigInput.headerItems
+           .foldLeftM(List[RequestSelector[FH, H]]()) { (lst, pih) =>
              selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
            }
          for
@@ -134,7 +145,7 @@ class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
         *   1. use `fetchKeyId` to construct the needed verifier
         *   1. Verify the header, and if verified return the Agent object A
         */
-      def signatureAuthN[A](
+      def signatureAuthN[F[_], A](
           fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
       )(
           using
@@ -148,22 +159,22 @@ class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
                s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}'"
              )
            )
-           now <- summon[Clock[F]].realTime
+           now <- summon[Clock[F]].realTime // todo: should it be monotonic?
            sigStr <-
              if si.isValidAt(now)
              then ME.fromEither(req.signatureBase(si))
              else
                 ME.fromEither(
-                  Left(new Throwable(s"Signature no longer valid at $now"))
+                  Left(InvalidSigException(s"Signature no longer valid at $now"))
                 ) // todo exception tuning
            keyId <- ME.fromOption(si.keyid, KeyIdException("keyId missing or badly formatted"))
            signatureVerificiationFn <- fetchKeyId(keyId)
            agent <- signatureVerificiationFn(sigStr, ByteVector(sig.toArray)) // todo: unify bytes
         yield agent
 
-   extension (req: Http.Request[F, H])
+   extension (req: Http.Request[FH, H])
 
-      def sigBase(sigIn: ReqSigInput[F, H]): Either[ParsingExc, SigningString] =
+      def sigBase(sigIn: ReqSigInput[FH, H]): Either[ParsingExc, SigningString] =
         for
            lines <- sigBaseFn(req, sigIn.selectors.reverse, sigIn.toString)
            bytes <- ByteVector.encodeAscii(lines.mkString("\n"))
@@ -208,12 +219,15 @@ class MessageSignature[F[_], H <: Http](using ops: HttpOps[H]):
         *   a function to create a new HttpRequest when given signing function wrapped in a F the F
         *   can capture an IllegalArgumentException if the required headers are not present in the
         *   request
+        *
+        * todo: why does it require meF to be a MonadError of a Throwable? MonadError[F, Exception]
+        * does not compile...
         */
-      def withSigInput(
+      def withSigInput[F[_]](
           name: Rfc8941.Token,
-          sin: ReqSigInput[F, H],
+          sin: ReqSigInput[FH, H],
           signerF: SigningF[F]
-      )(using meF: MonadError[F, Throwable]): F[Http.Request[F, H]] =
+      )(using meF: MonadError[F, Throwable]): F[Http.Request[FH, H]] =
         for
            toSignBytes <- meF.fromEither(req.sigBase(sin))
            signature   <- signerF(toSignBytes)

@@ -25,3 +25,7 @@ package run.cosy.http.headers
   *   the name of the proof to look at
   */
 case class HttpSig(proofName: Rfc8941.Token)
+
+object HttpSig:
+   @throws[ParsingException]
+   def apply(token: String): HttpSig = new HttpSig(Rfc8941.Token(token))

@@ -27,9 +27,12 @@ import scala.collection.immutable.ListSet
 /** ReqSigInput is useful for building a Signature-Input structure in a typesafe manner for a
   * request. Compare with SigInput which is used to parse incoming requests where the order of of
   * the parameters is important.
+  *
+  * @tparam FH[_]
+  *   a functor related to the Http Type.
   */
-class ReqSigInput[F[_], H <: Http](
-    val selectors: List[RequestSelector[F, H]] = List(),
+class ReqSigInput[FH[_], H <: Http](
+    val selectors: List[RequestSelector[FH, H]] = List(),
     val params: ListSet[SigIn.Param] = ListSet()
 ):
    import Rfc8941.Serialise.given
@@ -38,9 +41,7 @@ class ReqSigInput[F[_], H <: Http](
      selectors.map(sel => sel.identifier).mkString("(", " ", ")")
    def paramStr: String =
       import Rfc8941.Serialise.*
-      if params.size == 0 then ""
-      else
-         params.map(_.canon).mkString(";", ";", "")
+      params.map(_.canon).mkString("")
 
    override def toString() = """"@signature-params": """ + siginputStr + paramStr
 

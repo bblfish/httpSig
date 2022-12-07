@@ -1,5 +1,5 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.{ CrossVersion, Def, MavenRepository, ModuleID, Test, *}
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.{CrossVersion, Def, MavenRepository, ModuleID, Test, *}
 
 object Dependencies {
   lazy val scalajsDom   = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
@@ -11,7 +11,7 @@ object Dependencies {
     lazy val munit = Def.setting("org.scalameta" %%% "munit" % "0.7.29")
     // https://github.com/typelevel/munit-cats-effect
     lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
-    
+
     // test time in cats-effect https://typelevel.org/cats-effect/docs/core/test-runtime
     lazy val catsEffectTestKit = Def.setting("org.typelevel" %% "cats-effect-testkit" % "3.4.2")
 

@@ -2,6 +2,8 @@ import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.firefox.FirefoxOptions
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import Dependencies.*
+// this import is needed to be able to run `set useJSEnv := JSEnv.Firefox` in sbt
+import JSEnv.*
 
 name := "httpSig"
 
@@ -134,6 +136,7 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
       tests.munitEffect.value,
       cats.caseInsensitive.value,
       tests.munit.value % Test,
+      tests.catsEffectTestKit.value,
       cats.bobcats.value classifier ("tests"),        // bobcats test examples,
       cats.bobcats.value classifier ("tests-sources") // bobcats test examples
     )

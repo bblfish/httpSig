@@ -43,6 +43,6 @@ class AkkaReqSigSuite extends SigInputReqSuite[cats.Id, HT](
       )
     )
 
-class AkkaStaticSigInputReqSuite extends StaticSigInputReqSuite[Id, HT](
+class AkkaStaticSigInputReqSuite extends VerifyBaseOnRequests[Id, HT](
       new ReqSelectors[Id, HT]
     )

@@ -28,22 +28,22 @@ import scala.util.{Failure, Success, Try}
 
 /** DB matching component names to selectors At selectors are hard coded, whereas header selectors
   * are more flexible, depending on the type of the syntax of a header's values
-  * @param atSel:
+  * @param reqSel:
   *   DB of Message Selectors
   * @param headerTypeDB
   *   Database mapping header ids to the recognised way of encoding that header
   */
-case class ReqComponentDB[F[_], H <: Http](
-    atSel: ReqSelectors[F, H],
+case class ReqComponentDB[FH[_], H <: Http](
+    reqSel: ReqSelectors[FH, H],
     knownIds: Seq[HeaderId]
 ):
    import Parameters.{bsTk, keyTk, nameTk, sfTk}
    import Rfc8941.SfString
 
-   def addIds(ids: HeaderId*) = ReqComponentDB(atSel, knownIds ++ ids)
+   def addIds(ids: HeaderId*) = ReqComponentDB(reqSel, knownIds ++ ids)
 
-   lazy val atComponentMap: Map[AtId, RequestSelector[F, H]] =
-      import atSel.*
+   lazy val atComponentMap: Map[AtId, RequestSelector[FH, H]] =
+      import reqSel.*
       List(
         `@path`,
         `@authority`,
@@ -58,14 +58,14 @@ case class ReqComponentDB[F[_], H <: Http](
      (AtIds.Request.all ++ knownIds).map(id => id.specName -> id).toMap
 
    // we get this info from the Signing-String header
-   def get(id: String, params: Rfc8941.Params): Either[ParsingExc, RequestSelector[F, H]] =
+   def get(id: String, params: Rfc8941.Params): Either[ParsingExc, RequestSelector[FH, H]] =
      componentIds.get(id) match
         case Some(at: AtId) => atComponentMap.get(at) match
              case Some(sel) => Right(sel)
              case None =>
                if at == AtIds.Request.`query-param` then
                   params.get(nameTk).collect {
-                    case p: SfString => atSel.`@query-param`(p)
+                    case p: SfString => reqSel.`@query-param`(p)
                   }.toRight(SelectorException(
                     s"Wrong parameter for @query-param. Received: >$params<"
                   ))
@@ -78,7 +78,7 @@ case class ReqComponentDB[F[_], H <: Http](
         case Some(hdrId: HeaderId) =>
           for
              collTp <- ReqComponentDB.interpretParams(hdrId, params)
-          yield atSel.onRequest(hdrId)(collTp)
+          yield reqSel.onRequest(hdrId)(collTp)
         case None => Left(SelectorException(s"we don't recognised component >$id<"))
 
 end ReqComponentDB

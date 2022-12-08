@@ -33,7 +33,7 @@ given V: bobcats.Verifier[SyncIO]           = Verifier.forSync[SyncIO]
 class H4VerifySigTests extends VerifySignatureTests[IO, HT](
       new ReqSelectors[IO, HT]
     ):
-  
+
    // needed for testing signatures
-  override val thisPlatform: RunPlatform = RunPlatform.JVM
-  testSignatures(specRequestSigs)
+   override val thisPlatform: RunPlatform = RunPlatform.JVM
+   testSignatures(specRequestSigs)

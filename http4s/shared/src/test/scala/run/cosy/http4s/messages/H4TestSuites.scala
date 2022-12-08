@@ -37,7 +37,7 @@ class Http4SAtRequestSelectorSuite[F[_]] extends AtRequestSelectorSuite[F, HT]:
    def sel(using ServerContext): AtReqSelectors[F, HT] =
      new AtReqSelectors[F, HT](using new SelectorFnsH4[F]) {}
    def interp: TestHttpMsgInterpreter[F, HT] = new Http4sMsgInterpreter[F]
-   def platform: HttpMsgPlatform                    = HttpMsgPlatform.Http4s
+   def platform: HttpMsgPlatform             = HttpMsgPlatform.Http4s
 
 class H4ReqSigSuite[F[_]] extends SigInputReqSuite[F, HT](
       new ReqComponentDB(

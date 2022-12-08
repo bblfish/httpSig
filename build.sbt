@@ -2,9 +2,9 @@ import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.firefox.FirefoxOptions
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
 import org.openqa.selenium.safari.SafariOptions
-import Dependencies._
+import Dependencies.*
 // this import is needed to be able to run `set useJSEnv := JSEnv.Firefox` in sbt
-import JSEnv._
+import JSEnv.*
 
 name := "httpSig"
 

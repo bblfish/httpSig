@@ -28,10 +28,11 @@ case class TestSignature(
     msg: String,
     reqStr: RequestStr,
     sigName: String,
-    time: Long,
+    created: Long,
     keyId: String,
     shouldSucceed: Boolean = true,
-    unsupported: List[RunPlatform] = Nil
+    unsupported: List[RunPlatform] = Nil,
+    expires: Long = Long.MinValue
 )
 
 object TestSignatures:
@@ -68,6 +69,7 @@ object TestSignatures:
          1618884475L,
          "test-key-rsa-pss"
        ),
+       // this has an expiration date to test too.
        // see https://github.com/httpwg/http-extensions/issues/2347
        //       TestSignature(
        //         "Sig on request §4.3 enhanced by proxy. Test original",
@@ -109,7 +111,8 @@ object TestSignatures:
          DB.`B.2_Req_sig_b25`,
          "sig-b25",
          1618884473L,
-         "test-shared-secret"
+         "test-shared-secret",
+         unsupported = List(BrowserJS) //todo: fixable, some problem with hmac needing async
        ),
        TestSignature(
          "B.2.5 signing with ed25519",
@@ -174,54 +177,66 @@ trait VerifySignatureTests[FH[_], H <: Http](
    // needed to verify signatures
    given selectorDB: ReqComponentDB[FH, H] = ReqComponentDB(hsel, HeaderIds.all) // ++ testIds.all)
 
-   def doAt[A](start: FiniteDuration, act: IO[A]): IO[Option[Outcome[Id, Throwable, A]]] =
-     TestControl.execute(act).flatMap { ctrl =>
-       for
-          _ <- ctrl.results.assertEquals(None)
-          _ <- ctrl.advanceAndTick(start)
-          x <- ctrl.results
-       yield x
-     }
-
    def testSignatures(sigs: List[TestSignature]): Unit =
-     sigs.zipWithIndex.foreach { (testSig, i) =>
-       if testSig.unsupported.contains(thisPlatform) then
-          test(s"test sig $i ${testSig.msg} cannot be run on $thisPlatform".ignore) {}
-       else
-          test(s"test sig $i: ${testSig.msg} for ${testSig.keyId}") {
+      import scala.util.control.NonLocalReturns.*
+      sigs.zipWithIndex.foreach { (testSig, i) =>
+        if testSig.unsupported.contains(thisPlatform) then
+           test(s"test sig $i ${testSig.msg} cannot be run on $thisPlatform".ignore) {}
+        else
+           val req: Request[FH, H] = interpret.asRequest(testSig.reqStr)
 
-            val req: Request[FH, H] = interpret.asRequest(testSig.reqStr)
-            // now test the signature
-            // this is where ME and Clock are needed.
-            val auth: HttpSig => IO[KeyIdentified] =
-              req.signatureAuthN[IO, KeyIdentified](signaturesDB.keyidFetcher)
-            val res: IO[KeyIdentified] = auth(HttpSig(testSig.sigName))
+           // now test the signature
+           // this is where ME and Clock are needed.
+           val authFn: (FiniteDuration, HttpSig) => IO[KeyIdentified] =
+             req.signatureAuthN[IO, KeyIdentified](signaturesDB.keyidFetcher)
+           test(s"test sig $i before time on ${testSig.msg} fails") {
 
-            val done: IO[Option[Outcome[Id, Throwable, KeyIdentified]]] =
-              doAt(FiniteDuration(testSig.time - 10, duration.SECONDS), res).map { out =>
-                 println("=====" + out)
-                 out match
-                    case Some(Outcome.Errored(e: InvalidSigException)) => assert(true, e)
-                    case x                                             => assert(false, x)
-              } >> doAt(
-                FiniteDuration(testSig.time + 1, duration.SECONDS),
-                res.to[IO]
-              )
-            if testSig.shouldSucceed then
-               done.map { x =>
-                  println("~=~=~=~=>>" + x)
-                  assertEquals(x, Some(Outcome.Succeeded(Id(PureKeyId(testSig.keyId)))), testSig)
-               }
-            else
-               done.map { v =>
-                  println("~~~~~~>" + v)
-                  v match
-                     case Some(Outcome.Errored(x)) => true
-                     case _ => throw Exception(
-                         s"the verification of $req should not have errored. Instead we got " + v
-                       )
-               }
-          }
-     }
+             authFn(
+               FiniteDuration(testSig.created - 10, duration.SECONDS),
+               HttpSig(testSig.sigName)
+             )
+               .redeemWith(
+                 t => IO(assert(true, t)),
+                 k => IO(assert(false, s"should not have received answer >$k<"))
+               )
+           }
+           test(s"test sig $i at time on ${testSig.msg} succeeds") {
+             val done: IO[KeyIdentified] =
+               authFn(FiniteDuration(testSig.created, duration.SECONDS), HttpSig(testSig.sigName))
+             if testSig.shouldSucceed then
+                done.assertEquals(PureKeyId(testSig.keyId), testSig)
+             else
+                done.redeemWith(
+                  t => IO(assert(true, t)),
+                  k => IO(assert(false, s"should not have received answer >$k<"))
+                )
+           }
+           if testSig.expires != Long.MinValue then
+              test(s"test sig $i at time on ${testSig.msg} succeeds") {
+                val done: IO[KeyIdentified] =
+                  authFn(
+                    FiniteDuration(testSig.expires - 1, duration.SECONDS),
+                    HttpSig(testSig.sigName)
+                  )
+                if testSig.shouldSucceed then
+                   done.assertEquals(PureKeyId(testSig.keyId), testSig)
+                else
+                   done.redeemWith(
+                     t => IO(assert(true, t)),
+                     k => IO(assert(false, s"should not have received answer >$k<"))
+                   )
+              }
+              test("sig after time...") {
+                authFn(
+                  FiniteDuration(testSig.expires + 1, duration.SECONDS),
+                  HttpSig(testSig.sigName)
+                )
+                  .redeemWith(
+                    t => IO(assert(true, t)),
+                    k => IO(assert(false, s"should not have received answer >$k<"))
+                  )
+              }
+
+      }
 
 end VerifySignatureTests

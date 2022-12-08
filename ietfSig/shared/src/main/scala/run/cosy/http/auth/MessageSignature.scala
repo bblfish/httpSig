@@ -33,6 +33,7 @@ import java.security.{PrivateKey, PublicKey, SignatureException}
 import java.util.Locale
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 object MessageSignature:
@@ -148,10 +149,8 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
       def signatureAuthN[F[_], A](
           fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
       )(
-          using
-          ME: MonadError[F, Throwable],
-          clock: Clock[F]
-      ): HttpSig => F[A] = (httpSig) =>
+          using ME: MonadError[F, Throwable]
+      ): (FiniteDuration, HttpSig) => F[A] = (now, httpSig) =>
         for
            (si: SigInput, sig: Bytes) <- ME.fromOption(
              req.getSignature(httpSig.proofName),
@@ -159,7 +158,6 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
                s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}'"
              )
            )
-           now <- summon[Clock[F]].realTime // todo: should it be monotonic?
            sigStr <-
              if si.isValidAt(now)
              then ME.fromEither(req.signatureBase(si))

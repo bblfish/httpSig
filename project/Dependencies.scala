@@ -13,7 +13,7 @@ object Dependencies {
     lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
 
     // test time in cats-effect https://typelevel.org/cats-effect/docs/core/test-runtime
-    lazy val catsEffectTestKit = Def.setting("org.typelevel" %% "cats-effect-testkit" % "3.4.2")
+    lazy val catsEffectTestKit = Def.setting("org.typelevel" %%% "cats-effect-testkit" % "3.4.2")
 
     lazy val discipline = Def.setting("org.typelevel" %%% "discipline-munit" % "1.0.9")
     lazy val laws       = Def.setting("org.typelevel" %%% "cats-laws" % "2.7.0")
@@ -59,8 +59,8 @@ object Dependencies {
 
     // https://index.scala-lang.org/typelevel/cats-effect/artifacts/cats-effect/3.3.14
     // todo: other libraries depend on cats effect, is this the right version?
-    lazy val catsEffect      = Def.setting("org.typelevel" %% "cats-effect" % "3.4.2")
-    lazy val caseInsensitive = Def.setting("org.typelevel" %% "case-insensitive" % "1.3.0")
+    lazy val catsEffect      = Def.setting("org.typelevel" %%% "cats-effect" % "3.4.2")
+    lazy val caseInsensitive = Def.setting("org.typelevel" %%% "case-insensitive" % "1.3.0")
   }
 
   object akka {

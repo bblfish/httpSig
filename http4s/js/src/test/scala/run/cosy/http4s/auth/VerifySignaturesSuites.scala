@@ -17,7 +17,7 @@
 package run.cosy.http4s.auth
 
 import bobcats.Verifier
-import cats.effect.{IO, Sync, SyncIO}
+import cats.effect.{Async, IO}
 import run.cosy.http.auth.TestSignatures.specRequestSigs
 import run.cosy.http.auth.VerifySignatureTests
 import run.cosy.http.messages.{ReqFns, ReqSelectors, ServerContext, TestHttpMsgInterpreter}
@@ -27,11 +27,12 @@ import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 given ServerContext                         = ServerContext("bblfish.net", true)
 given [F[_]]: TestHttpMsgInterpreter[F, HT] = new Http4sMsgInterpreter[F]
 given [F[_]]: ReqFns[F, HT]                 = new SelectorFnsH4[F]
-given ME: cats.effect.Sync[SyncIO]          = SyncIO.syncForSyncIO
-given V: bobcats.Verifier[SyncIO]           = Verifier.forSync[SyncIO]
+given ME: cats.effect.Sync[IO]              = IO.asyncForIO
+given V: bobcats.Verifier[IO]               = Verifier.forAsync[IO]
 
+// to get this to work, we need to first work out how to generically switch between IO and SyncIO
 class H4VerifySigTests extends VerifySignatureTests[IO, HT](
       new ReqSelectors[IO, HT]
     ):
-   // needed for testing signatures
+
    testSignatures(specRequestSigs)

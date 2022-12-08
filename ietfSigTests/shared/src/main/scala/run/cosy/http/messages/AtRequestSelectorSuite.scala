@@ -12,7 +12,7 @@ import scala.util.{Success, Try}
 trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
    def sel(sc: ServerContext): AtReqSelectors[F, H]
    def interp: TestHttpMsgInterpreter[F, H]
-   def platform: Platform
+   def platform: HttpMsgPlatform
 
    test("@method") {
      val sc: ServerContext       = ServerContext("www.example.com", true)
@@ -118,7 +118,7 @@ trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      import selF.*
 
      assertEquals(`@method`.signingStr(req), resS("@method", "OPTIONS"))
-     if platform != Platform.Akka then
+     if platform != HttpMsgPlatform.Akka then
         assertEquals(
           `@request-target`.signingStr(req),
           resS("@request-target", "https://www.example.com:443")
@@ -159,7 +159,7 @@ trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
           `@request-target`.signingStr(req),
           resS("@request-target", "www.example.com:80")
         )
-     catch case MessageInterpreterError(Platform.Akka, msg) => println(msg)
+     catch case MessageInterpreterError(HttpMsgPlatform.Akka, msg) => println(msg)
 
    }
 
@@ -173,7 +173,7 @@ trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
 
         assertEquals(`@method`.signingStr(req), resS("@method", "OPTIONS"))
         assertEquals(`@request-target`.signingStr(req), resS("@request-target", "*"))
-     catch case MessageInterpreterError(Platform.Akka, msg) => println(msg)
+     catch case MessageInterpreterError(HttpMsgPlatform.Akka, msg) => println(msg)
 
    }
 
@@ -182,7 +182,7 @@ trait AtRequestSelectorSuite[F[_], H <: Http] extends CatsEffectSuite:
      val sc: ServerContext = ServerContext("bblfish.net", false) // this should have no effect here
      val selF: AtReqSelectors[F, H] = sel(sc)
      import selF.*
-     if platform != Platform.Akka then
+     if platform != HttpMsgPlatform.Akka then
         assertEquals(`@query`.signingStr(req), resS("@query", "?param=value&foo=bar&baz=bat%2Dman"))
      else println("2.2.7 Query does not work with out Akka test suite.")
      assertEquals(`@method`.signingStr(req), resS("@method", "POST"))

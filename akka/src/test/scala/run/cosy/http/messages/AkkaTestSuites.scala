@@ -34,7 +34,7 @@ class AkkaAtRequestSelectorSuite extends AtRequestSelectorSuite[Id, HT]:
    def sel(using ServerContext): AtReqSelectors[Id, HT] =
      new AtReqSelectors[Id, HT](using new RequestSelectorFnsAkka()) {}
    def interp: TestHttpMsgInterpreter[cats.Id, HT] = AkkaMsgInterpreter
-   def platform: Platform                          = Platform.Akka
+   def platform: HttpMsgPlatform                          = HttpMsgPlatform.Akka
 
 class AkkaReqSigSuite extends SigInputReqSuite[cats.Id, HT](
       new ReqComponentDB(

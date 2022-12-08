@@ -1,7 +1,7 @@
 package run.cosy.http.auth
 
-import bobcats.{Signer, Verifier}
 import bobcats.Verifier.SigningString
+import bobcats.{Signer, Verifier}
 import cats.effect.syntax.all.*
 import cats.effect.testkit.TestControl
 import cats.effect.{IO, Outcome, Sync, SyncIO}
@@ -19,13 +19,19 @@ import scala.collection.immutable.ListSet
 import scala.concurrent.duration
 import scala.concurrent.duration.{FiniteDuration, TimeUnit}
 
+enum RunPlatform:
+   case BrowserJS, NodeJS, JVM
+
+import run.cosy.http.auth.RunPlatform.*
+
 case class TestSignature(
     msg: String,
     reqStr: RequestStr,
     sigName: String,
     time: Long,
     keyId: String,
-    succeed: Boolean = true
+    shouldSucceed: Boolean = true,
+    unsupported: List[RunPlatform] = Nil
 )
 
 object TestSignatures:
@@ -110,7 +116,8 @@ object TestSignatures:
          DB.`B.2_Req_sig_b26`,
          "sig-b26",
          1618884473L,
-         "test-key-ed25519"
+         "test-key-ed25519",
+         unsupported = List(BrowserJS)
        ),
        TestSignature(
          "B.3 Proxy example",
@@ -134,12 +141,12 @@ object TestSignatures:
            "transform",
            1618884473L,
            "test-key-ed25519",
-           req._2
+           req._2,
+           unsupported = List(BrowserJS)
          )
        )
      }
 end TestSignatures
-
 
 trait VerifySignatureTests[FH[_], H <: Http](
     // we don't pass it implicitly, because we need to add some headers
@@ -147,9 +154,10 @@ trait VerifySignatureTests[FH[_], H <: Http](
 )(using
     hops: HttpOps[H],
     interpret: TestHttpMsgInterpreter[FH, H],
-    ME: cats.effect.Sync[IO],
+    ME: cats.effect.Async[IO],
     V: bobcats.Verifier[IO]
 ) extends CatsEffectSuite:
+   val thisPlatform: RunPlatform
 
    val hds = HeaderIds
 
@@ -177,33 +185,44 @@ trait VerifySignatureTests[FH[_], H <: Http](
      }
 
    def testSignatures(sigs: List[TestSignature]): Unit =
+     sigs.zipWithIndex.foreach { (testSig, i) =>
+       if testSig.unsupported.contains(thisPlatform) then
+          test(s"test sig $i ${testSig.msg} cannot be run on $thisPlatform".ignore) {}
+       else
+          test(s"test sig $i: ${testSig.msg} for ${testSig.keyId}") {
 
-      sigs.zipWithIndex.foreach { (testSig, i) =>
-        test(s"test sig $i: ${testSig.msg} for ${testSig.keyId}") {
+            val req: Request[FH, H] = interpret.asRequest(testSig.reqStr)
+            // now test the signature
+            // this is where ME and Clock are needed.
+            val auth: HttpSig => IO[KeyIdentified] =
+              req.signatureAuthN[IO, KeyIdentified](signaturesDB.keyidFetcher)
+            val res: IO[KeyIdentified] = auth(HttpSig(testSig.sigName))
 
-          val req: Request[FH, H] = interpret.asRequest(testSig.reqStr)
-          // now test the signature
-          // this is where ME and Clock are needed.
-          val auth: HttpSig => IO[KeyIdentified] =
-            req.signatureAuthN[IO, KeyIdentified](signaturesDB.keyidFetcher)
-          val res: IO[KeyIdentified] = auth(HttpSig(testSig.sigName))
-          
-          val done = doAt(FiniteDuration(testSig.time - 10, duration.SECONDS), res).map {
-            case Some(Outcome.Errored(e: InvalidSigException)) => true
-            case _                                             => false
-          }.assertEquals(true) >> doAt(
-            FiniteDuration(testSig.time + 1, duration.SECONDS),
-            res.to[IO]
-          )
-          if testSig.succeed then
-             done.assertEquals(Option(Outcome.succeeded(Id(PureKeyId(testSig.keyId)))), testSig)
-          else
-             done.map(v =>
-               v match
-                  case Some(Outcome.Errored(x)) => true
-                  case _ => throw Exception(s"the verification of $req should not have errored. Instead we got "+v)
-             )
-        }
-      }
+            val done: IO[Option[Outcome[Id, Throwable, KeyIdentified]]] =
+              doAt(FiniteDuration(testSig.time - 10, duration.SECONDS), res).map { out =>
+                 println("=====" + out)
+                 out match
+                    case Some(Outcome.Errored(e: InvalidSigException)) => assert(true, e)
+                    case x                                             => assert(false, x)
+              } >> doAt(
+                FiniteDuration(testSig.time + 1, duration.SECONDS),
+                res.to[IO]
+              )
+            if testSig.shouldSucceed then
+               done.map { x =>
+                  println("~=~=~=~=>>" + x)
+                  assertEquals(x, Some(Outcome.Succeeded(Id(PureKeyId(testSig.keyId)))), testSig)
+               }
+            else
+               done.map { v =>
+                  println("~~~~~~>" + v)
+                  v match
+                     case Some(Outcome.Errored(x)) => true
+                     case _ => throw Exception(
+                         s"the verification of $req should not have errored. Instead we got " + v
+                       )
+               }
+          }
+     }
 
 end VerifySignatureTests

@@ -5,11 +5,11 @@ import run.cosy.http.Http
 import scala.util.Either
 import scala.util.matching.Regex
 
-enum Platform:
+enum HttpMsgPlatform:
    case Akka
    case Http4s
 
-case class MessageInterpreterError(platform: Platform, message: String) extends Exception
+case class MessageInterpreterError(platform: HttpMsgPlatform, message: String) extends Exception
 
 trait TestHttpMsgInterpreter[F[_], H <: Http]:
 

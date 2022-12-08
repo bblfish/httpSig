@@ -1,9 +1,10 @@
 import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.firefox.FirefoxOptions
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
-import Dependencies.*
+import org.openqa.selenium.safari.SafariOptions
+import Dependencies._
 // this import is needed to be able to run `set useJSEnv := JSEnv.Firefox` in sbt
-import JSEnv.*
+import JSEnv._
 
 name := "httpSig"
 
@@ -72,6 +73,12 @@ ThisBuild / Test / jsEnv := {
       val options = new ChromeOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
+    /* Safari is very limited, allowing only one session at a time, and no headless mode.
+     * but we leave this here, to keep track of evolution
+     * https://developer.apple.com/documentation/webkit/about_webdriver_for_safari  */
+    case JSEnv.Safari =>
+      val o = new SafariOptions()
+      new SeleniumJSEnv(o)
   }
 }
 

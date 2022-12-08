@@ -25,7 +25,7 @@ import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.Http
 import run.cosy.http.Http.Request
-import run.cosy.http.messages.{MessageInterpreterError, Platform, HttpMessageDB as DB}
+import run.cosy.http.messages.{MessageInterpreterError, HttpMsgPlatform, HttpMessageDB as DB}
 import run.cosy.http.utils.StringUtils.rfc8792single
 
 import scala.language.implicitConversions
@@ -75,10 +75,10 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.TestHttpMsgInterpreter[
             protocol = akka.http.scaladsl.model.HttpProtocols.`HTTP/1.1`
           )
         case DB.`2.2.5_OPTIONS` =>
-          throw MessageInterpreterError(Platform.Akka, "OPTIONS * cannot be built in Akka")
+          throw MessageInterpreterError(HttpMsgPlatform.Akka, "OPTIONS * cannot be built in Akka")
 
         case DB.`2.2.5_CONNECT` => throw MessageInterpreterError(
-            Platform.Akka,
+            HttpMsgPlatform.Akka,
             "CONNECT example.com:80 cannot be built in Akka"
           )
         case DB.`2.2.7_Query` => HttpRequest(

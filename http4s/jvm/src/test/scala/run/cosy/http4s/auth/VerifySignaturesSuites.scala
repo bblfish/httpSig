@@ -19,7 +19,7 @@ package run.cosy.http4s.auth
 import bobcats.Verifier
 import cats.effect.{IO, Sync, SyncIO}
 import run.cosy.http.auth.TestSignatures.specRequestSigs
-import run.cosy.http.auth.VerifySignatureTests
+import run.cosy.http.auth.{RunPlatform, VerifySignatureTests}
 import run.cosy.http.messages.{ReqFns, ReqSelectors, ServerContext, TestHttpMsgInterpreter}
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
@@ -33,5 +33,7 @@ given V: bobcats.Verifier[SyncIO]           = Verifier.forSync[SyncIO]
 class H4VerifySigTests extends VerifySignatureTests[IO, HT](
       new ReqSelectors[IO, HT]
     ):
+  
    // needed for testing signatures
-   testSignatures(specRequestSigs)
+  override val thisPlatform: RunPlatform = RunPlatform.JVM
+  testSignatures(specRequestSigs)

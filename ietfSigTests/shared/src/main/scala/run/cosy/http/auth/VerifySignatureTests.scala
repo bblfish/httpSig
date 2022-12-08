@@ -112,7 +112,6 @@ object TestSignatures:
          "sig-b25",
          1618884473L,
          "test-shared-secret",
-         unsupported = List(BrowserJS) //todo: fixable, some problem with hmac needing async
        ),
        TestSignature(
          "B.2.5 signing with ed25519",

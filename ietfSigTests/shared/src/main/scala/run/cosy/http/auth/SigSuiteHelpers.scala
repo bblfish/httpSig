@@ -3,6 +3,7 @@ package run.cosy.http.auth
 import bobcats.*
 import bobcats.HmacAlgorithm.SHA256
 import bobcats.Verifier.{Signature, SigningString}
+import cats.effect.Async
 import cats.effect.kernel.Sync
 import cats.syntax.all.*
 import cats.{Functor, Monad, MonadError}
@@ -13,7 +14,7 @@ import scodec.bits.ByteVector
 
 import scala.util.{Failure, Try}
 
-class SigSuiteHelpers[F[_]: Sync](using
+class SigSuiteHelpers[F[_]: Async](using
     // <- todo: why not something less strong than Throwable? (it's not that easy to change)
     ME: MonadError[F, Throwable],
     V: Verifier[F]

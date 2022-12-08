@@ -175,11 +175,10 @@ trait VerifySignatureTests[FH[_], H <: Http](
    given selectorDB: ReqComponentDB[FH, H] = ReqComponentDB(hsel, HeaderIds.all) // ++ testIds.all)
 
    def doAt[A](start: FiniteDuration, act: IO[A]): IO[Option[Outcome[Id, Throwable, A]]] =
-     TestControl.execute(act.to[IO]).flatMap { ctrl =>
+     TestControl.execute(act).flatMap { ctrl =>
        for
           _ <- ctrl.results.assertEquals(None)
-          _ <- ctrl.advance(start)
-          _ <- ctrl.tick
+          _ <- ctrl.advanceAndTick(start)
           x <- ctrl.results
        yield x
      }

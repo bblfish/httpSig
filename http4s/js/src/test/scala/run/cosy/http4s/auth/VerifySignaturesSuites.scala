@@ -19,21 +19,27 @@ package run.cosy.http4s.auth
 import bobcats.Verifier
 import cats.effect.{Async, IO, kernel}
 import run.cosy.http.auth.TestSignatures.specRequestSigs
-import run.cosy.http.auth.{RunPlatform, VerifySignatureTests}
-import run.cosy.http.messages.{ReqFns, ReqSelectors, ServerContext, TestHttpMsgInterpreter}
+import run.cosy.http.auth.{MessageSignature, RunPlatform, SigSuiteHelpers, VerifySignatureTests}
+import run.cosy.http.messages.*
+import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
 given ServerContext                         = ServerContext("bblfish.net", true)
-given [F[_]]: TestHttpMsgInterpreter[F, HT] = new Http4sMsgInterpreter[F]
 given [F[_]]: ReqFns[F, HT]                 = new SelectorFnsH4[F]
-given x: cats.effect.Async[IO]              = IO.asyncForIO
-given V: bobcats.Verifier[IO]               = Verifier.forAsync[IO]
 
 // to get this to work, we need to first work out how to generically switch between IO and SyncIO
 class H4VerifySigTests extends VerifySignatureTests[IO, HT](
-      new ReqSelectors[IO, HT]
+      new Http4sMsgInterpreter[IO]
     ):
    override val thisPlatform: RunPlatform = RunPlatform.BrowserJS
+   val msgSig: MessageSignature[IO, HT]   = new MessageSignature[IO, HT]
+   import Http4sTp.given
 
-   testSignatures(specRequestSigs)
+   given ME: cats.effect.Async[IO] = IO.asyncForIO
+   given V: bobcats.Verifier[IO]   = Verifier.forAsync[IO]
+   val signaturesDB                = new SigSuiteHelpers[IO]
+
+   val selectorDB: ReqComponentDB[IO, HT] = ReqComponentDB(new ReqSelectors[IO, HT], HeaderIds.all)
+
+   testSignatures(specRequestSigs, msgSig.SigVerifier(selectorDB, signaturesDB.keyidFetcher))

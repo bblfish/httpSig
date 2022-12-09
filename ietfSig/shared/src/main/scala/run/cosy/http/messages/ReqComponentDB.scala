@@ -18,7 +18,7 @@ package run.cosy.http.messages
 
 import cats.data.NonEmptyList
 import run.cosy.http.Http
-import run.cosy.http.auth.{AttributeException, ParsingExc, SelectorException}
+import run.cosy.http.auth.{AttributeException, MessageSignature, ParsingExc, SelectorException}
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.messages.HeaderId.SfHeaderId

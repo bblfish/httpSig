@@ -18,8 +18,8 @@ package run.cosy.http.auth
 
 import _root_.run.cosy.http.Http.*
 import _root_.run.cosy.http.auth.Agent
-import _root_.run.cosy.http.headers.{HttpSig, *}
 import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.*
 import _root_.run.cosy.http.messages.{ReqComponentDB, RequestSelector, `@signature-params`}
 import _root_.run.cosy.http.{Http, HttpOps}
 import cats.MonadError
@@ -75,8 +75,77 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
      selectors.foldM(List(sigParamStr)) { (lst, selector) =>
        selector.signingStr(req).map(_ :: lst)
      }
-     
-  
+
+     /** Signature Verifier builds a function to verify a given signature on a request. It takes
+       *   - a database of message and header selectors,
+       *   - and a function that from a keyId can fetch the verification function (built out of
+       *     public and private key info)
+       * return an Authenticated Agent of type A
+       *
+       * In a server setup, the function to fetch the keyId is going to be very stable, and
+       * related to the particular protocol defined, so it makes more sense to have an object that
+       * encompasses that function, can be named, and re-used. After that the HttpSig (id) really
+       * depends on the request (it should be taken from the particular request) and the time
+       * depends on the event of the httprequest arriving, so they will be variable.
+       *
+       * Todo: signature verification should be a class by itself, as one may want to use it without generating
+       *   signatures.
+       *
+       * @param fetchKeyId
+       *   function taking a keyId and returning a Verifier function that can verify a signature using
+       *   the public or symmetric key info from that keyId.
+       * @tparam F
+       *   The context to fetch the key. Something like Future or IO
+       * @tparam A
+       *   The type of agent returned by the successful verification. (placing this inside context F
+       *   should allow the agent A to be constructed only on verification of key material)
+      */
+   case class SigVerifier[F[_], A](
+       selectorDB: ReqComponentDB[FH, H],
+       fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
+   )(using ME: MonadError[F, Throwable]):
+      // while refactoring we need to use the extension function below
+      given ReqComponentDB[FH, H] = selectorDB
+
+      /** Verify that the signature Id in the request is valid
+        *
+        * @param req
+        *   The request on which to check the function
+        * @param now
+        *   the current time to check the signature validity at
+        * @param sigId
+        *   the id of the signature to find in the request (taken from the Authorization header for example)
+        * @return a verified Agent Id `A` after
+        *   1. find the signature input data in the req (no need to continue if that is not there)
+        *   1. verify the signature is still valid given the time
+        *   1. build the signature base from the request
+        *   1. if all that is good, use `fetchKeyId` to construct the needed verifier from the sigId
+        *      (fetch public key info)
+        *   1. Verify this Request message, and if verified return the Agent object A
+        * @return
+        */
+      def apply(req: Http.Request[FH, H], now: FiniteDuration, sigId: HttpSig): F[A] =
+        for
+           (si: SigInput, sig: Bytes) <- ME.fromOption(
+             req.getSignature(sigId.proofName),
+             InvalidSigException(
+               s"could not find Signature-Input and Signature for Sig name '${sigId.proofName}'"
+             )
+           )
+           sigStr <-
+             if si.isValidAt(now)
+             then ME.fromEither(req.signatureBase(si))
+             else
+                ME.fromEither(
+                  Left(InvalidSigException(s"Signature no longer valid at $now"))
+                ) // todo exception tuning
+           keyId <- ME.fromOption(si.keyid, KeyIdException("keyId missing or badly formatted"))
+           signatureVerificiationFn <- fetchKeyId(keyId)
+           agent <- signatureVerificiationFn(sigStr, sig)
+        yield agent
+
+   end SigVerifier
+
    import Http.*
    import MessageSignature.*
    import bobcats.Verifier.{Signature, SigningString}
@@ -116,73 +185,6 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
             ).leftMap(ce => CharacterCodingExc(ce.getMessage.nn))
          yield bytes
       end signatureBase
-
-      /** take a function `fetchKeyId` which takes a keyId argument and fetches in context F that
-        * key's data (public key, etc) allowing it to construct a signature verifier that can return
-        * an Agent ID of type `A`.
-        *
-        * signatureAuthN lifts such a function, into a function which given a Signature name, will
-        * use the information in the Http Message header to construct the signing string and verify
-        * the signature using the verifier returned by fetchKeyId.
-        *
-        * return an Authenticated Agent of type A
-        *
-        * todo: specify Throwable more precisely in MonadError? todo: the function `fetchKeyId`
-        * returns a F[SignatureVerifier] but the signature specification may also set constraints on
-        * the type of signature allowed. So we are missing here a way to check that the constraints
-        * are satisfied. Check what constraint verifications are needed!
-        *
-        * todo: In a server setup, the function to fetch the keyId is going to be very stable, and
-        *    related to the particular protocol defined, so it makes more sense to have an object that
-        *    encompasses that function, can be named, and re-used. After that the HttpSig (id) really
-        *    depends on the request (it should be taken from the particular request) and the time
-        *    depends on the event of the httprequest arriving.
-        *
-        * Note: that the Solid HttpSig verification would automate the finding of the signature name,
-        *    by looking for it in the `Authorization header. A protocol like that would take a function
-        *    to fetch the key, and from there require only a request and a time to verify the request.
-        *
-        *
-        * @param fetchKeyId
-        *   function taking a keyId and returning a Verifier function using the public key info from
-        *   that keyId.
-        * @tparam F
-        *   The context to fetch the key. Something like Future or IO.
-        * @tparam A
-        *   The type of agent returned by the successful verification. (placing this inside context
-        *   F should allow the agent A to be constructed only on verification of key material)
-        * @return
-        *   a function which given a particular time and an Http Signature Identifier
-        *   will return an Agent of type A in the context F. Calling this function for a Http Signature
-        *   name (e.g. "sig1") will
-        *   1. find the signature input data (to construct a signature) and the signature bytes
-        *   1. verify the signature is still valid given the time
-        *   1. use `fetchKeyId` to construct the needed verifier
-        *   1. Verify this Request message, and if verified return the Agent object A
-        */
-      def signatureAuthN[F[_], A](
-          fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
-      )(
-          using ME: MonadError[F, Throwable]
-      ): (FiniteDuration, HttpSig) => F[A] = (now, httpSigId) =>
-        for
-           (si: SigInput, sig: Bytes) <- ME.fromOption(
-             req.getSignature(httpSigId.proofName),
-             InvalidSigException(
-               s"could not find Signature-Input and Signature for Sig name '${httpSigId.proofName}'"
-             )
-           )
-           sigStr <-
-             if si.isValidAt(now)
-             then ME.fromEither(req.signatureBase(si))
-             else
-                ME.fromEither(
-                  Left(InvalidSigException(s"Signature no longer valid at $now"))
-                ) // todo exception tuning
-           keyId <- ME.fromOption(si.keyid, KeyIdException("keyId missing or badly formatted"))
-           signatureVerificiationFn <- fetchKeyId(keyId)
-           agent <- signatureVerificiationFn(sigStr, ByteVector(sig.toArray)) // todo: unify bytes
-        yield agent
 
    extension (req: Http.Request[FH, H])
 

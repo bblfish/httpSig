@@ -14,10 +14,11 @@ import scodec.bits.ByteVector
 
 import scala.util.{Failure, Try}
 
-class SigSuiteHelpers[F[_]: Async](using
+class SigSuiteHelpers[F[_]](using
     // <- todo: why not something less strong than Throwable? (it's not that easy to change)
     ME: MonadError[F, Throwable],
-    V: Verifier[F]
+    V: Verifier[F],
+    HMac: Hmac[F]
 ):
    import bobcats.Verifier.*
 
@@ -53,12 +54,12 @@ class SigSuiteHelpers[F[_]: Async](using
    //      pemutils.getPublicKeySpec(keyinfo.publicPk8Key, keyinfo.keyAlg)
 
    import bobcats.HttpMessageSignaturesV13 as SigV13
-   import bobcats.HttpMessageSignaturesV13 as SigV07
+   import bobcats.HttpMessageSignaturesV07 as SigV07
 
 
-   lazy val (rsaPubKey, rsaPrivKey)       = keySpecsFor(SigV13.`test-key-rsa`)
-   lazy val (rsaPSSPubKey, rsaPSSPrivKey) = keySpecsFor(SigV13.`test-key-rsa-pss`)
-   lazy val (ecc256PubKey, ecc256PrivKey) = keySpecsFor(SigV13.`test-key-ecc-p256`)
+   lazy val (rsaPubKey, rsaPrivKey)         = keySpecsFor(SigV13.`test-key-rsa`)
+   lazy val (rsaPSSPubKey, rsaPSSPrivKey)   = keySpecsFor(SigV13.`test-key-rsa-pss`)
+   lazy val (ecc256PubKey, ecc256PrivKey)   = keySpecsFor(SigV13.`test-key-ecc-p256`)
    lazy val (ed25519PubKey, ed25519PrivKey) = keySpecsFor(SigV07.`test-key-ed25519`)
    import run.cosy.http.utils.StringUtils.*
 

@@ -18,6 +18,7 @@ import run.cosy.http.{Http, HttpOps, auth}
 import scala.collection.immutable.ListSet
 import scala.concurrent.duration
 import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.util.Try
 
 enum RunPlatform:
    case BrowserJS, NodeJS, JVM
@@ -111,7 +112,7 @@ object TestSignatures:
          DB.`B.2_Req_sig_b25`,
          "sig-b25",
          1618884473L,
-         "test-shared-secret",
+         "test-shared-secret"
        ),
        TestSignature(
          "B.2.5 signing with ed25519",
@@ -151,32 +152,21 @@ object TestSignatures:
 end TestSignatures
 
 trait VerifySignatureTests[FH[_], H <: Http](
-    // we don't pass it implicitly, because we need to add some headers
-    hsel: ReqSelectors[FH, H]
-)(using
-    hops: HttpOps[H],
-    interpret: TestHttpMsgInterpreter[FH, H],
-    ME: cats.effect.Async[IO],
-    V: bobcats.Verifier[IO]
+    interpret: TestHttpMsgInterpreter[FH, H]
 ) extends CatsEffectSuite:
    val thisPlatform: RunPlatform
+   import cats.syntax.functor.{*, given}
+   import cats.syntax.monadError.{*, given}
 
-   val hds = HeaderIds
-
-   import HeaderSelectors.*
-   import run.cosy.http.utils.StringUtils.*
-
-   val msgSigfns: MessageSignature[FH, H] = new MessageSignature[FH, H]
-   import msgSigfns.*
-
-   val signaturesDB = new SigSuiteHelpers[IO]
-   // todo: it may be useful if hsel had a list of all the headers it used
-   // so that there was not a danger of being out of sync with the verifier in ReqComponentDB...
-   // we did not duplicate the headerIds
-   // needed to verify signatures
-   given selectorDB: ReqComponentDB[FH, H] = ReqComponentDB(hsel, HeaderIds.all) // ++ testIds.all)
-
-   def testSignatures(sigs: List[TestSignature]): Unit =
+   /*
+   * note: this function does not require IO at all, so that we could test it without needing CatsEffectSuite.
+   * the SigVerifier does take a functor F, but that could be cats.Id on java with a lookup, or
+   * it could be a Future to test Akka. For JS it needs to a async.
+   * */
+   def testSignatures[F[_]](
+       sigs: List[TestSignature],
+       verify: MessageSignature[FH, H]#SigVerifier[F, KeyIdentified]
+   )(using ME: MonadError[F, Throwable]): Unit =
       import scala.util.control.NonLocalReturns.*
       sigs.zipWithIndex.foreach { (testSig, i) =>
         if testSig.unsupported.contains(thisPlatform) then
@@ -184,56 +174,57 @@ trait VerifySignatureTests[FH[_], H <: Http](
         else
            val req: Request[FH, H] = interpret.asRequest(testSig.reqStr)
 
-           // now test the signature
-           // this is where ME and Clock are needed.
-           val authFn: (FiniteDuration, HttpSig) => IO[KeyIdentified] =
-             req.signatureAuthN[IO, KeyIdentified](signaturesDB.keyidFetcher)
            test(s"test sig $i before time on ${testSig.msg} fails") {
 
-             authFn(
+             verify(
+               req,
                FiniteDuration(testSig.created - 10, duration.SECONDS),
                HttpSig(testSig.sigName)
+             ).redeemWith(
+               t => ME.catchNonFatal(assert(true, t))),
+               k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<")))
              )
-               .redeemWith(
-                 t => IO(assert(true, t)),
-                 k => IO(assert(false, s"should not have received answer >$k<"))
-               )
            }
            test(s"test sig $i at time on ${testSig.msg} succeeds") {
-             val done: IO[KeyIdentified] =
-               authFn(FiniteDuration(testSig.created, duration.SECONDS), HttpSig(testSig.sigName))
+             val done: F[KeyIdentified] =
+               verify(
+                 req,
+                 FiniteDuration(testSig.created, duration.SECONDS),
+                 HttpSig(testSig.sigName)
+               )
              if testSig.shouldSucceed then
-                done.assertEquals(PureKeyId(testSig.keyId), testSig)
+                done.map(id => assertEquals(id, PureKeyId(testSig.keyId), testSig))
              else
                 done.redeemWith(
-                  t => IO(assert(true, t)),
-                  k => IO(assert(false, s"should not have received answer >$k<"))
+                  t => ME.catchNonFatal(assert(true, t)),
+                  k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<"))
                 )
            }
            if testSig.expires != Long.MinValue then
               test(s"test sig $i at time on ${testSig.msg} succeeds") {
-                val done: IO[KeyIdentified] =
-                  authFn(
+                val done: F[KeyIdentified] =
+                  verify(
+                    req,
                     FiniteDuration(testSig.expires - 1, duration.SECONDS),
                     HttpSig(testSig.sigName)
                   )
                 if testSig.shouldSucceed then
-                   done.assertEquals(PureKeyId(testSig.keyId), testSig)
+                   done.map(k => assertEquals(k, PureKeyId(testSig.keyId), testSig))
                 else
                    done.redeemWith(
-                     t => IO(assert(true, t)),
-                     k => IO(assert(false, s"should not have received answer >$k<"))
+                     t => ME.catchNonFatal(assert(true, t)),
+                     k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<"))
                    )
               }
               test("sig after time...") {
-                authFn(
+                verify(
+                  req,
                   FiniteDuration(testSig.expires + 1, duration.SECONDS),
                   HttpSig(testSig.sigName)
+                ).redeemWith(
+                  t => ME.catchNonFatal(assert(true, t)),
+                  k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<"))
                 )
-                  .redeemWith(
-                    t => IO(assert(true, t)),
-                    k => IO(assert(false, s"should not have received answer >$k<"))
-                  )
               }
 
       }

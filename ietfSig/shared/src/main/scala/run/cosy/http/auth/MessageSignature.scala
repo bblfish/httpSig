@@ -18,7 +18,7 @@ package run.cosy.http.auth
 
 import _root_.run.cosy.http.Http.*
 import _root_.run.cosy.http.auth.Agent
-import _root_.run.cosy.http.headers.*
+import _root_.run.cosy.http.headers.{HttpSig, *}
 import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.messages.{ReqComponentDB, RequestSelector, `@signature-params`}
 import _root_.run.cosy.http.{Http, HttpOps}
@@ -26,6 +26,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.kernel.{Clock, MonadCancel}
 import cats.syntax.all.*
+import run.cosy.http.auth.MessageSignature.SignatureVerifier
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
@@ -74,7 +75,8 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
      selectors.foldM(List(sigParamStr)) { (lst, selector) =>
        selector.signingStr(req).map(_ :: lst)
      }
-
+     
+  
    import Http.*
    import MessageSignature.*
    import bobcats.Verifier.{Signature, SigningString}
@@ -130,6 +132,17 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         * the type of signature allowed. So we are missing here a way to check that the constraints
         * are satisfied. Check what constraint verifications are needed!
         *
+        * todo: In a server setup, the function to fetch the keyId is going to be very stable, and
+        *    related to the particular protocol defined, so it makes more sense to have an object that
+        *    encompasses that function, can be named, and re-used. After that the HttpSig (id) really
+        *    depends on the request (it should be taken from the particular request) and the time
+        *    depends on the event of the httprequest arriving.
+        *
+        * Note: that the Solid HttpSig verification would automate the finding of the signature name,
+        *    by looking for it in the `Authorization header. A protocol like that would take a function
+        *    to fetch the key, and from there require only a request and a time to verify the request.
+        *
+        *
         * @param fetchKeyId
         *   function taking a keyId and returning a Verifier function using the public key info from
         *   that keyId.
@@ -139,23 +152,24 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         *   The type of agent returned by the successful verification. (placing this inside context
         *   F should allow the agent A to be constructed only on verification of key material)
         * @return
-        *   a function which given a particular Http Signature name will return an Agent of type A
-        *   in the context F. Calling this function for a Http Signature name (e.g. "sig1") will
+        *   a function which given a particular time and an Http Signature Identifier
+        *   will return an Agent of type A in the context F. Calling this function for a Http Signature
+        *   name (e.g. "sig1") will
         *   1. find the signature input data (to construct a signature) and the signature bytes
-        *   1. verify the signature is still valid given the clock,
+        *   1. verify the signature is still valid given the time
         *   1. use `fetchKeyId` to construct the needed verifier
-        *   1. Verify the header, and if verified return the Agent object A
+        *   1. Verify this Request message, and if verified return the Agent object A
         */
       def signatureAuthN[F[_], A](
           fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
       )(
           using ME: MonadError[F, Throwable]
-      ): (FiniteDuration, HttpSig) => F[A] = (now, httpSig) =>
+      ): (FiniteDuration, HttpSig) => F[A] = (now, httpSigId) =>
         for
            (si: SigInput, sig: Bytes) <- ME.fromOption(
-             req.getSignature(httpSig.proofName),
+             req.getSignature(httpSigId.proofName),
              InvalidSigException(
-               s"could not find Signature-Input and Signature for Sig name '${httpSig.proofName}'"
+               s"could not find Signature-Input and Signature for Sig name '${httpSigId.proofName}'"
              )
            )
            sigStr <-

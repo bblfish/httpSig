@@ -1,5 +1,9 @@
 # Data Model
 
+The first implementation of [draft-ietf-httpbis-message-signatures 07](https://datatracker.ietf.org/doc/draft-ietf-httpbis-message-signatures/) proceeded by trial and error, and was useable. The second implementation - at this point of version 013 - built on the previous work. These two implementations were using what I call below the Kleisli category of `Try`, ie every function was wrapped in a Try monad. This was correct for a server receiving a signed request, but felt wrong for a client that already knew how and what it was going to sign. There a typesafe approach using well defined functions with set arguments and values felt more correct.
+
+Below is the reasoning I followed to get from one to the other. 
+Having worked this through, the coding process went a lot smoother.
 
 ## Morphisms in a Kleisli category of an error monad
 
@@ -7,7 +11,7 @@ We have something like the following morphisms in the Kleisli category of the Tr
 in the Kleisli category as `X ⟹ Y`
 
 ```scala
-CompontenDB : ID ⟹ Component
+CompontentDB : ID ⟹ Component
 Component : Params ⟹ Selector
 Selector : Msg ⟹ String
 ```

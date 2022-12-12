@@ -14,35 +14,37 @@
  * limitations under the License.
  */
 
-package run.cosy.http4s.auth
+package run.cosy.http.auth
 
-import bobcats.Verifier
-import cats.MonadError
 import cats.effect.{IO, Sync, SyncIO}
-import run.cosy.http.HttpOps
+import cats.{Id, MonadError}
+import bobcats.Verifier
+import run.cosy.akka.http.AkkaTp
+import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.auth.TestSignatures.specRequestSigs
-import run.cosy.http.auth.*
+import run.cosy.http.auth.VerifySignatureTests
 import run.cosy.http.messages.*
-import run.cosy.http4s.Http4sTp
-import run.cosy.http4s.Http4sTp.HT
-import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
+import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext         = ServerContext("bblfish.net", true)
-given [F[_]]: ReqFns[F, HT] = new SelectorFnsH4[F]
+given ServerContext  = ServerContext("bblfish.net", true)
+given ReqFns[Id, HT] = new RequestSelectorFnsAkka
+import scala.concurrent.Future
 
-class H4VerifySigTests extends VerifySignatureTests[IO, HT](
-      new Http4sMsgInterpreter[IO]
+class AkkaVerifySigTests extends VerifySignatureTests[Id, HT](
+      AkkaMsgInterpreter
     ):
    override val thisPlatform: RunPlatform = RunPlatform.JVM
-   val msgSig: MessageSignature[IO, HT]   = new MessageSignature[IO, HT]
+   val msgSig: MessageSignature[Id, HT]   = new MessageSignature[Id, HT]
 
-   import Http4sTp.given
+   import AkkaTp.given
+
    given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
    given V: bobcats.Verifier[SyncIO]  = Verifier.forSync[SyncIO]
    val signaturesDB                   = new SigSuiteHelpers[SyncIO]
 
-   val selectorDB: ReqComponentDB[IO, HT] = ReqComponentDB(new ReqSelectors[IO, HT], HeaderIds.all)
+   val selectorDB: ReqComponentDB[Id, HT] = ReqComponentDB(new ReqSelectors[Id, HT], HeaderIds.all)
 
-   // needed for testing signatures
-
-   testSignatures(specRequestSigs, msgSig.SigVerifier(selectorDB, signaturesDB.keyidFetcher))
+   testSignatures[SyncIO](
+     specRequestSigs,
+     msgSig.SigVerifier(selectorDB, signaturesDB.keyidFetcher)
+   )

@@ -182,7 +182,9 @@ object HttpMessageDB:
        |  LMCy8uqK488o+9jrptQ+xFPHK7a9sRL1IXNaagCNN3ZxJsYapFj+JXbmaI5rtAdSf\
        |  SvzPuBCh+ARHBmWuNo1UzVVdHXrl8ePL4cccqlazIJdC4QEjrF+Sn4IxBQzTZsL9y\
        |  9TP5FsZYzHvDqbInkTNigBcE9cKOYNFCn4D/WM7F6TNuZO9EgtzepLWcjTymlHzK7\
-       |  aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:""".rfc8792single
+       |  aXq6Am6sfOrpIC49yXjj3ae6HRalVc/g==:
+       |
+       |{"hello": "world"}""".rfc8792single
    )
 
    val `4.3_POST_Sig1` = RequestStr(

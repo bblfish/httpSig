@@ -181,8 +181,8 @@ trait VerifySignatureTests[FH[_], H <: Http](
                FiniteDuration(testSig.created - 10, duration.SECONDS),
                HttpSig(testSig.sigName)
              ).redeemWith(
-               t => ME.catchNonFatal(assert(true, t))),
-               k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<")))
+               t => ME.catchNonFatal(assert(true, t)),
+               k => ME.catchNonFatal(assert(false, s"should not have received answer >$k<"))
              )
            }
            test(s"test sig $i at time on ${testSig.msg} succeeds") {

@@ -11,15 +11,15 @@ enum HttpMsgPlatform:
 
 case class MessageInterpreterError(platform: HttpMsgPlatform, message: String) extends Exception
 
-trait TestHttpMsgInterpreter[F[_], H <: Http]:
+trait TestHttpMsgInterpreter[H <: Http]:
 
    import run.cosy.http.messages.HttpMessageDB.{RequestStr,ResponseStr}
 
    @throws[Throwable]("if the request string could not be interpreted")
-   def asRequest(header: RequestStr): Http.Request[F, H]
+   def asRequest(header: RequestStr): Http.Request[H]
 
    @throws[Throwable]("if the response string could not be interpreted")
-   def asResponse(header: ResponseStr): Http.Response[F,H]
+   def asResponse(header: ResponseStr): Http.Response[H]
    
    
 object TestHttpMsgInterpreter:

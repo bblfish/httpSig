@@ -58,12 +58,12 @@ end SelectorFn
   */
 
 /** see [[README.md README.md]] for justification. */
-trait RequestSelector[F[_], H <: Http] extends Selector:
-   type Msg = Http.Request[F, H]
+trait RequestSelector[H <: Http] extends Selector:
+   type Msg = Http.Request[H]
 
 /** see [[README.md README]] for justification. */
-trait ResponseSelector[F[_], H <: Http] extends Selector:
-   type Msg = Http.Response[F, H]
+trait ResponseSelector[H <: Http] extends Selector:
+   type Msg = Http.Response[H]
 
 /** This is the class that keeps track of the name of the selector function and its rendering to a
   * base string, that will be used in the signature

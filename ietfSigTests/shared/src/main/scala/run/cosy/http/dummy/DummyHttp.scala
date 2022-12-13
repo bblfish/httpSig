@@ -16,23 +16,24 @@ import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
 
 object DummyHttp extends Http:
   http =>
-  
-  override type Message[F[_]] =  Seq[Header]
-  override type Request[F[_]] =  Seq[Header]
-  override type Response[F[_]]=  Seq[Header]
+
+  override type F[A] = cats.Id[A]
+  override type Message =  Seq[Header]
+  override type Request =  Seq[Header]
+  override type Response =  Seq[Header]
 
   override type Header = (CIString, String)
   
   given hOps: HttpOps[HT] with
   
-    val Signature: SignatureMatcher[run.cosy.http.dummy.DummyHttp.HT] = ???
-    val `Signature-Input`: SignatureInputMatcher[run.cosy.http.dummy.DummyHttp.HT] = ???
+    val Signature: SignatureMatcher[DummyHttp.HT] = ???
+    val `Signature-Input`: SignatureInputMatcher[DummyHttp.HT] = ???
     /** extensions needed to abstract across HTTP implementations for our purposes */
-    extension[F[_]] (msg: Http.Message[F, HT])
-      def headers: Seq[Http.Header[HT]] =
+    extension (msg: Http.Message[HT])
+      def headerSeq: Seq[Http.Header[HT]] =
         msg.asInstanceOf[Seq[Header]]
 
-    extension[F[_], R <: Http.Message[F, HT]] (msg: R)
+    extension[R <: Http.Message[HT]] (msg: R)
       def addHeaders(headers: Seq[Http.Header[HT]]): R =
         val x: Seq[Header] = msg.asInstanceOf[Seq[Header]] :++ headers
         x.asInstanceOf[R]
@@ -61,14 +62,14 @@ import run.cosy.http.Http
 import run.cosy.http.Http.*
 
   
-object DummyHeaderSelectorFns extends messages.RequestHeaderSelectorFns[Id,DHT]
-    with messages.ResponseHeaderSelectorFns[Id, DHT]:
+object DummyHeaderSelectorFns extends messages.RequestHeaderSelectorFns[DHT]
+    with messages.ResponseHeaderSelectorFns[DHT]:
 
   import DummyHttp.given
 
   override def requestHeaders(name: HeaderId): RequestFn =
-    new messages.SelectorFn[Http.Request[Id,DHT]]:
-      override val signingValues: Request[Id, DHT] => Either[ParsingExc, String|NonEmptyList[String]] =
+    new messages.SelectorFn[Http.Request[DHT]]:
+      override val signingValues: Request[DHT] => Either[ParsingExc, String|NonEmptyList[String]] =
         req => msgSel(name, req.asInstanceOf[Seq[(String,String)]])
         
   end requestHeaders 
@@ -82,8 +83,8 @@ object DummyHeaderSelectorFns extends messages.RequestHeaderSelectorFns[Id,DHT]
   end msgSel
 
   override def responseHeaders(name: HeaderId): ResponseFn =
-    new messages.SelectorFn[Http.Response[Id,DHT]]:
-      override val signingValues: Response[Id, DHT] => Either[ParsingExc, String | NonEmptyList[String]] =
+    new messages.SelectorFn[Http.Response[DHT]]:
+      override val signingValues: Response[DHT] => Either[ParsingExc, String | NonEmptyList[String]] =
         res => msgSel(name, res.asInstanceOf[Seq[(String,String)]])
 
 end DummyHeaderSelectorFns

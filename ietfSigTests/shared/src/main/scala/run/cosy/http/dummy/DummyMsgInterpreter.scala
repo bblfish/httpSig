@@ -8,10 +8,10 @@ import run.cosy.http.Http.Response
 import run.cosy.http.messages.HttpMessageDB.ResponseStr
 import org.typelevel.ci.*
 
-class DummyMsgInterpreter extends TestHttpMsgInterpreter[cats.Id, DummyHttp.HT]:
+class DummyMsgInterpreter extends TestHttpMsgInterpreter[DummyHttp.HT]:
    val VerticalTAB: Char           = "\u000B".head
 
-   def asRequest(header: RequestStr): Request[cats.Id, DummyHttp.HT] =
+   def asRequest(header: RequestStr): Request[DummyHttp.HT] =
       val res = header match
          case HttpMessageDB.`§2.1_HeaderField` => Seq[(CIString, String)](
              ci"Host"              -> "www.example.com",
@@ -26,9 +26,9 @@ class DummyMsgInterpreter extends TestHttpMsgInterpreter[cats.Id, DummyHttp.HT]:
              ci"Example-Dict"      -> "  d",
              ci"Example-Header"    -> "of, commas"
            )
-      removeObsLF(res).asInstanceOf[Request[cats.Id, DummyHttp.HT]]
+      removeObsLF(res).asInstanceOf[Request[DummyHttp.HT]]
    end asRequest
-   def asResponse(header: ResponseStr): Response[cats.Id, DummyHttp.HT] = ???
+   def asResponse(header: ResponseStr): Response[DummyHttp.HT] = ???
 
 
    def removeObsLF(msg: Seq[(CIString, String)]): Seq[(CIString, String)] = msg.map { (k, v) =>

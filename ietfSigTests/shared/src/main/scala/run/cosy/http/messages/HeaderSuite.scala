@@ -52,10 +52,10 @@ object HeaderSuite:
   * Running on underlying implementations is still useful because those may or may not
   * interpret the headers before the client receives them.
   */
-open class HeaderSuite[F[_], H <: Http](
-    selectr: RequestHeaderSelectors[F, H]
+open class HeaderSuite[H <: Http](
+    selectr: RequestHeaderSelectors[H]
 )(using
-  interp: TestHttpMsgInterpreter[F, H]
+  interp: TestHttpMsgInterpreter[H]
 ) extends CatsEffectSuite:
 
    import _root_.run.cosy.http.headers.Rfc8941
@@ -101,7 +101,7 @@ open class HeaderSuite[F[_], H <: Http](
    /** example from [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html
      */
    // the example in the spec does not have the `GET`. Added here for coherence
-   lazy val `§2.1_HF`: Request[F, H] = interp.asRequest(DB.`§2.1_HeaderField`)
+   lazy val `§2.1_HF`: Request[H] = interp.asRequest(DB.`§2.1_HeaderField`)
 
    //  val `§2.1_HeadersWihoutObsLF`: HttpHeaders = `§2.1_HeaderField`.map { (k, v) =>
    //    (k, v.split(VerticalTAB).map(_.trim).mkString(" "))

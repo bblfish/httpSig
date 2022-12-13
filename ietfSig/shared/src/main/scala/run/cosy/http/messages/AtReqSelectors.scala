@@ -26,53 +26,53 @@ import scala.collection.immutable.ListMap
 import scala.util.{Success, Try}
 
 /** These selectors can all be used to build a Signature-Input */
-open class AtRequestSel[F[_], H <: Http](
+open class AtRequestSel[H <: Http](
     val name: AtId,
-    val selectorFn: SelectorFn[Http.Request[F, H]],
+    val selectorFn: SelectorFn[Http.Request[H]],
     override val params: Rfc8941.Params = ListMap()
-) extends RequestSelector[F, H]:
+) extends RequestSelector[H]:
    override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
      Right(nel.map(header + _).toList.mkString("\n"))
 
-open class AtResponseSel[F[_], H <: Http](
+open class AtResponseSel[H <: Http](
     val name: AtId,
-    val selectorFn: SelectorFn[Http.Response[F, H]],
+    val selectorFn: SelectorFn[Http.Response[H]],
     override val params: Rfc8941.Params = ListMap()
-) extends ResponseSelector[F, H]:
+) extends ResponseSelector[H]:
    override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
      Right(nel.map(header + _).toList.mkString("\n"))
 
-trait AtReqSelectors[F[_], H <: Http](using sf: AtReqSelectorFns[F, H]):
+trait AtReqSelectors[H <: Http](using sf: AtReqSelectorFns[H]):
 
    import AtIds.Request.*
    import Rfc8941.Syntax.*
-   lazy val `@method`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](method, sf.method)
+   lazy val `@method`: AtRequestSel[H] =
+     AtRequestSel[H](method, sf.method)
 
-   lazy val `@request-target`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`request-target`, sf.requestTarget)
+   lazy val `@request-target`: AtRequestSel[H] =
+     AtRequestSel[H](`request-target`, sf.requestTarget)
 
-   lazy val `@target-uri`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`target-uri`, sf.targetUri)
+   lazy val `@target-uri`: AtRequestSel[H] =
+     AtRequestSel[H](`target-uri`, sf.targetUri)
 
-   lazy val `@authority`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`authority`, sf.authority)
+   lazy val `@authority`: AtRequestSel[H] =
+     AtRequestSel[H](`authority`, sf.authority)
 
-   lazy val `@scheme`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`scheme`, sf.scheme)
+   lazy val `@scheme`: AtRequestSel[H] =
+     AtRequestSel[H](`scheme`, sf.scheme)
 
-   lazy val `@path`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`path`, sf.path)
+   lazy val `@path`: AtRequestSel[H] =
+     AtRequestSel[H](`path`, sf.path)
 
-   lazy val `@query`: AtRequestSel[F, H] =
-     AtRequestSel[F, H](`query`, sf.query)
+   lazy val `@query`: AtRequestSel[H] =
+     AtRequestSel[H](`query`, sf.query)
 
    /** todo: arguably the paramName should be an Rfc8941.Token, because it will be used as the key
      * in a dict, and that is a token. But then one has to be careful to render that token as a
      * string in the `"@query-param";key="q":` header
      */
-   def `@query-param`(paramName: SfString): RequestSelector[F, H] =
-     AtRequestSel[F, H](
+   def `@query-param`(paramName: SfString): RequestSelector[H] =
+     AtRequestSel[H](
        `query-param`,
        sf.queryParam(paramName),
        Params(Parameters.nameTk -> paramName)
@@ -80,7 +80,7 @@ trait AtReqSelectors[F[_], H <: Http](using sf: AtReqSelectorFns[F, H]):
 
 end AtReqSelectors
 
-trait AtResSelectors[F[_], H <: Http](using sf: AtResSelectorFns[F, H]):
+trait AtResSelectors[H <: Http](using sf: AtResSelectorFns[H]):
 
-   lazy val `@status`: AtResponseSel[F, H] =
-     AtResponseSel[F, H](AtIds.Response.`status`, sf.status)
+   lazy val `@status`: AtResponseSel[H] =
+     AtResponseSel[H](AtIds.Response.`status`, sf.status)

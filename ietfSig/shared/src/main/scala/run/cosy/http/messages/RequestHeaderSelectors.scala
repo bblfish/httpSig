@@ -23,16 +23,16 @@ import run.cosy.http.headers.Rfc8941
 
 import scala.collection.immutable.ListMap
 
-class RequestHeaderSel[F[_], H <: Http](
+class RequestHeaderSel[H <: Http](
     override val name: HeaderId,
     collTp: name.AllowedCollation,
-    override val selectorFn: SelectorFn[Http.Request[F, H]],
+    override val selectorFn: SelectorFn[Http.Request[H]],
     override val params: Rfc8941.Params = ListMap()
-) extends RequestSelector[F, H]:
+) extends RequestSelector[H]:
    override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
      HeaderSelectors.render(name, collTp)(nel).map(header + _)
 
-trait RequestHeaderSelectors[F[_], H <: Http](using sf: RequestHeaderSelectorFns[F, H]):
+trait RequestHeaderSelectors[H <: Http](using sf: RequestHeaderSelectorFns[H]):
 
    /** build a request Header selector for the given header id.
      * @collTp
@@ -40,8 +40,8 @@ trait RequestHeaderSelectors[F[_], H <: Http](using sf: RequestHeaderSelectorFns
      */
    def onRequest(name: HeaderId)(
        collTp: name.AllowedCollation
-   ): RequestSelector[F, H] =
-     new RequestHeaderSel[F, H](
+   ): RequestSelector[H] =
+     new RequestHeaderSel[H](
        name,
        collTp,
        sf.requestHeaders(name),

@@ -33,8 +33,8 @@ import scala.util.{Failure, Success, Try}
   * @param headerTypeDB
   *   Database mapping header ids to the recognised way of encoding that header
   */
-case class ReqComponentDB[FH[_], H <: Http](
-    reqSel: ReqSelectors[FH, H],
+case class ReqComponentDB[H <: Http](
+    reqSel: ReqSelectors[H],
     knownIds: Seq[HeaderId]
 ):
    import Parameters.{bsTk, keyTk, nameTk, sfTk}
@@ -42,7 +42,7 @@ case class ReqComponentDB[FH[_], H <: Http](
 
    def addIds(ids: HeaderId*) = ReqComponentDB(reqSel, knownIds ++ ids)
 
-   lazy val atComponentMap: Map[AtId, RequestSelector[FH, H]] =
+   lazy val atComponentMap: Map[AtId, RequestSelector[H]] =
       import reqSel.*
       List(
         `@path`,
@@ -58,7 +58,7 @@ case class ReqComponentDB[FH[_], H <: Http](
      (AtIds.Request.all ++ knownIds).map(id => id.specName -> id).toMap
 
    // we get this info from the Signing-String header
-   def get(id: String, params: Rfc8941.Params): Either[ParsingExc, RequestSelector[FH, H]] =
+   def get(id: String, params: Rfc8941.Params): Either[ParsingExc, RequestSelector[H]] =
      componentIds.get(id) match
         case Some(at: AtId) => atComponentMap.get(at) match
              case Some(sel) => Right(sel)

@@ -18,5 +18,5 @@ package run.cosy.http.messages
 
 import run.cosy.http.Http
 
-class ReqSelectors[F[_], H <: Http](using ReqFns[F, H])
-    extends AtReqSelectors[F, H] with RequestHeaderSelectors[F, H]
+class ReqSelectors[H <: Http](using ReqFns[H])
+    extends AtReqSelectors[H] with RequestHeaderSelectors[H]

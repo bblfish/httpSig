@@ -62,14 +62,14 @@ object MessageSignature:
   *
   * I will use those names to distinguish the types of functors we are using.
   */
-class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
+class MessageSignature[H <: Http](using ops: HttpOps[H]):
 
    /** return the sigbase given the request selectors and the corresponding @signature-params
      * string.
      */
    protected def sigBaseFn(
-       req: Http.Request[FH, H],
-       selectors: List[RequestSelector[FH, H]],
+       req: Http.Request[H],
+       selectors: List[RequestSelector[H]],
        sigParamStr: String
    ): Either[ParsingExc, List[String]] =
      selectors.foldM(List(sigParamStr)) { (lst, selector) =>
@@ -100,11 +100,11 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
        *   should allow the agent A to be constructed only on verification of key material)
        */
    case class SigVerifier[F[_], A](
-       selectorDB: ReqComponentDB[FH, H],
+       selectorDB: ReqComponentDB[H],
        fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
    )(using ME: MonadError[F, Throwable]):
       // while refactoring we need to use the extension function below
-      given ReqComponentDB[FH, H] = selectorDB
+      given ReqComponentDB[H] = selectorDB
 
       /** Verify that the signature Id in the request is valid
         *
@@ -125,7 +125,7 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         *   1. Verify this Request message, and if verified return the Agent object A
         * @return
         */
-      def apply(req: Http.Request[FH, H], now: FiniteDuration, sigId: HttpSig): F[A] =
+      def apply(req: Http.Request[H], now: FiniteDuration, sigId: HttpSig): F[A] =
         for
            (si: SigInput, sig: Bytes) <- ME.fromOption(
              req.getSignature(sigId.proofName),
@@ -154,11 +154,7 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
 
    val urlStrRegex = "<(.*)>".r
 
-   // todo: is this the right place
-
-   /** [[https://tools.ietf.org/html/draft-ietf-httpbis-message-signatures-03#section-4.1 Message Signatures]]
-     */
-   extension (req: Http.Request[FH, H])(using selectorDB: ReqComponentDB[FH, H])
+   extension (req: Http.Request[H])(using selectorDB: ReqComponentDB[H])
 
       /** Generate the signature string, given the `signature-input` header. Note, that the headers
         * to be signed, always contains the `signature-input` header itself.
@@ -172,8 +168,8 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         *   be more correct if the result is a byte array, rather than a Unicode String.
         */
       def signatureBase(sigInput: SigInput): Either[ParsingExc, SigningString] =
-         val xl: Either[ParsingExc, List[RequestSelector[FH, H]]] = sigInput.headerItems
-           .foldLeftM(List[RequestSelector[FH, H]]()) { (lst, pih) =>
+         val xl: Either[ParsingExc, List[RequestSelector[H]]] = sigInput.headerItems
+           .foldLeftM(List[RequestSelector[H]]()) { (lst, pih) =>
              selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
            }
          for
@@ -187,9 +183,9 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
          yield bytes
       end signatureBase
 
-   extension (req: Http.Request[FH, H])
+   extension (req: Http.Request[H])
 
-      def sigBase(sigIn: ReqSigInput[FH, H]): Either[ParsingExc, SigningString] =
+      def sigBase(sigIn: ReqSigInput[H]): Either[ParsingExc, SigningString] =
         for
            lines <- sigBaseFn(req, sigIn.selectors.reverse, sigIn.toString)
            bytes <- ByteVector.encodeAscii(lines.mkString("\n"))
@@ -212,11 +208,11 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         *   that were signed, where the key is and what the signing algorithm used was
         */
       def getSignature(name: Rfc8941.Token): Option[(SigInput, ByteVector)] =
-        req.headers.collectFirst {
+        req.headerSeq.collectFirst {
           case `Signature-Input`(inputs) if inputs.si.contains(name) =>
             inputs.si(name)
         }.flatMap { siginput =>
-          req.headers.collectFirst {
+          req.headerSeq.collectFirst {
             case Signature(sigs) if sigs.sigmap.contains(name) =>
               (siginput, sigs.sigmap(name).item)
           }
@@ -240,9 +236,9 @@ class MessageSignature[FH[_], H <: Http](using ops: HttpOps[H]):
         */
       def withSigInput[F[_]](
           name: Rfc8941.Token,
-          sin: ReqSigInput[FH, H],
+          sin: ReqSigInput[H],
           signerF: SigningF[F]
-      )(using meF: MonadError[F, Throwable]): F[Http.Request[FH, H]] =
+      )(using meF: MonadError[F, Throwable]): F[Http.Request[H]] =
         for
            toSignBytes <- meF.fromEither(req.sigBase(sin))
            signature   <- signerF(toSignBytes)

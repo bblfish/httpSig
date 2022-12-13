@@ -25,12 +25,12 @@ import org.typelevel.ci.CIString
 import run.cosy.http.messages.TestHttpMsgInterpreter
 import scodec.bits.ByteVector
 
-class Http4sMsgInterpreter[FH[_]]
-    extends run.cosy.http.messages.TestHttpMsgInterpreter[FH, Http4sTp.HT]:
+object Http4sMsgInterpreter
+    extends TestHttpMsgInterpreter[Http4sTp.HT]:
 
    import run.cosy.http.messages.HttpMessageDB.{RequestStr, ResponseStr}
 
-   override def asRequest(request: RequestStr): Http.Request[FH, HT] =
+   override def asRequest(request: RequestStr): Http.Request[HT] =
      request.str.split(Array('\n', '\r')).toList match
         case head :: tail =>
           head.split("\\s+").nn.toList match
@@ -41,12 +41,12 @@ class Http4sMsgInterpreter[FH[_]]
                val (rawH, body) = parseHeaders(tail)
                import org.http4s.Header.ToRaw.{given, *}
                // we can ignore the body here, since that is actually not relevant to signing
-               org.http4s.Request[FH](m, p, v, org.http4s.Headers(rawH))
-                 .asInstanceOf[Http.Request[FH, HT]] // <- todo: why needed?
+               org.http4s.Request[Http4sTp.F](m, p, v, org.http4s.Headers(rawH))
+                 .asInstanceOf[Http.Request[HT]] // <- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Request Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 
-   override def asResponse(response: ResponseStr): Http.Response[FH, HT] =
+   override def asResponse(response: ResponseStr): Http.Response[HT] =
      response.str.split(Array('\n', '\r')).nn.toList match
         case head :: tail =>
           head.split("\\s+").nn.toList match
@@ -59,8 +59,8 @@ class Http4sMsgInterpreter[FH[_]]
                val e = body match
                   case "" => org.http4s.Entity.Empty
                   case _  => org.http4s.Entity.Strict(ByteVector.encodeAscii(body).toOption.get)
-               org.http4s.Response[FH](status, version, org.http4s.Headers(rawH), e)
-                 .asInstanceOf[Http.Response[FH, HT]] // <- todo: why needed?
+               org.http4s.Response(status, version, org.http4s.Headers(rawH), e)
+                 .asInstanceOf[Http.Response[HT]] // <- todo: why needed?
              case _ => throw new Exception("Badly formed HTTP Response Command '" + head + "'")
         case _ => throw new Exception("Badly formed HTTP request")
 

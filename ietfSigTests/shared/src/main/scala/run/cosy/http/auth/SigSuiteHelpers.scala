@@ -8,6 +8,7 @@ import cats.effect.kernel.Sync
 import cats.syntax.all.*
 import cats.{Functor, Monad, MonadError}
 import run.cosy.http.auth.MessageSignature as MsgSig
+import run.cosy.http.auth.MessageSignature.SigningF
 import run.cosy.http.headers.Rfc8941
 import run.cosy.http.headers.Rfc8941.SfString
 import scodec.bits.ByteVector
@@ -18,6 +19,7 @@ class SigSuiteHelpers[F[_]](using
     // <- todo: why not something less strong than Throwable? (it's not that easy to change)
     ME: MonadError[F, Throwable],
     V: Verifier[F],
+    S: Signer[F],
     HMac: Hmac[F]
 ):
    import bobcats.Verifier.*
@@ -53,9 +55,7 @@ class SigSuiteHelpers[F[_]](using
 
    //      pemutils.getPublicKeySpec(keyinfo.publicPk8Key, keyinfo.keyAlg)
 
-   import bobcats.HttpMessageSignaturesV13 as SigV13
-   import bobcats.HttpMessageSignaturesV07 as SigV07
-
+   import bobcats.{HttpMessageSignaturesV07 as SigV07, HttpMessageSignaturesV13 as SigV13}
 
    lazy val (rsaPubKey, rsaPrivKey)         = keySpecsFor(SigV13.`test-key-rsa`)
    lazy val (rsaPSSPubKey, rsaPSSPrivKey)   = keySpecsFor(SigV13.`test-key-rsa-pss`)
@@ -90,3 +90,12 @@ class SigSuiteHelpers[F[_]](using
                else ME.fromTry(Failure(CryptoException("cannot verify symmetric key")))
              )
          case x => ME.fromEither(Left(new Exception(s"can't get info on sig $x")))
+
+   def signerFor(keyId: Rfc8941.SfString): F[SigningF[F]] =
+      import bobcats.AsymmetricKeyAlg as Asym
+      keyId.asciiStr match
+         case "test-key-rsa-pss" =>
+           S.build(rsaPSSPrivKey, Asym.`rsa-pss-sha512`)
+         case "test-key-rsa"      => S.build(rsaPrivKey, Asym.`rsa-v1_5-sha256`)
+         case "test-key-ecc-p256" => S.build(ecc256PrivKey, Asym.`ecdsa-p256-sha256`)
+         case "test-key-ed25519"  => S.build(ed25519PrivKey, Asym.ed25119)

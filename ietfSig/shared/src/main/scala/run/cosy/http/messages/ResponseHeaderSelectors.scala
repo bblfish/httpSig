@@ -23,20 +23,20 @@ import run.cosy.http.auth.ParsingExc
 import run.cosy.http.headers.Rfc8941
 import scala.collection.immutable.ListMap
 
-class ResponseHeaderSel[F[_], H <: Http](
+class ResponseHeaderSel[H <: Http](
     override val name: HeaderId,
     collTp: name.AllowedCollation,
-    override val selectorFn: SelectorFn[Http.Response[F, H]],
+    override val selectorFn: SelectorFn[Http.Response[H]],
     override val params: Rfc8941.Params = ListMap()
-) extends ResponseSelector[F, H]:
+) extends ResponseSelector[H]:
    override def renderNel(nel: NonEmptyList[String]): Either[ParsingExc, String] =
      HeaderSelectors.render(name, collTp)(nel).map(header + _)
 
-trait ResponseHeaderSelectors[F[_], H <: Http](using sf: ResponseHeaderSelectorFns[F, H]):
+trait ResponseHeaderSelectors[H <: Http](using sf: ResponseHeaderSelectorFns[H]):
    def onResponse(name: HeaderId)(
        collTp: name.AllowedCollation
-   ): ResponseSelector[F, H] =
-     new ResponseHeaderSel[F, H](
+   ): ResponseSelector[H] =
+     new ResponseHeaderSel[H](
        name,
        collTp,
        sf.responseHeaders(name),

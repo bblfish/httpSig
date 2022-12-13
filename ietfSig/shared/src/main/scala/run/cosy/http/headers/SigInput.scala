@@ -122,7 +122,7 @@ object SigInput:
      if valid(il) then Some(new SigInput(il)) else None
 
    /* this will always succeed */
-   def apply(sigIn: ReqSigInput[?, ?]): SigInput =
+   def apply(sigIn: ReqSigInput[?]): SigInput =
       val pitems: List[PItem[SfString]] = sigIn.selectors.map { sel =>
         new PItem(SfString(sel.name.lcname), sel.params)
       }

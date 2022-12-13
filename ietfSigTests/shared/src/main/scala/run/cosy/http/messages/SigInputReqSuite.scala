@@ -11,18 +11,18 @@ import run.cosy.http.{Http, HttpOps}
 
 import scala.util.{Failure, Success, Try}
 
-open class SigInputReqSuite[F[_], H <: Http](
-    rdb: ReqComponentDB[F, H] // we don't pass it implicitly, as we need to add some dummy headers
+open class SigInputReqSuite[H <: Http](
+    rdb: ReqComponentDB[H] // we don't pass it implicitly, as we need to add some dummy headers
 )(using
     hOps: HttpOps[H],
-    msgDB: TestHttpMsgInterpreter[F, H]
+    msgDB: TestHttpMsgInterpreter[H]
 ) extends CatsEffectSuite:
 
    val DB                                = HttpMessageDB
-   val msgSigfns: MessageSignature[F, H] = new MessageSignature[F, H]
+   val msgSigfns: MessageSignature[H] = new MessageSignature[H]
    import msgSigfns.*
 
-   given ReqComponentDB[F, H] = rdb.addIds(
+   given ReqComponentDB[H] = rdb.addIds(
      HeaderId("x-ows-header").toTry.get,
      HeaderId("x-obs-fold-header").toTry.get,
      HeaderId.dict("example-dict").toTry.get,
@@ -32,7 +32,7 @@ open class SigInputReqSuite[F[_], H <: Http](
 
    List(DB.`2.4_Req_Ex`, DB.`2.4_Req_v2`).zipWithIndex.foreach { (msg, i) =>
      test(s"Test SigInput §2.4 round $i") {
-       val req: Http.Request[F, H] = msgDB.asRequest(msg)
+       val req: Http.Request[H] = msgDB.asRequest(msg)
        val sigInput25: Option[SigInput] = SigInput(
          """("@method" "@authority" "@path" \
                |"content-digest" "content-length" "content-type")\

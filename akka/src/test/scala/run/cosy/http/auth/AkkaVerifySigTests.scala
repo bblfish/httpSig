@@ -21,20 +21,20 @@ import cats.{Id, MonadError}
 import bobcats.Verifier
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.http.auth.TestSignatures.specRequestSigs
+import run.cosy.http.auth.SignatureTests.specRequestSigs
 import run.cosy.http.auth.VerifySignatureTests
 import run.cosy.http.messages.*
 import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext  = ServerContext("bblfish.net", true)
-given ReqFns[Id, HT] = new RequestSelectorFnsAkka
+given ServerContext = ServerContext("bblfish.net", true)
+given ReqFns[HT]    = new RequestSelectorFnsAkka
 import scala.concurrent.Future
 
-class AkkaVerifySigTests extends VerifySignatureTests[Id, HT](
+class AkkaVerifySigTests extends VerifySignatureTests[HT](
       AkkaMsgInterpreter
     ):
    override val thisPlatform: RunPlatform = RunPlatform.JVM
-   val msgSig: MessageSignature[Id, HT]   = new MessageSignature[Id, HT]
+   val msgSig: MessageSignature[HT]       = new MessageSignature[HT]
 
    import AkkaTp.given
 
@@ -42,7 +42,7 @@ class AkkaVerifySigTests extends VerifySignatureTests[Id, HT](
    given V: bobcats.Verifier[SyncIO]  = Verifier.forSync[SyncIO]
    val signaturesDB                   = new SigSuiteHelpers[SyncIO]
 
-   val selectorDB: ReqComponentDB[Id, HT] = ReqComponentDB(new ReqSelectors[Id, HT], HeaderIds.all)
+   val selectorDB: ReqComponentDB[HT] = ReqComponentDB(new ReqSelectors[HT], HeaderIds.all)
 
    testSignatures[SyncIO](
      specRequestSigs,

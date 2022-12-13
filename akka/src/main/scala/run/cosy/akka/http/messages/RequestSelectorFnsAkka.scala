@@ -40,7 +40,7 @@ import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
 class RequestSelectorFnsAkka(using sc: ServerContext)
-    extends ReqFns[Id, HT]:
+    extends ReqFns[HT]:
 
    override val method: RequestFn =
      RequestAkka { req => Right(req.method.value) }
@@ -110,15 +110,14 @@ class RequestSelectorFnsAkka(using sc: ServerContext)
 
    case class RequestAkka(
        val sigValues: HttpRequest => Either[ParsingExc, String | NonEmptyList[String]]
-   ) extends SelectorFn[Http.Request[Id, HT]]:
-      override val signingValues
-          : Request[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
+   ) extends SelectorFn[Http.Request[HT]]:
+      override val signingValues: Request[HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpRequest])
 
 end RequestSelectorFnsAkka
 
 class ResponseSelectorFnsAkka(using sc: ServerContext)
-    extends ResFns[Id, HT]:
+    extends ResFns[HT]:
 
    override val status: ResponseFn = ResponseAkka { resp =>
      Right("" + resp.status.intValue)
@@ -126,9 +125,9 @@ class ResponseSelectorFnsAkka(using sc: ServerContext)
 
    case class ResponseAkka(
        val sigValues: HttpResponse => Either[ParsingExc, String | NonEmptyList[String]]
-   ) extends SelectorFn[Http.Response[Id, HT]]:
+   ) extends SelectorFn[Http.Response[HT]]:
       override val signingValues
-          : Response[Id, HT] => Either[ParsingExc, String | NonEmptyList[String]] =
+          : Response[HT] => Either[ParsingExc, String | NonEmptyList[String]] =
         msg => sigValues(msg.asInstanceOf[HttpResponse])
 
    // raw headers, no interpretation

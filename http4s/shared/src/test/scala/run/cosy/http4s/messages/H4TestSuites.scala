@@ -24,29 +24,29 @@ import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.SelectorFnsH4
 
-given ServerContext                         = ServerContext("bblfish.net", true)
-given [F[_]]: TestHttpMsgInterpreter[F, HT] = new Http4sMsgInterpreter[F]
+given ServerContext              = ServerContext("bblfish.net", true)
+given TestHttpMsgInterpreter[HT] = Http4sMsgInterpreter
 
-given [F[_]]: ReqFns[F, HT] = new SelectorFnsH4[F]
+given ReqFns[HT] = new SelectorFnsH4
 
-class H4HeaderSuite[F[_]] extends HeaderSuite(
-      new ReqSelectors[F, HT]
+class H4HeaderSuite extends HeaderSuite(
+      new ReqSelectors[HT]
     )
 
-class Http4SAtRequestSelectorSuite[F[_]] extends AtRequestSelectorSuite[F, HT]:
-   def sel(using ServerContext): AtReqSelectors[F, HT] =
-     new AtReqSelectors[F, HT](using new SelectorFnsH4[F]) {}
-   def interp: TestHttpMsgInterpreter[F, HT] = new Http4sMsgInterpreter[F]
-   def platform: HttpMsgPlatform             = HttpMsgPlatform.Http4s
+class Http4SAtRequestSelectorSuite extends AtRequestSelectorSuite[HT]:
+   def sel(using ServerContext): AtReqSelectors[HT] =
+     new AtReqSelectors[HT](using new SelectorFnsH4) {}
+   def interp: TestHttpMsgInterpreter[HT] = Http4sMsgInterpreter
+   def platform: HttpMsgPlatform          = HttpMsgPlatform.Http4s
 
-class H4ReqSigSuite[F[_]] extends SigInputReqSuite[F, HT](
+class H4ReqSigSuite[F[_]] extends SigInputReqSuite[HT](
       new ReqComponentDB(
-        new ReqSelectors[F, HT],
+        new ReqSelectors[HT],
         HeaderIds.all
       )
     )
 
-class H4StaticSigInputReqSuite[F[_]]
-    extends VerifyBaseOnRequests[F, HT](
-      new ReqSelectors[F, HT]
+class H4StaticSigInputReqSuite
+    extends VerifyBaseOnRequests[HT](
+      new ReqSelectors[HT]
     )

@@ -31,8 +31,8 @@ import scala.collection.immutable.ListSet
   * @tparam FH[_]
   *   a functor related to the Http Type.
   */
-class ReqSigInput[FH[_], H <: Http](
-    val selectors: List[RequestSelector[FH, H]] = List(),
+class ReqSigInput[H <: Http](
+    val selectors: List[RequestSelector[H]] = List(),
     val params: ListSet[SigIn.Param] = ListSet()
 ):
    import Rfc8941.Serialise.given
@@ -48,8 +48,8 @@ class ReqSigInput[FH[_], H <: Http](
 end ReqSigInput
 
 object ReqSigInput:
-   def apply[F[_], H <: Http](sels: RequestSelector[F, H]*)(params: SigIn.Param*) =
-     new ReqSigInput[F, H](sels.toList, ListSet(params*))
+   def apply[H <: Http](sels: RequestSelector[H]*)(params: SigIn.Param*) =
+     new ReqSigInput[H](sels.toList, ListSet(params*))
 
 object SigIn:
    import Rfc8941.Serialise.given

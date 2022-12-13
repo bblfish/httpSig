@@ -30,10 +30,10 @@ import run.cosy.http.utils.StringUtils.rfc8792single
 
 import scala.language.implicitConversions
 
-object AkkaMsgInterpreter extends run.cosy.http.messages.TestHttpMsgInterpreter[Id, AkkaTp.HT]:
+object AkkaMsgInterpreter extends run.cosy.http.messages.TestHttpMsgInterpreter[AkkaTp.HT]:
    val VerticalTAB: Char = "\u000B".head
 
-   override def asRequest(header: DB.RequestStr): Http.Request[Id, AkkaTp.HT] =
+   override def asRequest(header: DB.RequestStr): Http.Request[AkkaTp.HT] =
      header match
         case DB.`§2.1_HeaderField` => HttpRequest(
             HttpMethods.GET,
@@ -153,7 +153,7 @@ object AkkaMsgInterpreter extends run.cosy.http.messages.TestHttpMsgInterpreter[
                     throw new Exception("Malformed first line of request. received >" + head + "<")
              case other => throw new Exception("Badly formed HTTP request")
 
-   override def asResponse(header: DB.ResponseStr): Http.Response[Id, AkkaTp.HT] =
+   override def asResponse(header: DB.ResponseStr): Http.Response[AkkaTp.HT] =
      header match
         case DB.`2.2.9_Status_Code` => HttpResponse(
             StatusCodes.OK,

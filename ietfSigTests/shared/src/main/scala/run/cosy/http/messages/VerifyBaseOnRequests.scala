@@ -21,11 +21,11 @@ import scala.collection.immutable.ListSet
 /** This test suite looks at statically built SigInput requests using functions. This is useful for
   * clients writing signatures.
   */
-open class VerifyBaseOnRequests[F[_], H <: Http](
-    hsel: ReqSelectors[F, H] // we don't pass it implicitly, because we need to add some headers.
+open class VerifyBaseOnRequests[H <: Http](
+    hsel: ReqSelectors[H] // we don't pass it implicitly, because we need to add some headers.
 )(using
     hops: HttpOps[H],
-    interpret: TestHttpMsgInterpreter[F, H],
+    interpret: TestHttpMsgInterpreter[H],
     // needed for testing signatures
 //    ME: MonadError[F, Throwable],
 //    V: bobcats.Verifier[F],
@@ -37,7 +37,7 @@ open class VerifyBaseOnRequests[F[_], H <: Http](
    import hsel.RequestHd.*
    import run.cosy.http.utils.StringUtils.*
 
-   val msgSigfns: MessageSignature[F, H] = new MessageSignature[F, H]
+   val msgSigfns: MessageSignature[H] = new MessageSignature[H]
    import msgSigfns.*
 
    val DB = HttpMessageDB
@@ -63,12 +63,12 @@ open class VerifyBaseOnRequests[F[_], H <: Http](
    // so that there was not a danger of being out of sync with the verifier in ReqComponentDB...
    // we did not duplicate the headerIds
    //needed to verify signatures
-   given selectorDB: ReqComponentDB[F, H] = ReqComponentDB(hsel, HeaderIds.all ++ testIds.all)
+   given selectorDB: ReqComponentDB[H] = ReqComponentDB(hsel, HeaderIds.all ++ testIds.all)
    
    List(DB.`2.4_Req_Ex`, DB.`2.4_Req_v2`).zipWithIndex.foreach { (msg, i) =>
      val req = interpret.asRequest(msg)
      test("apply ReqSigInput selector on ex from 2.4 v." + i) {
-       val rsel: List[RequestSelector[F, H]] =
+       val rsel: List[RequestSelector[H]] =
          List(
            `@method`,
            `@authority`,
@@ -103,7 +103,7 @@ open class VerifyBaseOnRequests[F[_], H <: Http](
    case class TestBase(
      doc: String,
      reqStr: DB.RequestStr,
-     sigIn: ReqSigInput[F, H],
+     sigIn: ReqSigInput[H],
      baseResult: String,
      success: Boolean = true
    )

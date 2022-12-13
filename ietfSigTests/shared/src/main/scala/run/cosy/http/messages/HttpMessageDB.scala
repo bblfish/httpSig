@@ -97,6 +97,16 @@ object HttpMessageDB:
         |Date: Fri, 26 Mar 2010 00:05:00 GMT"""
    )
 
+   val `2.4_Req_Ex_pre` = RequestStr(
+     """POST /foo?param=Value&Pet=dog HTTP/1.1
+        |Host: example.com
+        |Date: Tue, 20 Apr 2021 02:07:55 GMT
+        |Content-Type: application/json
+        |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+        |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+        |Content-Length: 18
+     """)
+     
    val `2.4_Req_Ex` = RequestStr(
      """POST /foo?param=Value&Pet=dog HTTP/1.1
        |Host: example.com

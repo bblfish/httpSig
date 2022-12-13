@@ -21,28 +21,28 @@ import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext                  = ServerContext("bblfish.net", true)
-given TestHttpMsgInterpreter[Id, HT] = AkkaMsgInterpreter //this needs the above
+given ServerContext              = ServerContext("bblfish.net", true)
+given TestHttpMsgInterpreter[HT] = AkkaMsgInterpreter //this needs the above
 
-given ReqFns[Id, HT] = new RequestSelectorFnsAkka
+given ReqFns[HT] = new RequestSelectorFnsAkka
 
 class AkkaHeaderSelectorSuite extends HeaderSuite(
-      new ReqSelectors[Id, HT]
+      new ReqSelectors[HT]
     )
 
-class AkkaAtRequestSelectorSuite extends AtRequestSelectorSuite[Id, HT]:
-   def sel(using ServerContext): AtReqSelectors[Id, HT] =
-     new AtReqSelectors[Id, HT](using new RequestSelectorFnsAkka()) {}
-   def interp: TestHttpMsgInterpreter[cats.Id, HT] = AkkaMsgInterpreter
-   def platform: HttpMsgPlatform                   = HttpMsgPlatform.Akka
+class AkkaAtRequestSelectorSuite extends AtRequestSelectorSuite[HT]:
+   def sel(using ServerContext): AtReqSelectors[HT] =
+     new AtReqSelectors[HT](using new RequestSelectorFnsAkka()) {}
+   def interp: TestHttpMsgInterpreter[HT] = AkkaMsgInterpreter
+   def platform: HttpMsgPlatform          = HttpMsgPlatform.Akka
 
-class AkkaReqSigSuite extends SigInputReqSuite[cats.Id, HT](
+class AkkaReqSigSuite extends SigInputReqSuite[HT](
       new ReqComponentDB(
-        new ReqSelectors[Id, HT],
+        new ReqSelectors[HT],
         HeaderIds.all
       )
     )
 
-class AkkaStaticSigInputReqSuite extends VerifyBaseOnRequests[Id, HT](
-      new ReqSelectors[Id, HT]
+class AkkaStaticSigInputReqSuite extends VerifyBaseOnRequests[HT](
+      new ReqSelectors[HT]
     )

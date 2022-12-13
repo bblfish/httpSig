@@ -20,28 +20,26 @@ import bobcats.Verifier
 import cats.MonadError
 import cats.effect.{IO, Sync, SyncIO}
 import run.cosy.http.HttpOps
-import run.cosy.http.auth.TestSignatures.specRequestSigs
+import run.cosy.http.auth.SignatureTests.specRequestSigs
 import run.cosy.http.auth.*
 import run.cosy.http.messages.*
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
-given ServerContext         = ServerContext("bblfish.net", true)
-given [F[_]]: ReqFns[F, HT] = new SelectorFnsH4[F]
+given ServerContext = ServerContext("bblfish.net", true)
+given ReqFns[HT]    = new SelectorFnsH4
 
-class H4VerifySigTests extends VerifySignatureTests[IO, HT](
-      new Http4sMsgInterpreter[IO]
-    ):
+class H4VerifySigTests extends VerifySignatureTests(Http4sMsgInterpreter):
    override val thisPlatform: RunPlatform = RunPlatform.JVM
-   val msgSig: MessageSignature[IO, HT]   = new MessageSignature[IO, HT]
+   val msgSig: MessageSignature[HT]       = new MessageSignature[HT]
 
    import Http4sTp.given
    given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
    given V: bobcats.Verifier[SyncIO]  = Verifier.forSync[SyncIO]
    val signaturesDB                   = new SigSuiteHelpers[SyncIO]
 
-   val selectorDB: ReqComponentDB[IO, HT] = ReqComponentDB(new ReqSelectors[IO, HT], HeaderIds.all)
+   val selectorDB: ReqComponentDB[HT] = ReqComponentDB(new ReqSelectors[HT], HeaderIds.all)
 
    // needed for testing signatures
 

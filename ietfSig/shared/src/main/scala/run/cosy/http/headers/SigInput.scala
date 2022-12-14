@@ -30,7 +30,7 @@ import run.cosy.http.headers.Rfc8941.{
 }
 
 import java.time.Instant
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListMap, ListSet}
 import scala.concurrent.duration.FiniteDuration
 
 /** SigInputs are Maps from Signature Names to SigInput entries that this server understands.
@@ -81,8 +81,8 @@ final case class SigInput private (val il: IList):
    import SigInput.*
 
    // todo: verify that collecting only SfStrings is ok
-   def headers: Seq[String]              = il.items.collect { case PItem(SfString(str), _) => str }
-   def headerItems: Seq[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])
+   def headers: List[String]              = il.items.collect { case PItem(SfString(str), _) => str }
+   def headerItems: List[PItem[SfString]] = il.items.map(_.asInstanceOf[PItem[SfString]])
 
    def keyid: Option[Rfc8941.SfString] =
      il.params.get(keyidTk) match
@@ -96,19 +96,21 @@ final case class SigInput private (val il: IList):
        expires.map(_ + shift >= i.toSeconds).getOrElse(true)
    def created: Option[Long] = il.params.get(createdTk).collect { case SfInt(time) => time }
    def expires: Option[Long] = il.params.get(expiresTk).collect { case SfInt(time) => time }
+   def tag: Option[String]   = il.params.get(tagTk).collect { case SfString(x) => x }
    def canon: String         = il.canon
 
 object SigInput:
    /** registered metadata parameters for Signature specifications as per
-     * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html#name-initial-contents-2 §6.2.2 of 07 spec]].
+     * [[https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-15.html#name-initial-contents-2 §6.3.2 of 15 spec]].
      */
    val algTk     = Token("alg")
    val createdTk = Token("created")
    val expiresTk = Token("expires")
    val keyidTk   = Token("keyid")
    val nonceTk   = Token("nonce")
+   val tagTk     = Token("tag")
 
-   val registeredParams = Seq(algTk, createdTk, expiresTk, keyidTk, nonceTk)
+   val registeredParams = Seq(algTk, createdTk, expiresTk, keyidTk, nonceTk, tagTk)
 
    val Empty = ListMap.empty[Token, Item]
 
@@ -118,6 +120,19 @@ object SigInput:
 
    def apply(il: IList): Option[SigInput] =
      if valid(il) then Some(new SigInput(il)) else None
+
+   /* this will always succeed */
+   def apply(sigIn: ReqSigInput[?]): SigInput =
+      val pitems: List[PItem[SfString]] = sigIn.selectors.map { sel =>
+        new PItem(SfString(sel.name.specName), sel.params)
+      }
+      val params: ListMap[Token, Item] =
+         val lmb = ListMap.newBuilder[Token, Item]
+         sigIn.params.foreach { sg =>
+           lmb.addOne(sg.toRfcParam)
+         }
+         lmb.result()
+      new SigInput(new IList(pitems, params))
 
    // this is really functioning as a constructor in pattern matching contexts
    def unapply(pzd: Parameterized): Option[SigInput] =
@@ -132,7 +147,7 @@ object SigInput:
         pit.item.isInstanceOf[SfString] // todo: one could check the parameters follow a pattern...
       }
       def paramsOk = il.params.forall {
-        case (`keyidTk`, item: SfString)                       => true
+        case (`keyidTk`, _: SfString) | (`tagTk`, _: SfString) => true
         case (`createdTk`, _: SfInt) | (`expiresTk`, _: SfInt) => true
         case (`algTk`, _: SfString) | (`nonceTk`, _: SfString) => true
         // we are lenient on non-registered params
@@ -140,3 +155,4 @@ object SigInput:
       }
       headersOk && paramsOk
    end valid
+end SigInput

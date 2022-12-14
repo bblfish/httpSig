@@ -1,5 +1,5 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
-import sbt.{Def, *}
+import sbt.{CrossVersion, Def, MavenRepository, ModuleID, Test, *}
 
 object Dependencies {
   lazy val scalajsDom   = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
@@ -12,6 +12,9 @@ object Dependencies {
     // https://github.com/typelevel/munit-cats-effect
     lazy val munitEffect = Def.setting("org.typelevel" %%% "munit-cats-effect-3" % "1.0.7")
 
+    // test time in cats-effect https://typelevel.org/cats-effect/docs/core/test-runtime
+    lazy val catsEffectTestKit = Def.setting("org.typelevel" %%% "cats-effect-testkit" % "3.4.2")
+
     lazy val discipline = Def.setting("org.typelevel" %%% "discipline-munit" % "1.0.9")
     lazy val laws       = Def.setting("org.typelevel" %%% "cats-laws" % "2.7.0")
     lazy val scalaCheck = Def.setting("org.scalameta" %%% "munit-scalacheck" % "0.7.29")
@@ -23,6 +26,11 @@ object Dependencies {
 
   object Ver {
     val scala = "3.1.3"
+  }
+
+  object scodec {
+    // https://github.com/scodec/scodec-bits
+    val bits = Def.setting("org.scodec" %%% "scodec-bits" % "1.1.34")
   }
 
   // https://http4s.org/v1.0/client/
@@ -47,11 +55,12 @@ object Dependencies {
     lazy val parse = Def.setting("org.typelevel" %%% "cats-parse" % "0.3.8")
     // https://oss.sonatype.org/content/repositories/snapshots/net/bblfish/crypto/bobcats_3/
     lazy val bobcats =
-      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.2-2b3834e-SNAPSHOT")
+      Def.setting("net.bblfish.crypto" %%% "bobcats" % "0.3-3236e64-SNAPSHOT")
 
     // https://index.scala-lang.org/typelevel/cats-effect/artifacts/cats-effect/3.3.14
     // todo: other libraries depend on cats effect, is this the right version?
-    lazy val catsEffect = Def.setting("org.typelevel" %% "cats-effect" % "3.3.14")
+    lazy val catsEffect      = Def.setting("org.typelevel" %%% "cats-effect" % "3.4.2")
+    lazy val caseInsensitive = Def.setting("org.typelevel" %%% "case-insensitive" % "1.3.0")
   }
 
   object akka {

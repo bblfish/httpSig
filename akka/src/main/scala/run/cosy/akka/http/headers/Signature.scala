@@ -21,10 +21,10 @@ import akka.http.scaladsl.model.{HttpHeader, ParsingException}
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion, Signature}
 import run.cosy.http.Http.Header
-import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SignatureMatcher}
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, ParsingExc}
 import run.cosy.http.headers
 import run.cosy.http.headers.Rfc8941.{Bytes, IList, PItem, SfDict}
-import run.cosy.http.headers.{Rfc8941, Signatures}
+import run.cosy.http.headers.{Rfc8941, SignatureMatcher, Signatures}
 
 import scala.collection.immutable
 import scala.collection.immutable.{ArraySeq, ListMap}
@@ -55,10 +55,10 @@ object Signature
         case _: (RawHeader | CustomHeader) if h.lowercaseName == lowercaseName =>
           parse(h.value).toOption
         case _ => None
-   def parse(value: String): Try[Signatures] =
+   def parse(value: String): Either[ParsingExc, Signatures] =
      Rfc8941.Parser.sfDictionary.parseAll(value) match
-        case Left(e) => Failure(HTTPHeaderParseException(e, value))
+        case Left(e) => Left(HTTPHeaderParseException(e, value))
         case Right(lm) => Signatures(lm).toRight(
             InvalidSigException("Signature Header Parses but data structure is not appropriate")
-          ).toTry
+          )
 end Signature

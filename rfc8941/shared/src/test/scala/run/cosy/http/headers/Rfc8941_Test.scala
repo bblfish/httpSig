@@ -19,18 +19,21 @@ package run.cosy.http.headers
 import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.parse.Parser.{Expectation, Fail}
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.headers.Rfc8941.*
-import run.cosy.http.headers.Rfc8941.Parser.*
-import run.cosy.http.headers.Rfc8941.SyntaxHelper.*
+import _root_.run.cosy.http.headers.Rfc8941
+import _root_.run.cosy.http.headers.Rfc8941.*
+import _root_.run.cosy.http.headers.Rfc8941.Parser.*
+import _root_.run.cosy.http.headers.Rfc8941.Syntax.*
 
 import java.util.Base64
+import scodec.bits.ByteVector
 import scala.collection.immutable.{ArraySeq, ListMap}
 
 class Rfc8941_Test extends munit.FunSuite:
 
-   val cafebabe = ArraySeq[Byte](113, -89, -34, 109, -90, -34)
-   val cafedead = ArraySeq[Byte](113, -89, -34, 117, -26, -99)
+   val cafebabe   = ArraySeq[Byte](113, -89, -34, 109, -90, -34)
+   val cafebabeBV = ByteVector.view(cafebabe.toArray)
+   val cafedead   = ArraySeq[Byte](113, -89, -34, 117, -26, -99)
+   val cafedeadBV = ByteVector.view(cafedead.toArray)
 
    def R[T](value: T, remaining: String = ""): Right[Parser.Error, (String, T)] =
      Right(remaining, value)
@@ -157,14 +160,15 @@ class Rfc8941_Test extends munit.FunSuite:
    }
 
    test("test sfBinary") {
+     // we use byte vector but go through Base64 lib, just for another test
+     val expectedValue = ByteVector.fromBase64("cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==").get
+
      assertEquals(
        sfBinary.parse(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==:"),
-       R(ArraySeq.unsafeWrapArray(
-         Base64.getDecoder.nn.decode("cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==").nn
-       ))
+       R(expectedValue)
      )
-     assertEquals(sfBinary.parseAll(":cafebabe:"), RA(cafebabe))
-     assertEquals(sfBinary.parseAll(":cafedead:"), RA(cafedead))
+     assertEquals(sfBinary.parseAll(":cafebabe:"), RA(cafebabeBV))
+     assertEquals(sfBinary.parseAll(":cafedead:"), RA(cafedeadBV))
      parseFailAll(sfBinary.parseAll(" :cafedead:"), "can't start with space")
      parseFailAll(
        sfBinary.parseAll(":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg"),
@@ -213,7 +217,7 @@ class Rfc8941_Test extends munit.FunSuite:
          PI(false),
          PI(true),
          PI(sf"rum"),
-         PI(cafebabe)
+         PI(ByteVector(cafebabe))
        ))
      )
      assertEquals(
@@ -224,7 +228,7 @@ class Rfc8941_Test extends munit.FunSuite:
          PI(Token("foo123/456")),
          PI(false),
          PI(sf"No/No"),
-         PI(cafebabe)
+         PI(ByteVector(cafebabe.toArray))
        ))
      )
      assertEquals(
@@ -240,7 +244,7 @@ class Rfc8941_Test extends munit.FunSuite:
          PI(Token("foo123/456"), ListMap(Token("lang") -> Token("en"))),
          PI(false, ListMap(Token("sleep") -> true)),
          PI(sf"No/No"),
-         PI(cafebabe, ListMap(Token("enc") -> Token("unicode")))
+         PI(ByteVector.view(cafebabe.toArray), ListMap(Token("enc") -> Token("unicode")))
        ))
      )
    }
@@ -301,7 +305,7 @@ class Rfc8941_Test extends munit.FunSuite:
        sfDictionary.parse("""en="Applepie", da=:cafebabe:"""),
        R(ListMap(
          Token("en") -> PI(sf"Applepie"),
-         Token("da") -> PI(cafebabe)
+         Token("da") -> PI(ByteVector(cafebabe))
        ))
      )
      assertEquals(
@@ -331,7 +335,7 @@ class Rfc8941_Test extends munit.FunSuite:
 
      val `ex§4.1` =
        """sig1=("@request-target" "host" "date"   "cache-control" \
-			  |      "x-empty-header" "x-example"); keyid="test-key-a"; \
+			  |      "x-empty-header" "x-example" "x-example-dict";sf); keyid="test-key-a"; \
 			  |       alg="rsa-pss-sha512"; created=1402170695; expires=1402170995\
 			  |""".rfc8792single
 
@@ -344,7 +348,8 @@ class Rfc8941_Test extends munit.FunSuite:
            sf"date",
            sf"cache-control",
            sf"x-empty-header",
-           sf"x-example"
+           sf"x-example",
+           PItem(sf"x-example-dict")(Param("sf", true))
          )(
            Token("keyid")   -> sf"test-key-a",
            Token("alg")     -> sf"rsa-pss-sha512",
@@ -362,7 +367,7 @@ class Rfc8941_Test extends munit.FunSuite:
 			      1Q7MpWYZs0soHjttq0uLIA3DIbQfLiIvK6/l0BdWTU7+2uQj7lBkQAsFZHoA96ZZg\
 			      FquQrXRlmYOh+Hx5D9fJkXcXe5tmAg==:""".rfc8792single
 
-     val `ex§4.2value`: ArraySeq[Byte] =
+     val `ex§4.2value`: ByteVector =
        """K2qGT5srn2OGbOIDzQ6kYT+ruaycnDAAUpKv+ePFfD0RAxn/1BUe\
 			Zx/Kdrq32DrfakQ6bPsvB9aqZqognNT6be4olHROIkeV879RrsrObury8L9SCEibe\
 			oHyqU/yCjphSmEdd7WD+zrchK57quskKwRefy2iEC5S2uAH0EPyOZKWlvbKmKu5q4\
@@ -385,8 +390,8 @@ class Rfc8941_Test extends munit.FunSuite:
      assertEquals(SfInt("234").canon, "234")
      assertEquals(sf"hello".canon, """"hello"""")
      assertEquals(SfDec("1024.48").canon, "1024.48")
-     assertEquals(cafebabe.canon, ":cafebabe:")
-     assertEquals(cafedead.canon, ":cafedead:")
+     assertEquals(cafebabeBV.canon, ":cafebabe:")
+     assertEquals(ByteVector(cafedead).canon, ":cafedead:")
    }
    import Rfc8941.Token as Tk
 
@@ -402,7 +407,7 @@ class Rfc8941_Test extends munit.FunSuite:
        """;foo;bar=42;baz="hello""""
      )
      assertEquals(
-       Params(Tk("keyid") -> cafebabe).canon,
+       Params(Tk("keyid") -> cafebabeBV).canon,
        ";keyid=:cafebabe:"
      )
      assertEquals(
@@ -414,7 +419,7 @@ class Rfc8941_Test extends munit.FunSuite:
        "99.999;discount=0.2"
      )
      assertEquals(
-       PItem(cafebabe)(Tk("enc") -> sf"utf8").canon,
+       PItem(cafebabeBV)(Tk("enc") -> sf"utf8").canon,
        """:cafebabe:;enc="utf8""""
      )
    }

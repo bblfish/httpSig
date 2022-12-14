@@ -1,9 +1,9 @@
-import org.openqa.selenium.WebDriver
-import org.openqa.selenium.chrome.{ChromeDriver, ChromeOptions}
-import org.openqa.selenium.firefox.{FirefoxOptions, FirefoxProfile}
-import org.openqa.selenium.remote.server.{DriverFactory, DriverProvider}
+import org.openqa.selenium.chrome.ChromeOptions
+import org.openqa.selenium.firefox.FirefoxOptions
 import org.scalajs.jsenv.selenium.SeleniumJSEnv
+import org.openqa.selenium.safari.SafariOptions
 import Dependencies.*
+// this import is needed to be able to run `set useJSEnv := JSEnv.Firefox` in sbt
 import JSEnv.*
 
 name := "httpSig"
@@ -26,7 +26,9 @@ ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / tlCiReleaseTags     := false // don't publish artifacts on github
 //ThisBuild / tlSonatypeUseLegacyHost := false // TODO remove
 
-ThisBuild / crossScalaVersions := Seq("3.1.3")
+ThisBuild / crossScalaVersions := Seq("3.2.1")
+// check https://dotty.epfl.ch/docs/reference/experimental/canthrow.html
+//ThisBuild / scalaVersion := "3.3.0-RC1-bin-20221130-72c4ffd-NIGHTLY"
 
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(
@@ -71,6 +73,12 @@ ThisBuild / Test / jsEnv := {
       val options = new ChromeOptions()
       options.setHeadless(true)
       new SeleniumJSEnv(options)
+    /* Safari is very limited, allowing only one session at a time, and no headless mode.
+     * but we leave this here, to keep track of evolution
+     * https://developer.apple.com/documentation/webkit/about_webdriver_for_safari  */
+    case JSEnv.Safari =>
+      val o = new SafariOptions()
+      new SeleniumJSEnv(o)
   }
 }
 
@@ -92,6 +100,7 @@ lazy val rfc8941 = crossProject(JVMPlatform, JSPlatform)
     name        := "rfc8941",
     description := "RFC8941 Structured Field Values parser",
     libraryDependencies += cats.parse.value,
+    libraryDependencies += scodec.bits.value,
     libraryDependencies += tests.munit.value % Test
   ).jsSettings(
     scalacOptions ++= scala3jsOptions // ++= is really important. Do NOT use `:=` - that will block testing
@@ -132,6 +141,9 @@ lazy val ietfSigHttpTests = crossProject(JVMPlatform, JSPlatform)
     description := "Generic tests for generic implementation of IETF `Signing Http Messages`",
     libraryDependencies ++= Seq(
       tests.munitEffect.value,
+      cats.caseInsensitive.value,
+      tests.munit.value % Test,
+      tests.catsEffectTestKit.value,
       cats.bobcats.value classifier ("tests"),        // bobcats test examples,
       cats.bobcats.value classifier ("tests-sources") // bobcats test examples
     )
@@ -190,12 +202,13 @@ lazy val http4sSig = crossProject(JVMPlatform, JSPlatform)
   .dependsOn(ietfSigHttp, ietfSigHttpTests % Test, testUtils % Test)
 
 lazy val scala3Options = Seq(
+//    "-language:experimental.saferExceptions",
   // "-classpath", "foo:bar:...",         // Add to the classpath.
   // "-encoding", "utf-8",                // Specify character encoding used by source files.
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
   "-unchecked",   // Enable additional warnings where generated code depends on assumptions.
   "-feature", // Emit warning and location for usages of features that should be imported explicitly.
-  //	"-explain",                          // Explain errors in more detail.
+//  "-explain", // Explain errors in more detail.
   // "-explain-types",                    // Explain type errors in more detail.
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   // "-no-indent",                        // Require classical {...} syntax, indentation is not significant.
@@ -212,6 +225,8 @@ lazy val scala3Options = Seq(
   "-Yexplicit-nulls" // For explicit nulls behavior.
 )
 lazy val scala3jsOptions = Seq(
+  //  "-language:experimental.saferExceptions",
+  // "-classpath", "foo:bar:...",         // Add to the classpath.
   "-indent", // Together with -rewrite, remove {...} syntax when possible due to significant indentation.
   "-new-syntax", // Require `then` and `do` in control expressions.
   "-source:future", // Choices: future and future-migration. I use this to force future deprecation warnings, etc.

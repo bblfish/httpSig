@@ -25,26 +25,38 @@ import java.util.Base64
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.reflect.TypeTest
 import scala.util.{Failure, Success, Try}
-import run.cosy.http.headers.NumberOutOfBoundsException
+import scodec.bits.ByteVector
+import cats.syntax.all.*
 
-/** Structured Field Values for HTTP */
+//https://dotty.epfl.ch/docs/reference/experimental/canthrow.html
+// import language.experimental.saferExceptions
+
+/** Structured Field Values for HTTP [[https://www.rfc-editor.org/rfc/rfc8941.html RFC8941]]
+  */
 object Rfc8941:
+
    //
    // types used by RFC8941
    //
    /** see [[https://www.rfc-editor.org/rfc/rfc8941.html#section-3.3 §3.3 Items]] of RFC8941.
      */
    type Item   = SfInt | SfDec | SfString | Token | Bytes | Boolean
-   type Bytes  = ArraySeq[Byte]
+   type Bytes  = ByteVector
    type Param  = (Token, Item)
    type Params = ListMap[Token, Item]
    type SfList = List[Parameterized]
    type SfDict = ListMap[Token, Parameterized]
-   def Param(tk: String, i: Item): Param = (Token(tk), i)
-   def Params(ps: Param*): Params        = ListMap(ps*)
+
+   // warning this is public and there is an unsafeParse
+   def Param(tk: String, i: Item): Param = (Token.unsafeParsed(tk), i)
+
+   def Params(ps: Param*): Params = ListMap(ps*)
+
    def SfDict(entries: (Token, Parameterized)*): ListMap[Token, Parameterized] =
      ListMap(entries*)
+
    private def paramConversion(paras: Param*): Params = ListMap(paras*)
+
    sealed trait Parameterized:
       def params: Params
 
@@ -52,6 +64,7 @@ object Rfc8941:
      * pattern matched. Only the object constructor can build these
      */
    final case class SfInt private (val long: Long)
+
    /* https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal */
    final case class SfDec private (val double: Double)
 
@@ -72,8 +85,9 @@ object Rfc8941:
             else sb.append(c)
          sb.append('"')
          sb.toString()
+
    // class is abstract to remove copy operation
-   final case class Token private (t: String)
+   final case class Token private (val tk: String)
 
    /** dict-member = member-key ( parameters / ( "=" member-value )) member-value = sf-item /
      * inner-list
@@ -144,6 +158,9 @@ object Rfc8941:
 
       def isAsciiChar(c: Int): Boolean = (c > 0x1f) && (c < 0x7f)
 
+      /* No danger of throwing an exception here, as tokens are subsets of SfString */
+      def apply(token: Token): SfString = new SfString(token.tk)
+
       private[Rfc8941] def unsafeParsed(asciiStr: List[Char]): SfString =
         new SfString(asciiStr.mkString)
    end SfString
@@ -154,11 +171,12 @@ object Rfc8941:
         Parser.sfToken.parseAll(t) match
            case Right(value) => value
            case Left(err) => throw ParsingException(
-               s"error paring token $t",
+               s"error parsing token $t",
                s"failed at offset ${err.failedAtOffset}"
              )
 
       private[Rfc8941] def unsafeParsed(name: String) = new Token(name)
+
    end Token
 
    object PItem:
@@ -173,7 +191,7 @@ object Rfc8941:
 
    implicit val paramConv: Conversion[Seq[Param], Params] = paramConversion
 
-   object SyntaxHelper:
+   object Syntax:
       extension (sc: StringContext)
         def sf(args: Any*): SfString =
            val strings     = sc.parts.iterator
@@ -231,15 +249,15 @@ object Rfc8941:
         ((R5234.alpha | P.charIn('*')) ~ (Rfc7230.tchar | P.charIn(':', '/')).rep0)
           .map { (c, lc) => Token.unsafeParsed((c :: lc).mkString) }
       val base64: P[Char] = (R5234.alpha | R5234.digit | P.charIn('+', '/', '='))
-      val sfBinary: P[ArraySeq[Byte]] = (`:` *> base64.rep0 <* `:`).map { chars =>
-        ArraySeq.unsafeWrapArray(Base64.getDecoder.nn.decode(chars.mkString).nn)
+      val sfBinary: P[ByteVector] = (`:` *> base64.rep.string <* `:`).map { chars =>
+        ByteVector.fromValidBase64(chars, scodec.bits.Bases.Alphabets.Base64)
       }
       val bareItem: P[Item] =
         P.oneOf(sfNumber :: sfString :: sfToken :: sfBinary :: sfBoolean :: Nil)
       val lcalpha: P[Char] = P.charIn(0x61.toChar to 0x7a.toChar) | P.charIn('a' to 'z')
       val key: P[Token] =
         ((lcalpha | `*`) ~ (lcalpha | R5234.digit | P.charIn('_', '-', '.', '*')).rep0)
-          .map((c, lc) => Token((c :: lc).mkString))
+          .map((c, lc) => Token.unsafeParsed((c :: lc).mkString))
       val parameter: P[Param] =
         (key ~ (P.char('=') *> bareItem).orElse(P.pure(true)))
       // note: parameters always returns an answer (the empty list) as everything can have parameters
@@ -298,12 +316,11 @@ object Rfc8941:
            def canon: String = o match
               case i: SfInt => i.long.toString
               // todo: https://www.rfc-editor.org/rfc/rfc8941.html#ser-decimal
-              case d: SfDec    => d.double.toString
-              case s: SfString => s.formattedString
-              case tk: Token   => tk.t
-              case as: Bytes => ":" + Base64.getEncoder.nn
-                  .encodeToString(as.unsafeArray.asInstanceOf[Array[Byte]]) + ":"
-              case b: Boolean => if b then "?1" else "?0"
+              case d: SfDec       => d.double.toString
+              case s: SfString    => s.formattedString
+              case tk: Token      => tk.tk
+              case as: ByteVector => ":" + as.toBase64 + ":"
+              case b: Boolean     => if b then "?1" else "?0"
 
       //
       // complex types
@@ -321,7 +338,8 @@ object Rfc8941:
          extension (o: Params)
            def canon: String = o.map(_.canon).mkString
 
-      given sfParamterizedSer[T <: Item](using
+      given sfParamterizedSer[T <: Item](
+          using
           Serialise[Item],
           Serialise[Params]
       ): Serialise[Parameterized] with
@@ -330,7 +348,15 @@ object Rfc8941:
               case l: IList => l.items.map(i => i.canon).mkString("(", " ", ")") + l.params.canon
               case pi: PItem[?] => pi.item.canon + pi.params.canon
 
-      given sfDictSer(using
+      given sfListSer(
+          using Serialise[Params]
+      ): Serialise[SfList] with
+         extension (o: SfList)
+           def canon: String =
+             o.map(p => p.canon).mkString(", ")
+
+      given sfDictSer(
+          using
           Serialise[Item],
           Serialise[Param],
           Serialise[Params],

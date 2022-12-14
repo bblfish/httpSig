@@ -18,6 +18,7 @@ package run.cosy.http.utils
 
 import java.util.Base64
 import scala.annotation.tailrec
+import scodec.bits.ByteVector
 
 object StringUtils:
    private val singleSlsh = raw"\\\n[\t ]*".r
@@ -29,7 +30,8 @@ object StringUtils:
         */
       def rfc8792single: String = singleSlsh.replaceAllIn(str.stripMargin, "")
 
-      def base64Decode: IArray[Byte] = IArray.unsafeFromArray(Base64.getDecoder.nn.decode(str).nn)
+      def base64Decode: ByteVector =
+        ByteVector.fromBase64(str, scodec.bits.Bases.Alphabets.Base64).get
 
       def toRfc8792single(leftPad: Int = 4, maxLineLength: Int = 79): String =
          @tailrec

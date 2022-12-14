@@ -17,13 +17,26 @@
 package run.cosy.http
 
 import run.cosy.http.Http.Header
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
 
 trait Http:
    http =>
+
+   /** F is the functor type (monad actually) that gives access to the content or entity. It is
+     * explicit in Http4s where it is usually IO, but it Akka it is implicit, and probably a Future.
+     * So this type is going to be needed if we want to collect the tail headers that appear after
+     * the header is transmitted. In any case this is important when making ... todo: find the
+     * reason they were introduced as previsously and build a test to make sure this change is
+     * functioning. probably trying to fix what this commit fixed:
+     * https://github.com/bblfish/SolidCtrlApp/pull/1/commits/992a6feb1c4cc1d01880371dc95cb87fcc252d4a
+     * I think it was related to using http4s requests and then trying to work with them as Http
+     * objects... Somehow the F of the IO got lost
+     */
+   type F[_]
    type HT = http.type
-   type Message[F[_]] <: Matchable
-   type Request[F[_]] <: Message[F]
-   type Response[F[_]] <: Message[F]
+   type Message <: Matchable
+   type Request <: Message
+   type Response <: Message
    type Header <: Matchable
 
    given hOps: HttpOps[HT]
@@ -32,11 +45,14 @@ end Http
 trait HttpOps[H <: Http]:
    import Http.*
 
-   /** extensions needed to abstract across HTTP implementations for our purposes */
-   extension [F[_]](msg: Http.Message[F, H])
-     def headers: Seq[Http.Header[H]]
+   val Signature: SignatureMatcher[H]
+   val `Signature-Input`: SignatureInputMatcher[H]
 
-   extension [F[_], R <: Http.Message[F, H]](msg: R)
+   /** extensions needed to abstract across HTTP implementations for our purposes */
+   extension (msg: Http.Message[H])
+     def headerSeq: Seq[Http.Header[H]]
+
+   extension [R <: Http.Message[H]](msg: R)
       def addHeaders(headers: Seq[Http.Header[H]]): R
       // here we do really add a header to existing ones.
       // note http4s
@@ -48,22 +64,22 @@ trait HttpOps[H <: Http]:
 end HttpOps
 
 object Http:
-   type Message[F[_], H <: Http] = Request[F, H] | Response[F, H]
+   type Message[H <: Http] = Request[H] | Response[H]
 
-   type Request[F[_], H <: Http] =
+   type Request[H <: Http] =
      H match
-        case GetRequest[F, req] => req
+        case GetRequest[req] => req
 
-   type Response[F[_], H <: Http] =
+   type Response[H <: Http] =
      H match
-        case GetResponse[F, res] => res
+        case GetResponse[res] => res
 
    type Header[H <: Http] <: Matchable =
      H match
         case GetHeader[res] => res
 
 //   private type GetMessage[F[_], M]       = Http { type Message[F] = M }
-   private type GetRequest[F[_], R]       = Http { type Request[F] = R }
-   private type GetResponse[F[_], R]      = Http { type Response[F] = R }
+   private type GetRequest[R]             = Http { type Request = R }
+   private type GetResponse[R]            = Http { type Response = R }
    private type GetHeader[R <: Matchable] = Http { type Header = R }
 end Http

@@ -14,6 +14,22 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright 2021 Henry Story
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package run.cosy.akka.http.headers
 
 import _root_.akka.http.scaladsl.model.headers.{CustomHeader, RawHeader}
@@ -22,7 +38,7 @@ import cats.parse.Parser
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.headers.Encoding.UnicodeString
 import run.cosy.akka.http.headers.{BetterCustomHeader, BetterCustomHeaderCompanion}
-import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, SignatureInputMatcher}
+import run.cosy.http.auth.{HTTPHeaderParseException, InvalidSigException, ParsingExc}
 import run.cosy.http.headers.*
 import run.cosy.http.headers.Rfc8941.{
   IList,
@@ -73,12 +89,12 @@ object `Signature-Input`
           parse(h.value).toOption
         case _ => None
 
-   def parse(value: String): Try[SigInputs] =
+   def parse(value: String): Either[ParsingExc, SigInputs] =
      Rfc8941.Parser.sfDictionary.parseAll(value) match
-        case Left(e) => Failure(HTTPHeaderParseException(e, value))
-        case Right(lm) => SigInputs(lm).toRight(
+        case Left(e) => Left(HTTPHeaderParseException(e, value))
+        case Right(lm) => SigInputs(lm).toRight {
             InvalidSigException(
               "Signature-Input Header Parses but data structure is not appropriate"
             )
-          ).toTry
+          }
 end `Signature-Input`

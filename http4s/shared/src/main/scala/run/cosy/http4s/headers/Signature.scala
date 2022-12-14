@@ -18,7 +18,7 @@ package run.cosy.http4s.headers
 
 import org.http4s.{Header, ParseFailure, ParseResult}
 import org.http4s.util.{Renderer, Writer}
-import run.cosy.http.headers.{Rfc8941, SigInputs, Signatures}
+import run.cosy.http.headers.{Rfc8941, SigInputs, SignatureMatcher, Signatures}
 import org.typelevel.ci.*
 import run.cosy.http.Http
 import run.cosy.http4s.Http4sTp
@@ -28,7 +28,7 @@ import run.cosy.http4s.Http4sTp
   */
 case class Signature(signatures: Signatures)
 
-object Signature extends run.cosy.http.auth.SignatureMatcher[Http4sTp.type]:
+object Signature extends SignatureMatcher[Http4sTp.type]:
    def parse(s: String): ParseResult[Signature] =
      for
         dict <- util.fromParser(Rfc8941.Parser.sfDictionary, "Invalid `Signature-Input` header")(

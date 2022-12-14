@@ -17,31 +17,37 @@
 package run.cosy.akka.http
 
 import akka.http.scaladsl.model
-import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.headers.RawHeader
-import run.cosy.http.{Http, HttpOps}
-import akka.http.scaladsl.model as ak
+import akka.http.scaladsl.model.{HttpHeader, HttpMessage, HttpRequest, HttpResponse}
+import cats.Id
 import cats.effect.IO
+import run.cosy.http.headers.{SignatureInputMatcher, SignatureMatcher}
+import run.cosy.http.{Http, HttpOps}
 
 object AkkaTp extends Http:
-   override type Message[F[_]]  = model.HttpMessage
-   override type Request[F[_]]  = model.HttpRequest
-   override type Response[F[_]] = model.HttpResponse
-   override type Header         = model.HttpHeader
+   override type F[A]     = cats.Id[A]
+   override type Message  = model.HttpMessage
+   override type Request  = model.HttpRequest
+   override type Response = model.HttpResponse
+   override type Header   = model.HttpHeader
 
-   given Conversion[model.HttpRequest, Http.Request[IO, HT]] with
-      def apply(req: HttpRequest): Http.Request[IO, HT] = req.asInstanceOf[Http.Request[IO, HT]]
-   given Conversion[model.HttpResponse, Http.Response[IO, HT]] with
-      def apply(req: HttpResponse): Http.Response[IO, HT] = req.asInstanceOf[Http.Response[IO, HT]]
+//   given Conversion[model.HttpRequest, Http.Request[IO, HT]] with
+//      def apply(req: HttpRequest): Http.Request[IO, HT] = req.asInstanceOf[Http.Request[IO, HT]]
+//   given Conversion[model.HttpResponse, Http.Response[IO, HT]] with
+//      def apply(req: HttpResponse): Http.Response[IO, HT] = req.asInstanceOf[Http.Response[IO, HT]]
 
    given hOps: HttpOps[HT] with
 
-      extension [F[_]](msg: Http.Message[F, HT])
-        def headers: Seq[Http.Header[HT]] =
-           val m = msg.asInstanceOf[ak.HttpMessage]
+      extension (msg: Http.Message[HT])
+        def headerSeq: Seq[Http.Header[HT]] =
+           val m = msg.asInstanceOf[model.HttpMessage]
            m.headers
 
-      extension [F[_], R <: Http.Message[F, HT]](msg: R)
+      override val Signature: SignatureMatcher[HT] = run.cosy.akka.http.headers.Signature
+      override val `Signature-Input`: SignatureInputMatcher[HT] =
+        run.cosy.akka.http.headers.`Signature-Input`
+
+      extension [R <: Http.Message[HT]](msg: R)
          def addHeaders(headers: Seq[Http.Header[HT]]): R =
             // don't know how to get rid of the  asInstanceOf
             val m      = msg.asInstanceOf[HttpMessage]
@@ -53,7 +59,7 @@ object AkkaTp extends Http:
             m.withHeaders(m.headers.prepended(RawHeader(name, value))).asInstanceOf[R]
 
          def removeHeader(name: String): R =
-            val m = msg.asInstanceOf[ak.HttpMessage]
+            val m = msg.asInstanceOf[model.HttpMessage]
             m.removeHeader(name).asInstanceOf[R]
 
          def headerValue(name: String): Option[String] =

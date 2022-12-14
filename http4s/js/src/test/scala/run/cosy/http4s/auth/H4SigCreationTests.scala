@@ -17,30 +17,26 @@
 package run.cosy.http4s.auth
 
 import bobcats.Verifier
-import cats.MonadError
-import cats.effect.{IO, Sync, SyncIO}
-import run.cosy.http.HttpOps
-import run.cosy.http.auth.SignatureTests.specRequestSigs
-import run.cosy.http.auth.*
+import cats.effect.{IO, SyncIO}
+import run.cosy.http.auth.{RunPlatform, SigSuiteHelpers, SigVerifier}
 import run.cosy.http.messages.*
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
-given ServerContext = ServerContext("bblfish.net", true)
-given ReqFns[HT]    = new SelectorFnsH4
+//todo: this double use of "using" is really not good
+class JS_H4SigCreationTests extends run.cosy.http.auth.SigCreationTest[HT](
+      Http4sMsgInterpreter,
+      new ReqSelectors(using new SelectorFnsH4(using ServerContext("bblfish.net", true)))
+    ):
+   given ME: cats.effect.Sync[IO] = IO.asyncForIO
 
-class H4VerifySigTests extends VerifySignatureTests(Http4sMsgInterpreter):
-   override val thisPlatform: RunPlatform = RunPlatform.JVM
-   val msgSig: MessageSignature[HT]       = new MessageSignature[HT]
+   override val thisPlatform: RunPlatform = RunPlatform.BrowserJS
 
-   import Http4sTp.given
-   given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
-   given V: bobcats.Verifier[SyncIO]  = Verifier.forSync[SyncIO]
-   val signaturesDB                   = new SigSuiteHelpers[SyncIO]
+   given V: bobcats.Verifier[IO] = Verifier.forAsync[IO]
 
    val selectorDB: ReqComponentDB[HT] = ReqComponentDB(new ReqSelectors[HT], HeaderIds.all)
 
    // needed for testing signatures
 
-   testSignatures(specRequestSigs, SigVerifier(selectorDB, signaturesDB.keyidFetcher))
+   testSignatures[IO](signingTests, SigVerifier(selectorDB, signaturesDB[IO].keyidFetcher))

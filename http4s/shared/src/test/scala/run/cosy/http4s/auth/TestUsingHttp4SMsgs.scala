@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package run.cosy.http4s.messages
+package run.cosy.http4s.auth
 
 import cats.effect.{IO, SyncIO}
 import munit.CatsEffectSuite
@@ -34,8 +34,10 @@ import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.SelectorFnsH4
 
-/** We need to have a few basic examples made for people who would be overwhelmingly using one
-  * framework, and then need to add a signature to the header.
+/** We need to have a few basic examples/tests made to make sure that the overwhelming majority of
+  * people using the http4s framework, can use our library just for the signing functionality,
+  * without having to jump through too many hoops. So here we just test adding a signature to a
+  * request.
   */
 class TestUsingHttp4SMsgs extends CatsEffectSuite:
    import run.cosy.http4s.Http4sTp.given
@@ -55,8 +57,7 @@ class TestUsingHttp4SMsgs extends CatsEffectSuite:
        h4.Uri.unsafeFromString("/card"),
        headers = h4.Headers(h4.headers.Accept(org.http4s.MediaType.application.`rdf+xml`))
      )
-     val testkeyrsa = Rfc8941.SfString("test-key-rsa")
-     signaturesDB.signerFor(testkeyrsa).flatMap { (singFn: SigningF[IO]) =>
+     signaturesDB.signerFor("test-key-rsa").flatMap { (singFn: SigningF[IO]) =>
         val newReqIO: IO[Http.Request[HT]] = req.withSigInput[IO](
           Rfc8941.Token("sig1"),
           ReqSigInput(

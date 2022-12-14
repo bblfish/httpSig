@@ -18,8 +18,8 @@ package run.cosy.http.auth
 
 import _root_.run.cosy.http.Http.*
 import _root_.run.cosy.http.auth.Agent
-import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.headers.*
+import _root_.run.cosy.http.headers.Rfc8941.*
 import _root_.run.cosy.http.messages.{ReqComponentDB, RequestSelector, `@signature-params`}
 import _root_.run.cosy.http.{Http, HttpOps}
 import cats.MonadError
@@ -44,13 +44,129 @@ object MessageSignature:
    type SignatureVerifier[F[_], A] = (SigningString, Signature) => F[A]
    type SigningF[F[_]]             = SigningString => F[Signature]
 
+   /** return the sigbase given the request selectors and the corresponding @signature-params
+     * string.
+     */
+   protected def sigBaseFn[H <: Http](
+       req: Http.Request[H],
+       selectors: List[RequestSelector[H]],
+       sigParamStr: String
+   ): Either[ParsingExc, List[String]] =
+     selectors.foldM(List(sigParamStr)) { (lst, selector) =>
+       selector.signingStr(req).map(_ :: lst)
+     }
+
+   def sigBase[H <: Http](
+       req: Http.Request[H],
+       sigIn: ReqSigInput[H]
+   ): Either[ParsingExc, SigningString] =
+     for
+        lines <- sigBaseFn(req, sigIn.selectors.reverse, sigIn.toString)
+        bytes <- ByteVector.encodeAscii(lines.mkString("\n"))
+          .leftMap(ce =>
+            CharacterCodingExc(
+              "should never happen when called using ReqSigInput" + ce.getMessage.nn
+            )
+          )
+     yield bytes
+
+   /** get the signature data for a given signature name eg `sig1` from the headers.
+     *
+     * <pre> Signature-Input: sig1=("@authority" "content-type")\
+     * ;created=1618884475;keyid="test-key-rsa-pss" Signature:
+     * sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvu...: </pre>
+     *
+     * @return
+     *   a pair of SigInput Data, and the signature bytes The SigInput Data tells us what the
+     *   signature bytes are a signature of and how to interpret them, i.e. what the headers are
+     *   that were signed, where the key is and what the signing algorithm used was
+     */
+   def getSignature[H <: Http](req: Http.Request[H], name: Rfc8941.Token)(
+       using hops: HttpOps[H]
+   ): Option[(SigInput, ByteVector)] =
+      import hops.{`Signature-Input`, Signature}
+      req.headerSeq.collectFirst {
+        case `Signature-Input`(inputs) if inputs.si.contains(name) =>
+          inputs.si(name)
+      }.flatMap { siginput =>
+        req.headerSeq.collectFirst {
+          case Signature(sigs) if sigs.sigmap.contains(name) =>
+            (siginput, sigs.sigmap(name).item)
+        }
+      }
+
+   /** Generate a function to create a new HttpRequest with the given Signature-Input header. Called
+     * by the client that is building the message.
+     *
+     * @param name
+     *   the name of the signature todo: this should probably be done by the code, as it will depend
+     *   on other signatures present in the header
+     * @param sin
+     *   header describing the headers to sign as per "Signing Http Messages" RFC
+     * @return
+     *   a function to create a new HttpRequest when given signing function wrapped in a F the F can
+     *   capture an IllegalArgumentException if the required headers are not present in the request
+     *
+     * todo: why does it require meF to be a MonadError of a Throwable? MonadError[F, Exception]
+     * does not compile...
+     */
+   def withSigInput[F[_], H <: Http](
+       req: Http.Request[H],
+       name: Rfc8941.Token,
+       sin: ReqSigInput[H],
+       signerF: SigningF[F]
+   )(using
+       meF: MonadError[F, Throwable],
+       hOps: HttpOps[H]
+   ): F[Http.Request[H]] =
+      import hOps.{`Signature-Input`, Signature}
+      for
+         toSignBytes <- meF.fromEither(sigBase(req, sin))
+         signature   <- signerF(toSignBytes)
+      yield req.addHeaders(Seq(
+        `Signature-Input`(name, SigInput(sin)),
+        Signature(Signatures(name, signature))
+      ))
+   end withSigInput
+
+   /** Generate the signature string, given the `signature-input` header. Note, that the headers to
+     * be signed, always contains the `signature-input` header itself.
+     *
+     * @param sigInput
+     *   the sigInput header specifying the
+     * @return
+     *   signing String for given Signature Input on this http message. This string will either need
+     *   to be verified with a public key against the given one, or will need to be signed to be
+     *   added to the Request. In the latter case use the withSigInput method. todo: it may be more
+     *   correct if the result is a byte array, rather than a Unicode String.
+     */
+   def signatureBase[H <: Http](
+       req: Http.Request[H],
+       sigInput: SigInput,
+       selectorDB: ReqComponentDB[H]
+   ): Either[ParsingExc, SigningString] =
+      val xl: Either[ParsingExc, List[RequestSelector[H]]] = sigInput.headerItems
+        .foldLeftM(List[RequestSelector[H]]()) { (lst, pih) =>
+          selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
+        }
+      for
+         list <- xl
+         sigParamStr =
+           s""""@signature-params": (${list.reverse.map(s => s.identifier).mkString(" ")})"""
+         baseList <- sigBaseFn(req, list, sigParamStr)
+         bytes <- ByteVector.encodeAscii(
+           baseList.mkString("\n") + `@signature-params`.paramStr(sigInput)
+         ).leftMap(ce => CharacterCodingExc(ce.getMessage.nn))
+      yield bytes
+   end signatureBase
+
 /** Adds extensions methods to sign HttpMessage-s - be they requests or responses.
   *
   * Note!! We have a number of closely related but independent functors. In order to help
   * distinguish them I will use the following naming conventions:
   *
-  *   - `FH[_]` tied to `Http`` type (this may be important for reading header trailers that appear
-  *     at the end of a header)
+  *   - The `F[_]` tied inside `Http`` type (this may be important for reading header trailers that
+  *     appear at the end of a header)
   *     - Http4s requires `FH : Async`` ( I think)
   *     - Akka the type is actually `akka.stream.scaladsl.Source`
   *   - `F[_]` for fetching key data info (this really has to be Async)
@@ -64,89 +180,6 @@ object MessageSignature:
   */
 class MessageSignature[H <: Http](using ops: HttpOps[H]):
 
-   /** return the sigbase given the request selectors and the corresponding @signature-params
-     * string.
-     */
-   protected def sigBaseFn(
-       req: Http.Request[H],
-       selectors: List[RequestSelector[H]],
-       sigParamStr: String
-   ): Either[ParsingExc, List[String]] =
-     selectors.foldM(List(sigParamStr)) { (lst, selector) =>
-       selector.signingStr(req).map(_ :: lst)
-     }
-
-     /** Signature Verifier builds a function to verify a given signature on a request. It takes
-       *   - a database of message and header selectors,
-       *   - and a function that from a keyId can fetch the verification function (built out of
-       *     public and private key info) return an Authenticated Agent of type A
-       *
-       * In a server setup, the function to fetch the keyId is going to be very stable, and related
-       * to the particular protocol defined, so it makes more sense to have an object that
-       * encompasses that function, can be named, and re-used. After that the HttpSig (id) really
-       * depends on the request (it should be taken from the particular request) and the time
-       * depends on the event of the httprequest arriving, so they will be variable.
-       *
-       * Todo: signature verification should be a class by itself, as one may want to use it without
-       * generating signatures.
-       *
-       * @param fetchKeyId
-       *   function taking a keyId and returning a Verifier function that can verify a signature
-       *   using the public or symmetric key info from that keyId.
-       * @tparam F
-       *   The context to fetch the key. Something like Future or IO
-       * @tparam A
-       *   The type of agent returned by the successful verification. (placing this inside context F
-       *   should allow the agent A to be constructed only on verification of key material)
-       */
-   case class SigVerifier[F[_], A](
-       selectorDB: ReqComponentDB[H],
-       fetchKeyId: Rfc8941.SfString => F[SignatureVerifier[F, A]]
-   )(using ME: MonadError[F, Throwable]):
-      // while refactoring we need to use the extension function below
-      given ReqComponentDB[H] = selectorDB
-
-      /** Verify that the signature Id in the request is valid
-        *
-        * @param req
-        *   The request on which to check the function
-        * @param now
-        *   the current time to check the signature validity at
-        * @param sigId
-        *   the id of the signature to find in the request (taken from the Authorization header for
-        *   example)
-        * @return
-        *   a verified Agent Id `A` after
-        *   1. find the signature input data in the req (no need to continue if that is not there)
-        *   1. verify the signature is still valid given the time
-        *   1. build the signature base from the request
-        *   1. if all that is good, use `fetchKeyId` to construct the needed verifier from the sigId
-        *      (fetch public key info)
-        *   1. Verify this Request message, and if verified return the Agent object A
-        * @return
-        */
-      def apply(req: Http.Request[H], now: FiniteDuration, sigId: HttpSig): F[A] =
-        for
-           (si: SigInput, sig: Bytes) <- ME.fromOption(
-             req.getSignature(sigId.proofName),
-             InvalidSigException(
-               s"could not find Signature-Input and Signature for Sig name '${sigId.proofName}'"
-             )
-           )
-           sigStr <-
-             if si.isValidAt(now)
-             then ME.fromEither(req.signatureBase(si))
-             else
-                ME.fromEither(
-                  Left(InvalidSigException(s"Signature no longer valid at $now"))
-                ) // todo exception tuning
-           keyId <- ME.fromOption(si.keyid, KeyIdException("keyId missing or badly formatted"))
-           signatureVerificiationFn <- fetchKeyId(keyId)
-           agent                    <- signatureVerificiationFn(sigStr, sig)
-        yield agent
-
-   end SigVerifier
-
    import Http.*
    import MessageSignature.*
    import bobcats.Verifier.{Signature, SigningString}
@@ -155,98 +188,23 @@ class MessageSignature[H <: Http](using ops: HttpOps[H]):
    val urlStrRegex = "<(.*)>".r
 
    extension (req: Http.Request[H])(using selectorDB: ReqComponentDB[H])
-
-      /** Generate the signature string, given the `signature-input` header. Note, that the headers
-        * to be signed, always contains the `signature-input` header itself.
-        *
-        * @param sigInput
-        *   the sigInput header specifying the
-        * @return
-        *   signing String for given Signature Input on this http message. This string will either
-        *   need to be verified with a public key against the given one, or will need to be signed
-        *   to be added to the Request. In the latter case use the withSigInput method. todo: it may
-        *   be more correct if the result is a byte array, rather than a Unicode String.
-        */
-      def signatureBase(sigInput: SigInput): Either[ParsingExc, SigningString] =
-         val xl: Either[ParsingExc, List[RequestSelector[H]]] = sigInput.headerItems
-           .foldLeftM(List[RequestSelector[H]]()) { (lst, pih) =>
-             selectorDB.get(pih.item.asciiStr, pih.params).map(_ :: lst)
-           }
-         for
-            list <- xl
-            sigParamStr =
-              s""""@signature-params": (${list.reverse.map(s => s.identifier).mkString(" ")})"""
-            baseList <- sigBaseFn(req, list, sigParamStr)
-            bytes <- ByteVector.encodeAscii(
-              baseList.mkString("\n") + `@signature-params`.paramStr(sigInput)
-            ).leftMap(ce => CharacterCodingExc(ce.getMessage.nn))
-         yield bytes
-      end signatureBase
+     def signatureBase(sigInput: SigInput): Either[ParsingExc, SigningString] =
+       MessageSignature.signatureBase(req, sigInput, selectorDB)
 
    extension (req: Http.Request[H])
 
-      def sigBase(sigIn: ReqSigInput[H]): Either[ParsingExc, SigningString] =
-        for
-           lines <- sigBaseFn(req, sigIn.selectors.reverse, sigIn.toString)
-           bytes <- ByteVector.encodeAscii(lines.mkString("\n"))
-             .leftMap(ce =>
-               CharacterCodingExc(
-                 "should never happen when called using ReqSigInput" + ce.getMessage.nn
-               )
-             )
-        yield bytes
+      inline def sigBase(sigIn: ReqSigInput[H]): Either[ParsingExc, SigningString] =
+        MessageSignature.sigBase(req, sigIn)
 
-      /** get the signature data for a given signature name eg `sig1` from the headers.
-        *
-        * <pre> Signature-Input: sig1=("@authority" "content-type")\
-        * ;created=1618884475;keyid="test-key-rsa-pss" Signature:
-        * sig1=:KuhJjsOKCiISnKHh2rln5ZNIrkRvu...: </pre>
-        *
-        * @return
-        *   a pair of SigInput Data, and the signature bytes The SigInput Data tells us what the
-        *   signature bytes are a signature of and how to interpret them, i.e. what the headers are
-        *   that were signed, where the key is and what the signing algorithm used was
-        */
-      def getSignature(name: Rfc8941.Token): Option[(SigInput, ByteVector)] =
-        req.headerSeq.collectFirst {
-          case `Signature-Input`(inputs) if inputs.si.contains(name) =>
-            inputs.si(name)
-        }.flatMap { siginput =>
-          req.headerSeq.collectFirst {
-            case Signature(sigs) if sigs.sigmap.contains(name) =>
-              (siginput, sigs.sigmap(name).item)
-          }
-        }
+      inline def getSignature(name: Rfc8941.Token): Option[(SigInput, ByteVector)] =
+        MessageSignature.getSignature(req, name)
 
-      /** Generate a function to create a new HttpRequest with the given Signature-Input header.
-        * Called by the client that is building the message.
-        *
-        * @param name
-        *   the name of the signature todo: this should probably be done by the code, as it will
-        *   depend on other signatures present in the header
-        * @param sin
-        *   header describing the headers to sign as per "Signing Http Messages" RFC
-        * @return
-        *   a function to create a new HttpRequest when given signing function wrapped in a F the F
-        *   can capture an IllegalArgumentException if the required headers are not present in the
-        *   request
-        *
-        * todo: why does it require meF to be a MonadError of a Throwable? MonadError[F, Exception]
-        * does not compile...
-        */
-      def withSigInput[F[_]](
+      inline def withSigInput[F[_]](
           name: Rfc8941.Token,
           sin: ReqSigInput[H],
           signerF: SigningF[F]
       )(using meF: MonadError[F, Throwable]): F[Http.Request[H]] =
-        for
-           toSignBytes <- meF.fromEither(req.sigBase(sin))
-           signature   <- signerF(toSignBytes)
-        yield req.addHeaders(Seq(
-          `Signature-Input`(name, SigInput(sin)),
-          Signature(Signatures(name, signature))
-        ))
-      end withSigInput
+        MessageSignature.withSigInput(req, name, sin, signerF)
 
 //   /* needed for request-response dependencies */
 //   extension [F[_]](response: Response[F, H])(using

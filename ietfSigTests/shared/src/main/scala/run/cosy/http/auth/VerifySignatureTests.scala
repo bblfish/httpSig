@@ -42,7 +42,7 @@ trait VerifySignatureTests[H <: Http](
    * */
    def testSignatures[F[_]](
        sigs: List[SignatureTest],
-       verify: MessageSignature[H]#SigVerifier[F, KeyIdentified]
+       verify: SigVerifier[F, KeyIdentified, H]
    )(using ME: MonadError[F, Throwable]): Unit =
       import scala.util.control.NonLocalReturns.*
       sigs.zipWithIndex.foreach { (testSig, i) =>

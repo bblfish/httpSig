@@ -19,7 +19,13 @@ package run.cosy.http4s.auth
 import bobcats.Verifier
 import cats.effect.{Async, IO, kernel}
 import run.cosy.http.auth.SignatureTests.specRequestSigs
-import run.cosy.http.auth.{MessageSignature, RunPlatform, SigSuiteHelpers, VerifySignatureTests}
+import run.cosy.http.auth.{
+  MessageSignature,
+  RunPlatform,
+  SigSuiteHelpers,
+  SigVerifier,
+  VerifySignatureTests
+}
 import run.cosy.http.messages.*
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
@@ -40,4 +46,4 @@ class H4VerifySigTests extends VerifySignatureTests[HT](Http4sMsgInterpreter):
 
    val selectorDB: ReqComponentDB[HT] = ReqComponentDB(new ReqSelectors[HT], HeaderIds.all)
 
-   testSignatures(specRequestSigs, msgSig.SigVerifier(selectorDB, signaturesDB.keyidFetcher))
+   testSignatures[IO](specRequestSigs, SigVerifier(selectorDB, signaturesDB.keyidFetcher))

@@ -124,7 +124,7 @@ object SigInput:
    /* this will always succeed */
    def apply(sigIn: ReqSigInput[?]): SigInput =
       val pitems: List[PItem[SfString]] = sigIn.selectors.map { sel =>
-        new PItem(SfString(sel.name.lcname), sel.params)
+        new PItem(SfString(sel.name.specName), sel.params)
       }
       val params: ListMap[Token, Item] =
          val lmb = ListMap.newBuilder[Token, Item]

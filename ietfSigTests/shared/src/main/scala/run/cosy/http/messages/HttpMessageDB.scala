@@ -105,7 +105,8 @@ object HttpMessageDB:
         |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
         |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
         |Content-Length: 18
-     """)
+        |
+        |{"hello": "world"}""".rfc8792single)
      
    val `2.4_Req_Ex` = RequestStr(
      """POST /foo?param=Value&Pet=dog HTTP/1.1

@@ -16,33 +16,27 @@
 
 package run.cosy.http.auth
 
-import cats.effect.{IO, Sync, SyncIO}
-import cats.{Id, MonadError}
 import bobcats.Verifier
+import cats.effect.{IO, SyncIO}
 import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
-import run.cosy.http.auth.SignatureTests.specRequestSigs
-import run.cosy.http.auth.VerifySignatureTests
+import run.cosy.akka.http.messages.{RequestSelectorFnsAkka, SelectorAkka}
+import run.cosy.http.auth.{RunPlatform, SigSuiteHelpers, SigVerifier}
 import run.cosy.http.messages.*
-import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext = ServerContext("bblfish.net", true)
-given ReqFns[HT]    = new RequestSelectorFnsAkka
-import scala.concurrent.Future
-
-class AkkaVerifySigTests extends VerifySignatureTests[HT](AkkaMsgInterpreter):
-   override val thisPlatform: RunPlatform = RunPlatform.JVM
-   val msgSig: MessageSignature[HT]       = new MessageSignature[HT]
-
-   import AkkaTp.given
-
+//todo: this double use of "using" is really not good
+class AkkaSigCreationTests extends SigCreationTest[HT](
+      AkkaMsgInterpreter,
+      new ReqSelectors(using new RequestSelectorFnsAkka(using ServerContext("bblfish.net", true)))
+    ):
    given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
-   given V: bobcats.Verifier[SyncIO]  = Verifier.forSync[SyncIO]
-   val signaturesDB                   = new SigSuiteHelpers[SyncIO]
+
+   override val thisPlatform: RunPlatform = RunPlatform.JVM
+
+   given V: bobcats.Verifier[SyncIO] = Verifier.forSync[SyncIO]
 
    val selectorDB: ReqComponentDB[HT] = ReqComponentDB(new ReqSelectors[HT], HeaderIds.all)
 
-   testSignatures[SyncIO](
-     specRequestSigs,
-     SigVerifier(selectorDB, signaturesDB.keyidFetcher)
-   )
+   // needed for testing signatures
+
+   testSignatures[IO](signingTests, SigVerifier(selectorDB, signaturesDB[IO].keyidFetcher))

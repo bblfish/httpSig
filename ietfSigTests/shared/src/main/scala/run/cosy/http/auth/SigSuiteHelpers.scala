@@ -91,9 +91,9 @@ class SigSuiteHelpers[F[_]](using
              )
          case x => ME.fromEither(Left(new Exception(s"can't get info on sig $x")))
 
-   def signerFor(keyId: Rfc8941.SfString): F[SigningF[F]] =
+   def signerFor(keyId: String): F[SigningF[F]] =
       import bobcats.AsymmetricKeyAlg as Asym
-      keyId.asciiStr match
+      keyId match
          case "test-key-rsa-pss" =>
            S.build(rsaPSSPrivKey, Asym.`rsa-pss-sha512`)
          case "test-key-rsa"      => S.build(rsaPrivKey, Asym.`rsa-v1_5-sha256`)

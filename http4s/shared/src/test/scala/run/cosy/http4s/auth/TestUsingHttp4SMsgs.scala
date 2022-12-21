@@ -45,7 +45,7 @@ class TestUsingHttp4SMsgs extends CatsEffectSuite:
    import msgSig.*
    import Http4sTp.{*, given}
 
-   given ServerContext = ServerContext("bblfish.net", true)
+   given AServerContext = AServerContext("bblfish.net", true)
 
    given ReqFns[HT] = new SelectorFnsH4
    val sel          = new ReqSelectors[HT]

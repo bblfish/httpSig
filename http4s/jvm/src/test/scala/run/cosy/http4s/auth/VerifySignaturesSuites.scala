@@ -27,8 +27,8 @@ import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
-given ServerContext = ServerContext("bblfish.net", true)
-given ReqFns[HT]    = new SelectorFnsH4
+given AServerContext = AServerContext("bblfish.net", true)
+given ReqFns[HT]     = new SelectorFnsH4
 
 class H4VerifySigTests extends VerifySignatureTests(Http4sMsgInterpreter):
    override val thisPlatform: RunPlatform = RunPlatform.JVM

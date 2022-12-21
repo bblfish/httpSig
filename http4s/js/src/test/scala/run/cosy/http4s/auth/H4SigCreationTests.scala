@@ -27,7 +27,7 @@ import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 //todo: this double use of "using" is really not good
 class JS_H4SigCreationTests extends run.cosy.http.auth.SigCreationTest[HT](
       Http4sMsgInterpreter,
-      new ReqSelectors(using new SelectorFnsH4(using ServerContext("bblfish.net", true)))
+      new ReqSelectors(using new SelectorFnsH4(using AServerContext("bblfish.net", true)))
     ):
    given ME: cats.effect.Sync[IO] = IO.asyncForIO
 

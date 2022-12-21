@@ -31,8 +31,8 @@ import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.{Http4sMsgInterpreter, SelectorFnsH4}
 
-given ServerContext = ServerContext("bblfish.net", true)
-given ReqFns[HT]    = new SelectorFnsH4
+given AServerContext = AServerContext("bblfish.net", true)
+given ReqFns[HT]     = new SelectorFnsH4
 
 // to get this to work, we need to first work out how to generically switch between IO and SyncIO
 class H4VerifySigTests extends VerifySignatureTests[HT](Http4sMsgInterpreter):

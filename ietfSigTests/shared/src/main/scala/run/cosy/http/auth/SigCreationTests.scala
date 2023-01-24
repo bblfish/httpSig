@@ -11,13 +11,12 @@ import run.cosy.http.headers.Rfc8941.SfString
 import run.cosy.http.headers.Rfc8941.Syntax.sf
 import run.cosy.http.headers.SigIn.{Created, Expires, KeyId}
 import run.cosy.http.headers.{HttpSig, ReqSigInput, Rfc8941, SigInputs}
-import run.cosy.http.messages.HeaderSelectors.LS
-import run.cosy.http.messages.HttpMessageDB.RequestStr
 import run.cosy.http.messages.*
+import run.cosy.http.messages.HeaderSelectors.{Dict, LS}
+import run.cosy.http.messages.HttpMessageDB.RequestStr
 import run.cosy.http.{Http, HttpOps}
 import scodec.bits.ByteVector
 
-import java.net.http.HttpRequest
 import java.nio.charset.CharacterCodingException
 import scala.concurrent.duration.{FiniteDuration, SECONDS}
 
@@ -100,6 +99,30 @@ trait SigCreationTest[H <: Http](
          )(created1, kid)
        )
      },
+     List(
+       SigningTest(
+         s"§4.3 Multiple Signatures",
+         DB.`4.3_POST_EnhancedByProxy`,
+         "proxy_sig",
+         ReqSigInput(
+           `signature_sf`(Dict(sf"sig1")),
+           `@authority`,
+           `forwarded`(LS)
+         )(
+           Created(1618884480L),
+           KeyId(sf"test-key-rsa"),
+           Alg(SigAlg.`rsa-v1_5-sha256`),
+           Expires(1618884540L)
+         ),
+         signature = """\
+            YvYVO11F+Q+N4WZNeBdjFKluswwE3vQ4cTXpBwEiMz2hwu0J+wSJLRhHlIZ1N83epfn\
+            KDxY9cbNaVlbtr2UOLkw5O5Q5M5yrjx3s1mgDOsV7fuItD6iDyNISCiKRuevl+M+TyY\
+            Bo10ubG83As5CeeoUdmrtI4G6QX7RqEeX0Xj/CYofHljr/dVzARxskjHEQbTztYVg4W\
+            D+LWo1zjx9w5fw26tsOMagfXLpDb4zb4/lgpgyNKoXFwG7c89KId5q+0BC+kryWuA35\
+            ZcQGaRPAz/NqzeKq/c7p7b/fmHS71fy1jOaFgWFmD+Z77bJLO8AVKuF0y2fpL3KUYHy\
+            ITQHOsA==""".rfc8792single
+       )
+     ),
      keyAlgos.toList.map { (kid, algo) =>
        SigningTest(
          s"§B.2 req ${kid.value.asciiStr} using ${algo.value}",
@@ -179,9 +202,10 @@ trait SigCreationTest[H <: Http](
            if testSig.signature != "" then
               test(s"$i verify ${testSig.msg} signature statically") {
                 newReqIO.map { req =>
-                   val x: Option[Either[CharacterCodingException, String]] =
-                     MessageSignature.getSignature(req, sigName).map(pair => pair._2.decodeAscii)
-                   assertEquals(x, Some(Right(testSig.signature)), req)
+                   val x: Option[String] =
+                     MessageSignature.getSignature(req, sigName).map{pair => 
+                      pair._2.toBase64 }
+                   assertEquals(x, Some(testSig.signature), req)
                 }
               }
            else

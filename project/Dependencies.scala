@@ -2,8 +2,6 @@ import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
 import sbt.{CrossVersion, Def, MavenRepository, ModuleID, Test, *}
 
 object Dependencies {
-  lazy val scalajsDom   = Def.setting("org.scala-js" %%% "scalajs-dom" % "2.0.0")
-  lazy val bananaRdfLib = Def.setting("net.bblfish.rdf" %%% "rdflibJS" % "0.9-SNAPSHOT")
 
   object tests {
     //	val utest = Def.setting("com.lihaoyi" %%% "utest" % "0.7.10")
@@ -19,6 +17,7 @@ object Dependencies {
     lazy val laws       = Def.setting("org.typelevel" %%% "cats-laws" % "2.7.0")
     lazy val scalaCheck = Def.setting("org.scalameta" %%% "munit-scalacheck" % "0.7.29")
   }
+
   lazy val modelJS = Def.setting("net.bblfish.rdf" %%% "rdf-model-js" % "0.1a-SNAPSHOT")
   // needed for modelJS
   lazy val sonatypeSNAPSHOT: MavenRepository =

@@ -203,49 +203,59 @@ object HttpMessageDB:
        |Host: example.com
        |Date: Tue, 20 Apr 2021 02:07:55 GMT
        |Content-Type: application/json
-       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
-       |  aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
        |Content-Length: 18
+       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+       |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
        |Signature-Input: sig1=("@method" "@authority" "@path" \
-       |  "content-digest" "content-length" "content-type")\
-       |  ;created=1618884473;keyid="test-key-rsa-pss"
-       |Signature:  sig1=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0\
-       |  RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8Br\
-       |  c8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINTEzpx\
-       |  jqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr65+BXe\
-       |  TG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZElYyUKaAI\
-       |  jZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:
+       |   "content-digest" "content-type" "content-length")\
+       |   ;created=1618884475;keyid="test-key-ecc-p256"
+       |Signature: sig1=:hNojB+wWw4A7SYF3qK1S01Y4UP5i2JZFYa2WOlMB4Np5iWmJSO\
+       |   0bDe2hrYRbcIWqVAFjuuCBRsB7lYQJkzbb6g==:
        |
        |{"hello": "world"}""".rfc8792single
    )
-
-   val `4.3_POST_With_Proxy` = RequestStr(
+   
+   val `4.3_POST_EnhancedByProxy` = RequestStr(
      """POST /foo?param=Value&Pet=dog HTTP/1.1
        |Host: origin.host.internal.example
        |Date: Tue, 20 Apr 2021 02:07:56 GMT
        |Content-Type: application/json
-       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
-       |  aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
        |Content-Length: 18
        |Forwarded: for=192.0.2.123
+       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+       |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
        |Signature-Input: sig1=("@method" "@authority" "@path" \
-       |    "content-digest" "content-length" "content-type")\
-       |    ;created=1618884475;keyid="test-key-rsa-pss", \
-       |  proxy_sig=("signature";key="sig1" "forwarded")\
-       |    ;created=1618884480;expires=1618884540;keyid="test-key-rsa"\
-       |    ;alg="rsa-v1_5-sha256"
-       |Signature:  sig1=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0\
-       |    RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8\
-       |    Brc8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINT\
-       |    EzpxjqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr\
-       |    65+BXeTG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZE\
-       |    lYyUKaAIjZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:, \
-       |  proxy_sig=:G1WLTL4/9PGSKEQbSAMypZNk+I2dpLJ6qvl2JISahlP31OO/QEUd8/\
-       |    HdO2O7vYLi5k3JIiAK3UPK4U+kvJZyIUidsiXlzRI+Y2se3SGo0D8dLfhG95bKr\
-       |    6ukYXl60QHpsGRTfSiwdtvYKXGpKNrMlISJYd+oGrGRyI9gbCy0aFhc6I/okIML\
-       |    eK4g9PgzpC3YTwhUQ98KIBNLWHgREfBgJxjPbxFlsgJ9ykPviLj8GKJ81HwsK3X\
-       |    M9P7WaS7fMGOt8h1kSqgkZQB9YqiIo+WhHvJa7iPy8QrYFKzx9BBEY6AwfStZAs\
-       |    XXz3LobZseyxsYcLJLs8rY0wVA9NPsxKrHGA==:
+       |   "content-digest" "content-type" "content-length")\
+       |   ;created=1618884475;keyid="test-key-ecc-p256"
+       |Signature: sig1=:hNojB+wWw4A7SYF3qK1S01Y4UP5i2JZFYa2WOlMB4Np5iWmJSO\
+       |   0bDe2hrYRbcIWqVAFjuuCBRsB7lYQJkzbb6g==:
+       |
+       |{"hello": "world"}""".rfc8792single
+   )
+
+   val `4.3_POST_With_Proxy_Sig` = RequestStr(
+     """POST /foo?param=Value&Pet=dog HTTP/1.1
+       |Host: origin.host.internal.example
+       |Date: Tue, 20 Apr 2021 02:07:56 GMT
+       |Content-Type: application/json
+       |Content-Length: 18
+       |Forwarded: for=192.0.2.123
+       |Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+T\
+       |   aPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+       |Signature-Input: sig1=("@method" "@authority" "@path" \
+       |     "content-digest" "content-type" "content-length")\
+       |     ;created=1618884475;keyid="test-key-ecc-p256", \
+       |   proxy_sig=("signature";key="sig1" "@authority" "forwarded")\
+       |     ;created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256"\
+       |     ;expires=1618884540
+       |Signature: sig1=:hNojB+wWw4A7SYF3qK1S01Y4UP5i2JZFYa2WOlMB4Np5iWmJSO\
+       |     0bDe2hrYRbcIWqVAFjuuCBRsB7lYQJkzbb6g==:, \
+       |   proxy_sig=:YvYVO11F+Q+N4WZNeBdjFKluswwE3vQ4cTXpBwEiMz2hwu0J+wSJLR\
+       |     hHlIZ1N83epfnKDxY9cbNaVlbtr2UOLkw5O5Q5M5yrjx3s1mgDOsV7fuItD6iDy\
+       |     NISCiKRuevl+M+TyYBo10ubG83As5CeeoUdmrtI4G6QX7RqEeX0Xj/CYofHljr/\
+       |     dVzARxskjHEQbTztYVg4WD+LWo1zjx9w5fw26tsOMagfXLpDb4zb4/lgpgyNKoX\
+       |     FwG7c89KId5q+0BC+kryWuA35ZcQGaRPAz/NqzeKq/c7p7b/fmHS71fy1jOaFgW\
+       |     FmD+Z77bJLO8AVKuF0y2fpL3KUYHyITQHOsA==:
        |
        |{"hello": "world"}""".rfc8792single
    )

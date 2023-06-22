@@ -24,7 +24,7 @@ import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT
 import run.cosy.http4s.messages.SelectorFnsH4
 
-given ServerContext              = ServerContext("bblfish.net", true)
+given AServerContext             = AServerContext("bblfish.net", true)
 given TestHttpMsgInterpreter[HT] = Http4sMsgInterpreter
 
 given ReqFns[HT] = new SelectorFnsH4

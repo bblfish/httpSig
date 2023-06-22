@@ -26,8 +26,8 @@ import run.cosy.http.auth.VerifySignatureTests
 import run.cosy.http.messages.*
 import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext = ServerContext("bblfish.net", true)
-given ReqFns[HT]    = new RequestSelectorFnsAkka
+given AServerContext = AServerContext("bblfish.net", true)
+given ReqFns[HT]     = new RequestSelectorFnsAkka
 import scala.concurrent.Future
 
 class AkkaVerifySigTests extends VerifySignatureTests[HT](AkkaMsgInterpreter):

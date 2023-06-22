@@ -17,30 +17,27 @@
 package run.cosy.http4s.messages
 
 import cats.data.NonEmptyList
-import run.cosy.http.messages.{
-  AtReqSelectorFns,
-  HeaderId,
-  ReqFns,
-  ResFns,
-  SelectorFn,
-  ServerContext
-}
 import org.http4s.headers.Host
 import org.http4s.{Query, Uri, Message as H4Message, Request as H4Request, Response as H4Response}
+import org.typelevel.ci.CIString
 import run.cosy.http.Http
+import run.cosy.http.auth.{
+  AttributeException,
+  ParsingExc,
+  SelectorException,
+  MissingContextException
+}
+import run.cosy.http.headers.Rfc8941
 import run.cosy.http.messages.Parameters.nameTk
+import run.cosy.http.messages.*
 import run.cosy.http4s.Http4sTp
 import run.cosy.http4s.Http4sTp.HT as H4
-import run.cosy.platform
-import run.cosy.http.headers.Rfc8941
-import run.cosy.http.auth.{AttributeException, ParsingExc, SelectorException}
 import run.cosy.http4s.messages.SelectorFnsH4.getHeaders
+import run.cosy.platform
 
-import scala.util.Try
-import scala.util.{Failure, Success}
-import org.typelevel.ci.CIString
+import scala.util.{Failure, Success, Try}
 
-class SelectorFnsH4(using sc: ServerContext) extends ReqFns[H4]:
+class SelectorFnsH4(using sc: ServerContext = NoServerContext) extends ReqFns[H4]:
    val SF = SelectorFnsH4
 
    override def method: RequestFn =
@@ -103,7 +100,7 @@ class SelectorFnsH4(using sc: ServerContext) extends ReqFns[H4]:
 
 end SelectorFnsH4
 
-class ResponseSelectorFnsH4(using sc: ServerContext) extends ResFns[H4]:
+class ResponseSelectorFnsH4(using sc: AServerContext) extends ResFns[H4]:
    val SF = SelectorFnsH4
 
    override def responseHeaders(name: HeaderId): ResponseFn = ResponseSelH4(res =>
@@ -125,19 +122,21 @@ object SelectorFnsH4:
         case None      => Left(SelectorException(s"no header in request named $name"))
         case Some(nel) => Right(nel)
 
-   def defaultAuthorityOpt(scheme: Option[Uri.Scheme])(
-       using sc: ServerContext
-   ): Option[Uri.Authority] = sc.defaultHost.map(h =>
-     Uri.Authority(
-       None,
-       Uri.RegName(h),
-       // we assume that if the ports are the default one then we have the corresponding security values
-       // otherwise we just don't know... (a bit awkward. It may be better to fail)
-       if sc.secure && sc.port == 443 then None
-       else if (!sc.secure) && sc.port == 80 then None
-       else Some(sc.port)
-     )
-   )
+   def defaultAuthorityOpt(using sc: ServerContext): Option[Uri.Authority] =
+     sc match
+        case NoServerContext => None
+        case asc: AServerContext =>
+          asc.defaultHost.map(h =>
+            Uri.Authority(
+              None,
+              Uri.RegName(h),
+              // we assume that if the ports are the default one then we have the corresponding security values
+              // otherwise we just don't know... (a bit awkward. It may be better to fail)
+              if asc.secure && asc.port == 443 then None
+              else if (!asc.secure) && asc.port == 80 then None
+              else Some(asc.port)
+            )
+          )
 
    def normaliseAuthority(auth: Uri.Authority, schema: Option[Uri.Scheme]): Uri.Authority =
      schema match
@@ -149,14 +148,15 @@ object SelectorFnsH4:
    def authorityFor[F[_]](req: H4Request[F])(using sc: ServerContext): Option[Uri.Authority] =
      req.uri.authority
        .map(a => normaliseAuthority(a, req.uri.scheme))
-       .orElse {
-         req.headers.get[Host]
-           .map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
-           .orElse(defaultAuthorityOpt(req.uri.scheme))
-       }
+       .orElse(req.headers.get[Host]
+         .map(h => Uri.Authority(None, Uri.RegName(h.host), h.port))
+         .orElse(defaultAuthorityOpt))
 
-   def defaultScheme(using sc: ServerContext): Uri.Scheme =
-     if sc.secure then Uri.Scheme.https else Uri.Scheme.http
+   def defaultScheme(using sc: ServerContext): Option[Uri.Scheme] =
+     sc match
+        case NoServerContext => None
+        case asc: AServerContext =>
+          Some(if asc.secure then Uri.Scheme.https else Uri.Scheme.http)
 
    def effectiveUriFor[F[_]](req: H4Request[F])(using
        sc: ServerContext
@@ -166,10 +166,10 @@ object SelectorFnsH4:
       then Right(uri)
       else
          val newUri = uri.copy(
-           scheme = uri.scheme.orElse(Some(defaultScheme)),
+           scheme = uri.scheme.orElse(defaultScheme),
            authority = authorityFor(req)
          )
-         if newUri.authority.isDefined
+         if newUri.authority.isDefined && newUri.scheme.isDefined
          then Right(newUri)
          else Left(SelectorException(s"cannot create effective Uri for req. Got: <$newUri>"))
    end effectiveUriFor

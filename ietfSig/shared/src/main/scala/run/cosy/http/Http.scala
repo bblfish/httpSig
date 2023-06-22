@@ -53,6 +53,8 @@ trait HttpOps[H <: Http]:
      def headerSeq: Seq[Http.Header[H]]
 
    extension [R <: Http.Message[H]](msg: R)
+      // add the headers without removing duplicates, this limits the useage
+      // of this lib outside of httpSig. (reason: see http4s implementation)
       def addHeaders(headers: Seq[Http.Header[H]]): R
       // here we do really add a header to existing ones.
       // note http4s

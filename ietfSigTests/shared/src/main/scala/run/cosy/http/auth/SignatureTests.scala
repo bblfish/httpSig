@@ -48,7 +48,7 @@ object SignatureTests:
         DB.`4.3_POST_Sig1`,
         "sig1",
         1618884475L,
-        "test-key-rsa-pss"
+        "test-key-ecc-p256"
       ),
       // this has an expiration date to test too.
       // see https://github.com/httpwg/http-extensions/issues/2347
@@ -61,7 +61,7 @@ object SignatureTests:
       //       ),
       SignatureTest(
         "Sig on request §4.3 enhanced by proxy with later valid date. Test proxy's sig.",
-        DB.`4.3_POST_With_Proxy`,
+        DB.`4.3_POST_With_Proxy_Sig`,
         "proxy_sig",
         1618884480L,
         "test-key-rsa"

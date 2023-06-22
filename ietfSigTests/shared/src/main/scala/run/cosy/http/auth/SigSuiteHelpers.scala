@@ -41,7 +41,7 @@ class SigSuiteHelpers[F[_]](using
          else
             ME.fromEither(
               Left(InvalidSigException(s"could not verify $keyId with ${keySpec.algorithm} " +
-                s"on >${signingStr.decodeAsciiLenient}<"))
+                s"on >${signingStr.toBase64}<"))
             )
        )
 

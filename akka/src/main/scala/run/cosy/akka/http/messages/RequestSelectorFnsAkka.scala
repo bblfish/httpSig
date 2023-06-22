@@ -17,6 +17,7 @@
 package run.cosy.akka.http.messages
 
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.Uri.Authority
 import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.settings.ParserSettings.ConflictingContentTypeHeaderProcessingMode.NoContentType
 import cats.Id
@@ -25,12 +26,7 @@ import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.http.Http
 import run.cosy.http.Http.{Request, Response}
-import run.cosy.http.auth.{
-  AttributeException,
-  HTTPHeaderParseException,
-  ParsingExc,
-  SelectorException
-}
+import run.cosy.http.auth.*
 import run.cosy.http.headers.Rfc8941.{Param, Params}
 import run.cosy.http.headers.{ParsingException, Rfc8941}
 import run.cosy.http.messages.*
@@ -39,7 +35,7 @@ import java.nio.charset.StandardCharsets
 import scala.collection.immutable.ListMap
 import scala.util.{Failure, Success, Try}
 
-class RequestSelectorFnsAkka(using sc: ServerContext)
+class RequestSelectorFnsAkka(using sc: ServerContext = NoServerContext)
     extends ReqFns[HT]:
 
    override val method: RequestFn =
@@ -48,11 +44,18 @@ class RequestSelectorFnsAkka(using sc: ServerContext)
    override val authority: RequestFn =
      RequestAkka { req =>
        try
-          Right(req.effectiveUri(
-            sc.secure,
-            sc.defaultHost.map(Host(_))
-              .getOrElse(Host.empty)
-          ).authority.toString().toLowerCase(java.util.Locale.ROOT).nn)
+          sc match
+             case NoServerContext =>
+               // we can arbitrarily have secured connection be true, because we will ignore it when selecting the host
+               val euri = req.effectiveUri(true, Host.empty)
+               // an exception will have been thrown above if not absolute uri
+               Right(euri.authority.toString())
+             case asc: AServerContext =>
+               Right(req.effectiveUri(
+                 asc.secure,
+                 asc.defaultHost.map(Host(_))
+                   .getOrElse(Host.empty)
+               ).authority.toString())
        catch
           case urlEx: IllegalUriException =>
             Left(
@@ -93,19 +96,41 @@ class RequestSelectorFnsAkka(using sc: ServerContext)
           case head :: tail => Right(NonEmptyList(head, tail))
      }
 
+   val schemes = List("https", "http")
    override val scheme: RequestFn =
      RequestAkka { req =>
-       Right(req.effectiveUri(
-         securedConnection = sc.secure,
-         defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
-       ).scheme)
+       if schemes.contains(req.uri.scheme) then Right(req.uri.scheme)
+       else
+          sc match
+             case NoServerContext => Left(
+                 MissingContextException("No scheme in Uri and no context information available")
+               )
+             case asc: AServerContext => Right(if asc.secure then "https" else "http")
      }
 
    override val targetUri: RequestFn = RequestAkka { req =>
-     Right(req.effectiveUri(
-       securedConnection = sc.secure,
-       defaultHostHeader = sc.defaultHost.map(Host(_)).getOrElse(Host.empty)
-     ).toString())
+     try
+        sc match
+           case NoServerContext =>
+             // the request has to be absolute, because even with Host header we won't know scheme
+             if !schemes.contains(req.uri.scheme) then
+                Left(MissingContextException(
+                  "No authority in request, and no context to fill in missing request"
+                ))
+             else
+                Right(req.effectiveUri(
+                  req.uri.scheme == "https",
+                  Host.empty
+                ).toString())
+           case asc: AServerContext =>
+             Right(req.effectiveUri(
+               asc.secure,
+               asc.defaultHost.map(Host(_))
+                 .getOrElse(Host.empty)
+             ).toString())
+     catch
+        case urlEx: IllegalUriException =>
+          Left(SelectorException("cannot calculate effectuve url for request. " + urlEx.getMessage))
    }
 
    case class RequestAkka(
@@ -116,7 +141,7 @@ class RequestSelectorFnsAkka(using sc: ServerContext)
 
 end RequestSelectorFnsAkka
 
-class ResponseSelectorFnsAkka(using sc: ServerContext)
+class ResponseSelectorFnsAkka(using sc: AServerContext)
     extends ResFns[HT]:
 
    override val status: ResponseFn = ResponseAkka { resp =>

@@ -27,7 +27,7 @@ import run.cosy.http.messages.*
 //todo: this double use of "using" is really not good
 class AkkaSigCreationTests extends SigCreationTest[HT](
       AkkaMsgInterpreter,
-      new ReqSelectors(using new RequestSelectorFnsAkka(using ServerContext("bblfish.net", true)))
+      new ReqSelectors(using new RequestSelectorFnsAkka(using AServerContext("bblfish.net", true)))
     ):
    given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
 

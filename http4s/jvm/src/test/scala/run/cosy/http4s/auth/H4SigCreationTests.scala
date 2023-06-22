@@ -24,7 +24,7 @@ import run.cosy.http.messages.{
   ReqComponentDB,
   ReqFns,
   ReqSelectors,
-  ServerContext,
+  AServerContext,
   TestHttpMsgInterpreter
 }
 import run.cosy.http4s.Http4sTp
@@ -35,7 +35,7 @@ import run.cosy.http4s.messages.SelectorFnsH4
 //todo: this double use of "using" is really not good
 class H4SigCreationTests extends run.cosy.http.auth.SigCreationTest[HT](
       Http4sMsgInterpreter,
-      new ReqSelectors(using new SelectorFnsH4(using ServerContext("bblfish.net", true)))
+      new ReqSelectors(using new SelectorFnsH4(using AServerContext("bblfish.net", true)))
     ):
    given ME: cats.effect.Sync[SyncIO] = SyncIO.syncForSyncIO
 

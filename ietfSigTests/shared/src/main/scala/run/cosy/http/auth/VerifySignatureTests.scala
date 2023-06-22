@@ -45,6 +45,7 @@ trait VerifySignatureTests[H <: Http](
        verify: SigVerifier[F, KeyIdentified, H]
    )(using ME: MonadError[F, Throwable]): Unit =
       import scala.util.control.NonLocalReturns.*
+      
       sigs.zipWithIndex.foreach { (testSig, i) =>
         if testSig.unsupported.contains(thisPlatform) then
            test(s"test sig $i ${testSig.msg} cannot be run on $thisPlatform".ignore) {}
@@ -52,7 +53,6 @@ trait VerifySignatureTests[H <: Http](
            val req: Request[H] = interpret.asRequest(testSig.reqStr)
 
            test(s"test sig $i before time on ${testSig.msg} fails") {
-
              verify(
                req,
                FiniteDuration(testSig.created - 10, duration.SECONDS),

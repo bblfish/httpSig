@@ -44,15 +44,15 @@ open class SigInputReqSuite[H <: Http](
          x.flatMap(s => s.decodeAscii),
          Right(
            """"@method": POST
-                  |"@authority": example.com
-                  |"@path": /foo
-                  |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
-                  |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
-                  |"content-length": 18
-                  |"content-type": application/json
-                  |"@signature-params": ("@method" "@authority" "@path" \
-                  |  "content-digest" "content-length" "content-type")\
-                  |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
+             |"@authority": example.com
+             |"@path": /foo
+             |"content-digest": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX\
+             |  +TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+             |"content-length": 18
+             |"content-type": application/json
+             |"@signature-params": ("@method" "@authority" "@path" \
+             |  "content-digest" "content-length" "content-type")\
+             |  ;created=1618884473;keyid="test-key-rsa-pss"""".rfc8792single
          )
        )
 

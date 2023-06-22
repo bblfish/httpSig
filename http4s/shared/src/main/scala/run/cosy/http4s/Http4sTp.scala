@@ -46,7 +46,7 @@ object Http4sTp extends Http:
       extension [R <: Http.Message[HT]](msg: R)
          def addHeaders(headers: Seq[Http.Header[HT]]): R =
             val m = msg.asInstanceOf[org.http4s.Message[F]]
-            m.withHeaders((m.headers ++ Headers(headers)))
+            m.withHeaders((m.headers.transform(l => l ++ headers)))
               .asInstanceOf[R]
 
          def addHeader(name: String, value: String): R =

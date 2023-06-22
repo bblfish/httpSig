@@ -21,7 +21,7 @@ import run.cosy.akka.http.AkkaTp
 import run.cosy.akka.http.AkkaTp.HT
 import run.cosy.akka.http.messages.RequestSelectorFnsAkka
 
-given ServerContext              = ServerContext("bblfish.net", true)
+given AServerContext             = AServerContext("bblfish.net", true)
 given TestHttpMsgInterpreter[HT] = AkkaMsgInterpreter //this needs the above
 
 given ReqFns[HT] = new RequestSelectorFnsAkka
@@ -31,8 +31,8 @@ class AkkaHeaderSelectorSuite extends HeaderSuite(
     )
 
 class AkkaAtRequestSelectorSuite extends AtRequestSelectorSuite[HT]:
-   def sel(using ServerContext): AtReqSelectors[HT] =
-     new AtReqSelectors[HT](using new RequestSelectorFnsAkka()) {}
+   def sel(sc: ServerContext): AtReqSelectors[HT] =
+     new AtReqSelectors[HT](using new RequestSelectorFnsAkka(using sc)) {}
    def interp: TestHttpMsgInterpreter[HT] = AkkaMsgInterpreter
    def platform: HttpMsgPlatform          = HttpMsgPlatform.Akka
 
